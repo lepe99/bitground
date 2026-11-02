@@ -6,7 +6,8 @@ import bit.bitgroundspring.common.error.ErrorCode;
 import bit.bitgroundspring.dto.OrderRequestDto;
 import bit.bitgroundspring.dto.response.OrderResponseDto;
 import bit.bitgroundspring.entity.*;
-import bit.bitgroundspring.event.OrderCreatedEvent;
+import bit.bitgroundspring.dto.TradeDto;
+import bit.bitgroundspring.event.TradeExecutedEvent;
 import bit.bitgroundspring.repository.*;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -146,7 +147,10 @@ public class TradeService {
                 .updatedAt(now)
                 .build();
         Order savedOrder = orderRepository.save(order);
-        eventPublisher.publishEvent(new OrderCreatedEvent(this, savedOrder));
+        // 커밋 후 실시간 체결 내역으로 방송
+        eventPublisher.publishEvent(new TradeExecutedEvent(new TradeDto(coin.getSymbol(), coin.getKoreanName(),
+                savedOrder.getOrderType(), savedOrder.getAmount(), savedOrder.getTradePrice(),
+                savedOrder.getCreatedAt(), savedOrder.getUpdatedAt())));
 
         return new OrderResponseDto(
                 order.getId(),

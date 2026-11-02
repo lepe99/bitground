@@ -3,6 +3,7 @@ package bit.bitgroundspring.service;
 import bit.bitgroundspring.aop.Loggable;
 import bit.bitgroundspring.common.error.BusinessException;
 import bit.bitgroundspring.common.error.ErrorCode;
+import bit.bitgroundspring.common.tx.AfterCommit;
 import bit.bitgroundspring.dto.*;
 import bit.bitgroundspring.dto.projection.OrderProjection;
 import bit.bitgroundspring.dto.response.Message;
@@ -13,14 +14,9 @@ import bit.bitgroundspring.repository.*;
 import bit.bitgroundspring.util.UserSseEmitters;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.dao.DataAccessException;
-import org.springframework.data.redis.core.RedisOperations;
-import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.data.redis.core.SessionCallback;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -35,7 +31,7 @@ public class OrderService {
 
     private final OrderRepository orderRepository;
     private final SeasonRepository seasonRepository;
-    private final RedisTemplate<String, Object> redisTemplate;
+    private final ReservedOrderBook orderBook;
     private final CoinRepository coinRepository;
     private final UserSseEmitters userSseEmitters;
     private final UserRepository userRepository;
@@ -185,7 +181,8 @@ public class OrderService {
         }
         
         Order savedOrder = orderRepository.save(order);
-        saveOrderToRedis(savedOrder, coin.getSymbol());
+        // 커밋된 주문만 체결 대기열에 올린다 (롤백되면 Redis에도 남지 않음)
+        AfterCommit.run(() -> orderBook.add(savedOrder));
         
         log.info("Created reserve order: {} for user: {}", savedOrder.getId(), savedOrder.getUser().getId());
         return savedOrder;
@@ -206,46 +203,11 @@ public class OrderService {
         }
     }
     
-    private void saveOrderToRedis(Order order, String symbol) {
-        try {
-            String orderId = String.valueOf(order.getId());
-
-            OrderRedisDto orderDto = OrderRedisDto.builder()
-                    .id(order.getId())
-                    .userId(order.getUser().getId())
-                    .symbolId(order.getCoin().getId())
-                    .symbol(symbol)
-                    .orderType(order.getOrderType())
-                    .amount(order.getAmount())
-                    .reservePrice(order.getReservePrice())
-                    .status(order.getStatus())
-                    .createdAt(order.getCreatedAt())
-                    .build();
-            
-            // 수정: 파이프라인 사용으로 성능 개선
-            redisTemplate.executePipelined(new SessionCallback<Object>() {
-                @Override
-                public Object execute(RedisOperations operations) throws DataAccessException {
-                    operations.opsForValue().set("order:" + orderId, orderDto, Duration.ofDays(30));
-
-                    String orderTypeKey = order.getOrderType() == OrderType.BUY ?
-                            "buy_orders:" + symbol : "sell_orders:" + symbol;
-                    operations.opsForZSet().add(orderTypeKey, orderId, order.getReservePrice());
-                    operations.expire(orderTypeKey, Duration.ofDays(30));
-                    
-                    return null;
-                }
-            });
-            
-        } catch (Exception e) {
-            log.error("Failed to save order to Redis: {}", order.getId(), e);
-            // 수정: 예외 발생해도 서비스 계속 진행
-        }
-    }
-    
+    @Transactional
     @Loggable("예약 주문 취소")
     public void cancelOrder(Integer orderId, Integer userId) {
-        Order order = orderRepository.findById(orderId)
+        // 체결과 동시에 처리되지 않도록 주문 행을 잠금 (체결이 먼저 끝났으면 아래에서 ORDER_NOT_PENDING)
+        Order order = orderRepository.findByIdForUpdate(orderId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.ORDER_NOT_FOUND));
         
         if (!order.getUser().getId().equals(userId)) {
@@ -257,55 +219,20 @@ public class OrderService {
         }
         
         orderRepository.delete(order);
-        
-        removeOrderFromRedis(order);
+        AfterCommit.run(() -> orderBook.remove(order));
         
         log.info("Cancelled order: {} by user: {}", orderId, userId);
     }
     
-    private void removeOrderFromRedis(Order order) {
-        try {
-            String orderId = String.valueOf(order.getId());
-            Integer symbolId = order.getCoin().getId();
-            String symbol = coinRepository.findById(symbolId)
-                    .map(Coin::getSymbol)
-                    .orElseThrow(() -> new BusinessException(ErrorCode.COIN_NOT_FOUND));
-            String orderTypeKey = order.getOrderType() == OrderType.BUY ?
-                    "buy_orders:" + symbol : "sell_orders:" + symbol;
-            
-            redisTemplate.execute(new SessionCallback<Object>() {
-                @Override
-                public Object execute(RedisOperations operations) throws DataAccessException {
-                    operations.multi();
-                    operations.opsForZSet().remove(orderTypeKey, orderId);
-                    operations.delete("order:" + orderId);
-                    return operations.exec();
-                }
-            });
-            
-        } catch (Exception e) {
-            log.error("Failed to remove order from Redis: {}", order.getId(), e);
-        }
-    }
-
     @Loggable("시즌 갱신")
     public void seasonUpdate(String seasonFlag) {
         // 대부분의 로직은 go serverless로 처리, 나머지 것들을 수행하자
 
         if (seasonFlag.equals("season")) {
-            // redis에 저장된 예약 주문 목록 제거
-            List<Order> pendingOrders = orderRepository.findByStatus(Status.PENDING);
-            if (pendingOrders.isEmpty()) {
-                log.info("No pending orders to process for season update");
-            }
-            for (Order order : pendingOrders) {
-                try {
-                    removeOrderFromRedis(order);
-                    log.info("Removed pending order {} from Redis", order.getId());
-                } catch (Exception e) {
-                    log.error("Failed to remove pending order {} from Redis: {}", order.getId(), e.getMessage());
-                }
-            }
+            // 스케줄러가 이전 시즌 미체결 주문을 DB에서 지웠으므로 Redis 대기열을 DB 기준으로 다시 만든다
+            // (기존: 지워진 뒤의 PENDING 주문을 조회해 아무것도 지우지 못하고 이전 시즌 주문이 Redis에 남음)
+            int pending = orderBook.rebuild();
+            log.info("Reserved order book rebuilt after season update: {} pending orders", pending);
         }
 
         // 사용자에게 시즌 종료 / 스플릿 업데이트 알림 전송

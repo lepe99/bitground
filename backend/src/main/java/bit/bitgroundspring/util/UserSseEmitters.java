@@ -15,7 +15,6 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import jakarta.annotation.PreDestroy;
 import java.time.LocalDateTime;
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
@@ -92,12 +91,16 @@ public class UserSseEmitters {
         // 죽은 연결 정리
         cleanupDeadWrappers(userId, deadWrappers);
         
-        // 비동기 알림 저장
-        if (hasSuccessfulSend && data.getMessage() == Message.ORDER_EXECUTION) {
-            CompletableFuture.runAsync(() -> saveNotification(userId, data, data.getMessage()));
-        }
-        
         return hasSuccessfulSend;
+    }
+    
+    /**
+     * 예약 주문 체결 알림: 알림 목록에 먼저 저장하고, 접속 중이면 실시간으로도 보낸다.
+     * (기존: SSE 전송에 성공했을 때만 저장해서, 접속하지 않은 사이 체결된 주문은 알림이 남지 않음)
+     */
+    public void notifyOrderExecution(Integer userId, NotificationResponse data) {
+        saveNotification(userId, data, Message.ORDER_EXECUTION);
+        sendToUser(userId, data);
     }
     
     // 하트비트 전송 - 30초마다 실행
@@ -188,7 +191,7 @@ public class UserSseEmitters {
         }
     }
     
-    // 비동기 알림 저장 메서드
+    // 알림 저장 메서드
     private void saveNotification(Integer userId, NotificationResponse data, Message messageType) {
         try {
             Map<String, Object> dataMap = data.getData();
@@ -233,9 +236,9 @@ public class UserSseEmitters {
         
         log.info("모든 사용자에게 알림 전송 완료. 성공: {}, 실패: {}", successCount, failureCount);
         
-        // 시스템 알림 비동기 저장
+        // 시스템 알림 저장 (접속 여부와 무관)
         if (request.getMessage() == Message.SEASON_UPDATE || request.getMessage() == Message.NOTICE) {
-            CompletableFuture.runAsync(() -> saveSystemNotification(request));
+            saveSystemNotification(request);
         }
         
         return result;

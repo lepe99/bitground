@@ -6,7 +6,9 @@ import bit.bitgroundspring.entity.Order;
 import bit.bitgroundspring.entity.Season;
 import bit.bitgroundspring.entity.Status;
 import bit.bitgroundspring.entity.User;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -77,8 +79,10 @@ public interface OrderRepository extends JpaRepository<Order, Integer> {
     List<Order> findByUserAndSeasonAndStatus(User user, Season season, Status status);
     
     
-    // 예약 매수 전용
-    Optional<Order> findByIdAndStatus(Integer id, Status status);
+    // 체결·취소가 같은 주문을 동시에 처리하지 않도록 주문 행을 잠그고 조회
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT o FROM Order o JOIN FETCH o.coin WHERE o.id = :id")
+    Optional<Order> findByIdForUpdate(@Param("id") Integer id);
     
     // 거래 가능 자산 조회 위한 메서드
     @Query("""
@@ -119,7 +123,8 @@ public interface OrderRepository extends JpaRepository<Order, Integer> {
                                                  @Param("seasonId") Integer seasonId);
 
 
-    // pending 상태 주문 조회
-    List<Order> findByStatus(Status status);
+    // 체결 대기 주문 전체 (Redis 예약 주문 대기열 재적재용)
+    @Query("SELECT o FROM Order o JOIN FETCH o.coin WHERE o.status = bit.bitgroundspring.entity.Status.PENDING")
+    List<Order> findAllPendingWithCoin();
 
 }

@@ -2,221 +2,201 @@ package bit.bitgroundspring.service;
 
 import bit.bitgroundspring.common.error.BusinessException;
 import bit.bitgroundspring.common.error.ErrorCode;
-import bit.bitgroundspring.dto.response.Message;
-import bit.bitgroundspring.dto.response.MessageType;
-import bit.bitgroundspring.dto.response.NotificationResponse;
+import bit.bitgroundspring.common.logging.TraceIdFilter;
+import bit.bitgroundspring.dto.TradeDto;
 import bit.bitgroundspring.entity.*;
-import bit.bitgroundspring.event.OrderCreatedEvent;
-import bit.bitgroundspring.repository.CoinRepository;
+import bit.bitgroundspring.event.ReserveOrderExecutedEvent;
+import bit.bitgroundspring.event.TradeExecutedEvent;
 import bit.bitgroundspring.repository.OrderRepository;
 import bit.bitgroundspring.repository.UserAssetRepository;
 import bit.bitgroundspring.repository.UserRepository;
-import bit.bitgroundspring.util.UserSseEmitters;
-import bit.bitgroundspring.common.logging.TraceIdFilter;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PreDestroy;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDateTime;
-import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+/**
+ * 예약 주문 체결
+ *
+ * 가격 조건을 만족한 주문은 {@link ReservedOrderBook}이 체결 큐(Redis LIST)에 넣고,
+ * 이 서비스가 큐를 비울 때까지 꺼내 주문마다 별도 트랜잭션으로 체결한다.
+ * 체결에 실패하면 주문을 대기열에 되돌려 다음 시세에서 다시 체결한다. 오래된 요청도 버리지 않는다.
+ */
 @Service
 @Slf4j
-@RequiredArgsConstructor
 public class OrderExecutionService {
-    
+
+    /** 한 번 깨어날 때 처리하는 최대 건수 (다른 스케줄 작업이 밀리지 않도록) */
+    private static final int MAX_BATCH = 500;
+    /** 이보다 오래 큐에 머문 요청은 체결 지연으로 기록 */
+    private static final long LAG_WARN_MILLIS = 5_000;
+    private static final double EPS = 0.00000001;
+
+    /** 체결 큐 메시지 */
+    public record ExecutionRequest(int orderId, double price, long requestedAt) {
+    }
+
     private final OrderRepository orderRepository;
-    private final CoinRepository coinRepository;
-    private final RedisTemplate<String, Object> redisTemplate;
-    private final UserSseEmitters userSseEmitters;
     private final UserRepository userRepository;
     private final UserAssetRepository userAssetRepository;
+    private final ReservedOrderBook orderBook;
+    private final StringRedisTemplate redis;
+    private final ObjectMapper objectMapper;
+    private final TransactionTemplate transactionTemplate;
     private final ApplicationEventPublisher eventPublisher;
-    
-    @Value("${upbit.order.execution.queue}")
-    private String executionQueueName;
-    
+    private final String executionQueue;
+
     private final AtomicBoolean isShuttingDown = new AtomicBoolean(false);
-    
+
+    public OrderExecutionService(OrderRepository orderRepository, UserRepository userRepository,
+                                 UserAssetRepository userAssetRepository, ReservedOrderBook orderBook,
+                                 StringRedisTemplate redis, ObjectMapper objectMapper,
+                                 TransactionTemplate transactionTemplate, ApplicationEventPublisher eventPublisher,
+                                 @Value("${upbit.order.execution.queue}") String executionQueue) {
+        this.orderRepository = orderRepository;
+        this.userRepository = userRepository;
+        this.userAssetRepository = userAssetRepository;
+        this.orderBook = orderBook;
+        this.redis = redis;
+        this.objectMapper = objectMapper;
+        this.transactionTemplate = transactionTemplate;
+        this.eventPublisher = eventPublisher;
+        this.executionQueue = executionQueue;
+    }
+
     @PreDestroy
     public void shutdown() {
         isShuttingDown.set(true);
         log.info("OrderExecutionService shutting down...");
     }
-    
-    public void queueOrderExecution(Integer orderId, double executionPrice) {
-        // 종료 중이면 큐에 추가하지 않음
-        if (isShuttingDown.get()) {
-            return;
-        }
-        
-        try {
-            String executionMessage = orderId + ":" + executionPrice + ":" + System.currentTimeMillis();
-            redisTemplate.opsForList().leftPush(executionQueueName, executionMessage);
-        } catch (Exception e) {
-            log.error("Failed to queue order execution: {}", orderId, e);
+
+    @Scheduled(fixedDelay = 100)
+    public void processExecutionQueue() {
+        for (int i = 0; i < MAX_BATCH && !isShuttingDown.get(); i++) {
+            String message = redis.opsForList().rightPop(executionQueue);
+            if (message == null) {
+                return;
+            }
+            ExecutionRequest request = parse(message);
+            if (request != null) {
+                process(request);
+            }
         }
     }
-    
-    @Scheduled(fixedDelay = 100)
-    @Transactional
-    public void processOrderExecutionQueue() {
+
+    private void process(ExecutionRequest request) {
+        // 요청이 아닌 스케줄러 작업이므로 주문 단위로 traceId를 붙여 체결 로그를 묶는다
+        MDC.put(TraceIdFilter.TRACE_ID, "exec-" + request.orderId());
         try {
-            Object messageObj = redisTemplate.opsForList().rightPop(executionQueueName);
-            
-            if (messageObj != null) {
-                String message = messageObj.toString();
-                String[] parts = message.split(":");
-                if (parts.length >= 3) {
-                    Integer orderId = Integer.parseInt(parts[0]);
-                    // 요청이 아닌 스케줄러 작업이므로 주문 단위로 traceId를 붙여 체결 로그를 묶는다
-                    MDC.put(TraceIdFilter.TRACE_ID, "exec-" + orderId);
-                    double executionPrice = Double.parseDouble(parts[1]);
-                    long timestamp = Long.parseLong(parts[2]);
-                    
-                    if (System.currentTimeMillis() - timestamp > 300000) {
-                        log.warn("Discarding old execution message for order: {}", orderId);
-                        return;
-                    }
-                    
-                    executeOrder(orderId, executionPrice);
-                }
+            long lag = System.currentTimeMillis() - request.requestedAt();
+            if (lag > LAG_WARN_MILLIS) {
+                log.warn("Order {} execution delayed {} ms in queue", request.orderId(), lag);
             }
-        } catch (Exception e) {
-            log.error("Error processing order execution queue", e);
+            transactionTemplate.executeWithoutResult(status -> executeOrder(request.orderId(), request.price()));
+        } catch (RuntimeException e) {
+            // 롤백된 주문은 PENDING 그대로이므로 대기열에 되돌려 다음 시세에서 다시 체결
+            log.error("Failed to execute order {}, returned to order book", request.orderId(), e);
+            try {
+                orderBook.restore(request.orderId());
+            } catch (RuntimeException restoreError) {
+                log.error("Failed to restore order {} (rebuilt on next startup)", request.orderId(), restoreError);
+            }
         } finally {
             MDC.remove(TraceIdFilter.TRACE_ID);
         }
     }
-    
-    public void executeOrder(Integer orderId, double executionPrice) {
+
+    private ExecutionRequest parse(String message) {
         try {
-            Optional<Order> orderOpt = orderRepository.findByIdAndStatus(orderId, Status.PENDING);
-            if (orderOpt.isEmpty()) {
-                log.debug("Order not found or not pending: {}", orderId);
-                return;
-            }
-            
-            Order order = orderOpt.get();
-            int userId = order.getUser().getId();
-            OrderType orderType = order.getOrderType();
-            double amount = order.getAmount();
-            final double EPS = 0.00000001;
-
-            // 체결 시점에 잔액·보유 수량을 다시 확인 (사용자 행 잠금으로 시장가 주문과의 동시 갱신 방지)
-            User user = userRepository.findByIdWithPessimisticLock(userId)
-                    .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
-            Optional<UserAsset> userAssetOptional = userAssetRepository.findByUserAndCoinWithLock(user, order.getCoin());
-            boolean insufficient = orderType == OrderType.BUY
-                    ? user.getCash() < (int) (executionPrice * amount)
-                    : userAssetOptional.map(a -> a.getAmount() + EPS < amount).orElse(true);
-            if (insufficient) {
-                orderRepository.delete(order);
-                log.warn("Order {} cancelled at execution: insufficient {} for user {}",
-                        orderId, orderType == OrderType.BUY ? "cash" : "asset", userId);
-                return;
-            }
-
-            order.setStatus(Status.COMPLETED);
-            order.setTradePrice(executionPrice);
-            order.setUpdatedAt(LocalDateTime.now());
-            
-            orderRepository.save(order);
-            eventPublisher.publishEvent(new OrderCreatedEvent(this, order));
-            
-            String symbol = coinRepository.findById(order.getCoin().getId())
-                    .map(Coin::getSymbol)
-                    .orElse("Unknown");
-
-            // 유저 현재 잔액 업데이트
-            if (orderType == OrderType.BUY) {
-                user.setCash(user.getCash() - (int) (executionPrice * amount));
-            } else if (orderType == OrderType.SELL) {
-                user.setCash(user.getCash() + (int) (executionPrice * amount));
-            }
-            userRepository.save(user);
-            
-            // 유저 자산 업데이트
-            if (userAssetOptional.isPresent()) {
-                UserAsset userAsset = userAssetOptional.get();
-                double userAssetAmount = userAsset.getAmount();
-                if (orderType == OrderType.BUY) {
-                    userAsset.setAmount(userAssetAmount + amount);
-                    userAsset.setAvgPrice(
-                            (userAsset.getAvgPrice() * userAssetAmount + executionPrice * amount)
-                                    / (userAssetAmount + amount));
-                    userAssetRepository.save(userAsset);
-                } else if (orderType == OrderType.SELL) {
-                    double remainingAmount = userAssetAmount - amount;
-                    if (remainingAmount < EPS) {
-                        userAssetRepository.delete(userAsset);
-                    } else {
-                        userAsset.setAmount(remainingAmount);
-                        userAssetRepository.save(userAsset);
-                    }
-                }
-            } else if (orderType == OrderType.BUY) {
-                UserAsset newUserAsset = UserAsset.builder()
-                        .user(user)
-                        .coin(order.getCoin())
-                        .amount(amount)
-                        .avgPrice(executionPrice)
-                        .build();
-                userAssetRepository.save(newUserAsset);
-            }
-            
-            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                @Override
-                public void afterCommit() {
-                    // 이 블록은 트랜잭션이 성공적으로 DB에 커밋된 후에만 호출됩니다.
-                    sendSseNotification(order, symbol);
-                }
-            });
-            
-            log.info("Order executed: {} at price {} for user {}",
-                    orderId, executionPrice, order.getUser().getId());
-            
-        } catch (Exception e) {
-            log.error("Failed to execute order: {}", orderId, e);
+            return objectMapper.readValue(message, ExecutionRequest.class);
+        } catch (JsonProcessingException e) {
+            // 형식이 다른 메시지(이전 버전 "id:price:ts" 등). 해당 주문은 기동 시 DB에서 대기열로 다시 적재된다
+            log.error("Invalid execution message skipped: {}", message);
+            return null;
         }
     }
-    
+
     /**
-     * SSE 알림 전송을 담당하는 별도의 public 메서드 (트랜잭션과 무관)
+     * 주문 하나를 체결한다. 호출자의 트랜잭션 안에서 실행되며, 예외가 나면 전부 롤백된다.
+     * 주문 행 → 사용자 행 순서로 잠가 취소·시장가 주문과 동시에 처리되지 않게 한다.
      */
-    public void sendSseNotification(Order order, String symbol) {
-        try {
-            int userId = order.getUser().getId();
-            int finalCash = userRepository.findById(userId)
-                    .map(User::getCash)
-                    .orElse(0);
-            
-            Map<String, Object> data = Map.of(
-                    "orderType", order.getOrderType().name(),
-                    "symbol", symbol,
-                    "amount", order.getAmount(),
-                    "tradePrice", order.getTradePrice().floatValue(),
-                    "cash", finalCash
-            );
-            NotificationResponse notificationResponse = NotificationResponse.builder()
-                    .messageType(MessageType.INFO)
-                    .message(Message.ORDER_EXECUTION)
-                    .data(data)
-                    .build();
-            userSseEmitters.sendToUser(userId, notificationResponse);
-        } catch (Exception e) {
-            log.error("Failed to send SSE notification for order {}", order.getId(), e);
+    public void executeOrder(int orderId, double executionPrice) {
+        Optional<Order> orderOpt = orderRepository.findByIdForUpdate(orderId)
+                .filter(order -> order.getStatus() == Status.PENDING);
+        if (orderOpt.isEmpty()) {
+            log.debug("Order not found or not pending: {}", orderId);
+            return;
         }
+
+        Order order = orderOpt.get();
+        int userId = order.getUser().getId();
+        OrderType orderType = order.getOrderType();
+        double amount = order.getAmount();
+        int tradeAmount = (int) (executionPrice * amount);
+
+        // 체결 시점에 잔액·보유 수량을 다시 확인
+        User user = userRepository.findByIdWithPessimisticLock(userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+        Optional<UserAsset> userAssetOptional = userAssetRepository.findByUserAndCoinWithLock(user, order.getCoin());
+        boolean insufficient = orderType == OrderType.BUY
+                ? user.getCash() < tradeAmount
+                : userAssetOptional.map(a -> a.getAmount() + EPS < amount).orElse(true);
+        if (insufficient) {
+            orderRepository.delete(order);
+            log.warn("Order {} cancelled at execution: insufficient {} for user {}",
+                    orderId, orderType == OrderType.BUY ? "cash" : "asset", userId);
+            return;
+        }
+
+        order.setStatus(Status.COMPLETED);
+        order.setTradePrice(executionPrice);
+        order.setUpdatedAt(LocalDateTime.now());
+
+        user.setCash(orderType == OrderType.BUY ? user.getCash() - tradeAmount : user.getCash() + tradeAmount);
+
+        if (userAssetOptional.isPresent()) {
+            UserAsset userAsset = userAssetOptional.get();
+            double userAssetAmount = userAsset.getAmount();
+            if (orderType == OrderType.BUY) {
+                userAsset.setAmount(userAssetAmount + amount);
+                userAsset.setAvgPrice(
+                        (userAsset.getAvgPrice() * userAssetAmount + executionPrice * amount)
+                                / (userAssetAmount + amount));
+            } else {
+                double remainingAmount = userAssetAmount - amount;
+                if (remainingAmount < EPS) {
+                    userAssetRepository.delete(userAsset);
+                } else {
+                    userAsset.setAmount(remainingAmount);
+                }
+            }
+        } else if (orderType == OrderType.BUY) {
+            userAssetRepository.save(UserAsset.builder()
+                    .user(user)
+                    .coin(order.getCoin())
+                    .amount(amount)
+                    .avgPrice(executionPrice)
+                    .build());
+        }
+
+        // 커밋 후에만 리스너가 실행된다 (체결 내역 방송, 사용자 알림)
+        Coin coin = order.getCoin();
+        eventPublisher.publishEvent(new TradeExecutedEvent(new TradeDto(coin.getSymbol(), coin.getKoreanName(),
+                orderType, amount, executionPrice, order.getCreatedAt(), order.getUpdatedAt())));
+        eventPublisher.publishEvent(new ReserveOrderExecutedEvent(orderId, userId, coin.getSymbol(), orderType,
+                amount, executionPrice));
+
+        log.info("Order executed: {} at price {} for user {}", orderId, executionPrice, userId);
     }
 }
