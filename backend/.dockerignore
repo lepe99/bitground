@@ -1,0 +1,6 @@
+# 비밀값과 로컬 산출물은 빌드 컨텍스트에서 제외
+.env
+*.original.yml
+build/
+.gradle/
+.idea/
