@@ -37,47 +37,37 @@ public class CoinController {
 
     @GetMapping("/coins")
     public List<CoinResponse> getAllCoins() {
-        return coins(coinRepository.findAll().stream());
+        return coins(coinRepository.findByIsDeletedFalse().stream());
     }
 
     @GetMapping("/coins/high-trade-price")
     public List<CoinResponse> getTop5HighTradePriceCoins() {
-        return coins(coinRepository.findAll().stream()
-                .sorted(Comparator.comparing(Coin::getTradePrice24h).reversed())
-                .limit(5));
+        return coins(coinRepository.findTop5ByIsDeletedFalseOrderByTradePrice24hDesc().stream());
     }
 
     @GetMapping("/coins/price-increase")
     public List<CoinResponse> getTop5PriceIncreaseCoins() {
-        return coins(coinRepository.findAll().stream()
-                .filter(coin -> coin.getChangeRate() != null)
-                .sorted(Comparator.comparing(Coin::getChangeRate).reversed())
-                .limit(5));
+        return coins(coinRepository.findTop5ByIsDeletedFalseAndChangeRateNotNullOrderByChangeRateDesc().stream());
     }
 
     @GetMapping("/coins/price-decrease")
     public List<CoinResponse> getTop5PriceDecreaseCoins() {
-        return coins(coinRepository.findAll().stream()
-                .filter(coin -> coin.getChangeRate() != null)
-                .sorted(Comparator.comparing(Coin::getChangeRate))
-                .limit(5));
+        return coins(coinRepository.findTop5ByIsDeletedFalseAndChangeRateNotNullOrderByChangeRateAsc().stream());
     }
 
     @GetMapping("/coins/caution")
     public List<CoinResponse> getCautionCoins() {
-        return coins(coinRepository.findAll().stream().filter(Coin::getIsWarning));
+        return coins(coinRepository.findByIsDeletedFalseAndIsWarningTrue().stream());
     }
 
     @GetMapping("/coins/alert")
     public List<CoinResponse> getAlertCoins() {
-        return coins(coinRepository.findAll().stream().filter(Coin::getIsCaution));
+        return coins(coinRepository.findByIsDeletedFalseAndIsCautionTrue().stream());
     }
 
     @GetMapping("/coins/symbols")
     public List<CoinSymbolDto> getCoinSymbols() {
-        return coinRepository.findAll().stream()
-                .map(coin -> new CoinSymbolDto(coin.getSymbol(), coin.getKoreanName()))
-                .toList();
+        return coinRepository.findAllSymbols();
     }
 
     @GetMapping("/coins/{symbol}/insight")

@@ -23,4 +23,15 @@ public interface CoinRepository extends JpaRepository<Coin, Integer> {
     List<Coin> findAllBySymbolIn(Collection<String> symbols);
     
     List<Coin> findByIsDeletedFalse();
+
+    // 메인 화면 상위 5개: 전체를 읽어 자바에서 정렬하지 않고 DB에서 정렬·LIMIT (상장 폐지 코인 제외)
+    List<Coin> findTop5ByIsDeletedFalseOrderByTradePrice24hDesc();
+
+    List<Coin> findTop5ByIsDeletedFalseAndChangeRateNotNullOrderByChangeRateDesc();
+
+    List<Coin> findTop5ByIsDeletedFalseAndChangeRateNotNullOrderByChangeRateAsc();
+
+    List<Coin> findByIsDeletedFalseAndIsWarningTrue();
+
+    List<Coin> findByIsDeletedFalseAndIsCautionTrue();
 }

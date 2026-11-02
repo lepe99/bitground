@@ -19,6 +19,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import java.time.temporal.ChronoUnit;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -180,33 +181,44 @@ public class InvestmentAnalysisService {
         if (highestProfitCoinSymbol != null && !keyCoinSymbols.contains(highestProfitCoinSymbol)) keyCoinSymbols.add(highestProfitCoinSymbol);
         if (lowestProfitCoinSymbol != null && !keyCoinSymbols.contains(lowestProfitCoinSymbol)) keyCoinSymbols.add(lowestProfitCoinSymbol);
 
+        // 대상 코인(최대 3개)과 시즌 시작·종료일 시세를 쿼리 두 번으로 가져온다 (기존: 코인마다 코인·시세를 따로 조회)
+        Map<String, Coin> coinsBySymbol = coinRepository.findAllBySymbolIn(keyCoinSymbols).stream()
+                .collect(Collectors.toMap(Coin::getSymbol, c -> c));
+        Map<String, List<CoinPriceHistory>> pricesBySymbol = coinsBySymbol.isEmpty() ? Map.of()
+                : coinPriceHistoryRepository.findByCoinsAndDates(coinsBySymbol.values(), List.of(season.getStartAt(), season.getEndAt()))
+                .stream()
+                .collect(Collectors.groupingBy(h -> h.getCoin().getSymbol()));
+
         for (String symbol : keyCoinSymbols) {
-            Optional<Coin> coinOptional = coinRepository.findBySymbol(symbol);
-            if (coinOptional.isPresent()) {
-                Coin coin = coinOptional.get();
-
-                // 시즌 시작일의 시가: 해당 날짜의 가장 이른 시간 데이터의 openPrice
-                List<CoinPriceHistory> startDayPrices = coinPriceHistoryRepository.findByCoinAndDateOrderByHourAsc(coin, season.getStartAt());
-                Float startPrice = startDayPrices.isEmpty() ? null : startDayPrices.get(0).getOpenPrice();
-
-                // 시즌 종료일의 종가: 해당 날짜의 가장 늦은 시간 데이터의 closePrice
-                List<CoinPriceHistory> endDayPrices = coinPriceHistoryRepository.findByCoinAndDateOrderByHourDesc(coin, season.getEndAt());
-                Float endPrice = endDayPrices.isEmpty() ? null : endDayPrices.get(0).getClosePrice();
-
-                if (startPrice != null && endPrice != null && startPrice != 0) {
-                    String performanceSummary = String.format(
-                            "초기 %.2f원 -> 최종 %.2f원 (변동률: %.2f%%)",
-                            startPrice,
-                            endPrice,
-                            ((endPrice - startPrice) / startPrice) * 100
-                    );
-                    coinMarketPerformanceSummary.put(symbol, performanceSummary);
-                } else {
-                    log.warn("코인 {}의 시즌 시작/종료 가격 데이터를 찾을 수 없거나 시작 가격이 0입니다. (시즌 기간: {} ~ {})",
-                            symbol, season.getStartAt(), season.getEndAt());
-                }
-            } else {
+            if (!coinsBySymbol.containsKey(symbol)) {
                 log.warn("코인 심볼 {}에 해당하는 Coin 엔티티를 찾을 수 없습니다.", symbol);
+                continue;
+            }
+            List<CoinPriceHistory> prices = pricesBySymbol.getOrDefault(symbol, List.of());
+
+            // 시즌 시작일의 시가: 그날 가장 이른 시간의 openPrice / 종료일의 종가: 그날 가장 늦은 시간의 closePrice
+            Float startPrice = prices.stream()
+                    .filter(h -> h.getDate().equals(season.getStartAt()))
+                    .min(Comparator.comparing(CoinPriceHistory::getHour))
+                    .map(CoinPriceHistory::getOpenPrice)
+                    .orElse(null);
+            Float endPrice = prices.stream()
+                    .filter(h -> h.getDate().equals(season.getEndAt()))
+                    .max(Comparator.comparing(CoinPriceHistory::getHour))
+                    .map(CoinPriceHistory::getClosePrice)
+                    .orElse(null);
+
+            if (startPrice != null && endPrice != null && startPrice != 0) {
+                String performanceSummary = String.format(
+                        "초기 %.2f원 -> 최종 %.2f원 (변동률: %.2f%%)",
+                        startPrice,
+                        endPrice,
+                        ((endPrice - startPrice) / startPrice) * 100
+                );
+                coinMarketPerformanceSummary.put(symbol, performanceSummary);
+            } else {
+                log.warn("코인 {}의 시즌 시작/종료 가격 데이터를 찾을 수 없거나 시작 가격이 0입니다. (시즌 기간: {} ~ {})",
+                        symbol, season.getStartAt(), season.getEndAt());
             }
         }
 
