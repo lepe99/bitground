@@ -1,6 +1,6 @@
 package bit.bitgroundspring.event;
 
-import bit.bitgroundspring.dto.TradeDto;
+import bit.bitgroundspring.dto.response.TradeDto;
 
 /**
  * 시장가·예약 주문이 체결됨 (실시간 체결 내역 방송용)

@@ -5,7 +5,7 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import bit.bitgroundspring.security.token.AuthUser;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import bit.bitgroundspring.dto.CreateOrderRequest;
+import bit.bitgroundspring.dto.request.CreateOrderRequest;
 import bit.bitgroundspring.entity.Order;
 import bit.bitgroundspring.service.OrderService;
 import lombok.RequiredArgsConstructor;

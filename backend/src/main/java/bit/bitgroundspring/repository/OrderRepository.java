@@ -1,6 +1,6 @@
 package bit.bitgroundspring.repository;
 
-import bit.bitgroundspring.dto.TradeDto;
+import bit.bitgroundspring.dto.response.TradeDto;
 import bit.bitgroundspring.dto.projection.OrderProjection;
 import bit.bitgroundspring.entity.Order;
 import bit.bitgroundspring.entity.Season;
@@ -37,7 +37,7 @@ public interface OrderRepository extends JpaRepository<Order, Integer> {
 
 
     @Query(
-            "SELECT new bit.bitgroundspring.dto.TradeDto( " +
+            "SELECT new bit.bitgroundspring.dto.response.TradeDto( " +
                     "    o.coin.symbol,        " + // String
                     "    o.coin.koreanName,    " + // String
                     "    o.orderType,          " + // OrderType
@@ -57,7 +57,7 @@ public interface OrderRepository extends JpaRepository<Order, Integer> {
     );
 
     @Query("""
-        SELECT new bit.bitgroundspring.dto.TradeDto(
+        SELECT new bit.bitgroundspring.dto.response.TradeDto(
             o.coin.symbol,
             o.coin.koreanName,
             o.orderType,

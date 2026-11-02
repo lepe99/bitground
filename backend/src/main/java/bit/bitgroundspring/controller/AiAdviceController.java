@@ -5,7 +5,7 @@ import bit.bitgroundspring.common.error.BusinessException;
 import bit.bitgroundspring.common.error.ErrorCode;
 import bit.bitgroundspring.security.token.AuthUser;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import bit.bitgroundspring.dto.AiAdviceDto;
+import bit.bitgroundspring.dto.response.AiAdviceDto;
 import bit.bitgroundspring.service.AiAdviceService;
 import bit.bitgroundspring.service.UserService;
 import lombok.RequiredArgsConstructor;

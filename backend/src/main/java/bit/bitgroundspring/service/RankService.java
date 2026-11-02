@@ -5,7 +5,7 @@ import bit.bitgroundspring.dto.projection.RankProjection;
 import bit.bitgroundspring.dto.response.RankDetailResponse;
 import bit.bitgroundspring.entity.Status;
 import bit.bitgroundspring.entity.User;
-import bit.bitgroundspring.repository.RankRepository;
+import bit.bitgroundspring.repository.UserRankingRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -16,20 +16,20 @@ import java.util.List;
 @RequiredArgsConstructor
 public class RankService {
     
-    private final RankRepository rankRepository;
+    private final UserRankingRepository userRankingRepository;
     
     /**
      * 현 시즌 랭킹 조회
      */
     public List<RankProjection> getCurrentRankings() {
-        return rankRepository.findCurrentSeasonRankings();
+        return userRankingRepository.findCurrentSeasonRankings();
     }
     
     /**
      * 특정 시즌 랭킹 조회
      */
     public List<RankProjection> getSeasonRankings(int seasonId) {
-        return rankRepository.findRankingsBySeasonId(seasonId);
+        return userRankingRepository.findRankingsBySeasonId(seasonId);
     }
     
     /**
@@ -38,9 +38,9 @@ public class RankService {
     public RankDetailResponse getUserTierDetails(Integer userId) {
         User user = User.builder().id(userId).build();
 
-        Integer highestTier = rankRepository.findHighestTierByUser(user);
+        Integer highestTier = userRankingRepository.findHighestTierByUser(user);
 
-        List<PastSeasonTierProjection> pastSeasonTiers = rankRepository.findTop5CompletedSeasonsByUser(
+        List<PastSeasonTierProjection> pastSeasonTiers = userRankingRepository.findTop5CompletedSeasonsByUser(
                 user,
                 Status.COMPLETED,
                 PageRequest.of(0, 5)

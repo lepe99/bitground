@@ -2,6 +2,7 @@
 
 package bit.bitgroundspring.dto;
 
+import bit.bitgroundspring.dto.response.AiAdviceDto;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;

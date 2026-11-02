@@ -1,6 +1,6 @@
-package bit.bitgroundspring.util;
+package bit.bitgroundspring.service;
 
-import bit.bitgroundspring.dto.response.Message;
+import bit.bitgroundspring.entity.Message;
 import bit.bitgroundspring.dto.response.NotificationResponse;
 import bit.bitgroundspring.entity.Notification;
 import bit.bitgroundspring.entity.User;

@@ -14,7 +14,7 @@ import org.springframework.data.repository.query.Param;
 import java.util.List;
 import java.util.Optional;
 
-public interface RankRepository extends JpaRepository<UserRanking, Long> {
+public interface UserRankingRepository extends JpaRepository<UserRanking, Long> {
 
     // 단일 사용자 + 시즌별 랭킹 조회
     Optional<UserRanking> findByUserAndSeason(User user, Season season);

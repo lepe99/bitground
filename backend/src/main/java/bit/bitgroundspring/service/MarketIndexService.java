@@ -1,6 +1,6 @@
 package bit.bitgroundspring.service;
 
-import bit.bitgroundspring.dto.MarketIndexDto;
+import bit.bitgroundspring.dto.response.MarketIndexDto;
 import bit.bitgroundspring.entity.MarketIndex;
 import bit.bitgroundspring.repository.MarketIndexRepository;
 import lombok.RequiredArgsConstructor;

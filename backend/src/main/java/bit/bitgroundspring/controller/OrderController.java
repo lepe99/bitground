@@ -2,7 +2,7 @@ package bit.bitgroundspring.controller;
 
 import bit.bitgroundspring.security.token.AuthUser;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import bit.bitgroundspring.dto.OrderDto;
+import bit.bitgroundspring.dto.response.OrderDto;
 import bit.bitgroundspring.dto.projection.OrderProjection;
 import bit.bitgroundspring.service.OrderService;
 import lombok.RequiredArgsConstructor;

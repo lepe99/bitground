@@ -1,11 +1,11 @@
 package bit.bitgroundspring.service;
 
-import bit.bitgroundspring.dto.PublicRankingDto;
+import bit.bitgroundspring.dto.response.PublicRankingDto;
 import bit.bitgroundspring.dto.projection.RankProjection;
 import bit.bitgroundspring.dto.response.PublicRankingResponse;
 import bit.bitgroundspring.entity.Season;
 import bit.bitgroundspring.entity.Status;
-import bit.bitgroundspring.repository.RankRepository;
+import bit.bitgroundspring.repository.UserRankingRepository;
 import bit.bitgroundspring.repository.SeasonRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -18,11 +18,11 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class RankingPreviewService {
 
-    private final RankRepository rankRepository;
+    private final UserRankingRepository userRankingRepository;
     private final SeasonRepository seasonRepository;
 
     public PublicRankingResponse getPublicRankingPreview() {
-        List<RankProjection> projections = rankRepository.findCurrentSeasonRankings();
+        List<RankProjection> projections = userRankingRepository.findCurrentSeasonRankings();
 
         String seasonName;
         LocalDateTime baseTime;

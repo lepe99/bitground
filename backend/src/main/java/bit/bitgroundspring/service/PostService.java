@@ -3,13 +3,13 @@ package bit.bitgroundspring.service;
 import bit.bitgroundspring.common.error.BusinessException;
 import bit.bitgroundspring.common.error.ErrorCode;
 import bit.bitgroundspring.common.html.HtmlSanitizer;
-import bit.bitgroundspring.dto.BoardDto;
+import bit.bitgroundspring.dto.response.PostDto;
 import bit.bitgroundspring.dto.request.PostCreateRequest;
 import bit.bitgroundspring.dto.response.RankDetailResponse;
 import bit.bitgroundspring.entity.Category;
 import bit.bitgroundspring.entity.Post;
 import bit.bitgroundspring.entity.User;
-import bit.bitgroundspring.repository.BoardRepository;
+import bit.bitgroundspring.repository.PostRepository;
 import bit.bitgroundspring.repository.CommentRepository;
 import bit.bitgroundspring.repository.UserRepository;
 import bit.bitgroundspring.security.token.AuthUser;
@@ -24,12 +24,12 @@ import java.time.Duration;
 
 @Service
 @RequiredArgsConstructor
-public class BoardService {
+public class PostService {
 
     // 같은 사용자가 이 시간 안에 다시 열면 조회수를 올리지 않는다
     private static final Duration VIEW_DEDUP_WINDOW = Duration.ofHours(24);
 
-    private final BoardRepository boardRepository;
+    private final PostRepository postRepository;
     private final UserRepository userRepository;
     private final CommentRepository commentRepository;
     private final RankService rankService;
@@ -43,7 +43,7 @@ public class BoardService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
         String content = htmlSanitizer.sanitize(request.content());
 
-        return boardRepository.save(Post.builder()
+        return postRepository.save(Post.builder()
                 .user(user)
                 .tier(user.getTier())
                 .category(request.category())
@@ -55,8 +55,8 @@ public class BoardService {
 
     /** 게시글 목록 (본문 제외) */
     @Transactional(readOnly = true)
-    public Page<BoardDto> getBoardList(Category category, Pageable pageable) {
-        return boardRepository.findBoardList(category, pageable);
+    public Page<PostDto> getPostList(Category category, Pageable pageable) {
+        return postRepository.findPostList(category, pageable);
     }
 
     /**
@@ -64,15 +64,15 @@ public class BoardService {
      * (기존: ?forceViewCount=true만 붙이면 누구나 무한히 올릴 수 있었음)
      */
     @Transactional
-    public BoardDto getPostDetail(Integer postId, Integer viewerId) {
+    public PostDto getPostDetail(Integer postId, Integer viewerId) {
         if (countView(postId, viewerId)) {
-            boardRepository.incrementViews(postId);
+            postRepository.incrementViews(postId);
         }
 
-        Post post = boardRepository.findWithUserById(postId)
+        Post post = postRepository.findWithUserById(postId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.POST_NOT_FOUND));
 
-        BoardDto dto = new BoardDto(
+        PostDto dto = new PostDto(
                 post.getId(),
                 post.getUser().getId(),
                 post.getUser().getName(),
@@ -99,7 +99,7 @@ public class BoardService {
     /** 게시글 삭제 (작성자 본인 또는 관리자, 소프트 삭제) */
     @Transactional
     public void deletePost(Integer postId, AuthUser authUser) {
-        Post post = boardRepository.findById(postId)
+        Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.POST_NOT_FOUND));
         if (!post.getUser().getId().equals(authUser.id()) && !authUser.admin()) {
             throw new BusinessException(ErrorCode.NOT_AUTHOR);

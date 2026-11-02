@@ -1,4 +1,4 @@
-package bit.bitgroundspring.dto;
+package bit.bitgroundspring.dto.response;
 
 import bit.bitgroundspring.entity.MarketIndex;
 import lombok.Builder;

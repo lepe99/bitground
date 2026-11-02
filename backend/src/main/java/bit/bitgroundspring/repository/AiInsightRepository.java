@@ -3,7 +3,7 @@
 package bit.bitgroundspring.repository;
 
 import bit.bitgroundspring.entity.AiInsight; // AiInsight 엔티티 임포트
-import bit.bitgroundspring.dto.AiInsightSymbolDto; // AiInsightSymbolDto 임포트 추가
+import bit.bitgroundspring.dto.response.AiInsightSymbolDto; // AiInsightSymbolDto 임포트 추가
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query; // Query 임포트 추가
 import org.springframework.data.repository.query.Param; // Param 임포트 제거 (필요 없어짐)
@@ -29,7 +29,7 @@ public interface AiInsightRepository extends JpaRepository<AiInsight, Integer> {
      *
      * @return AiInsightSymbolDto 목록
      */
-    @Query("SELECT NEW bit.bitgroundspring.dto.AiInsightSymbolDto(ai.symbol, c.koreanName) " +
+    @Query("SELECT NEW bit.bitgroundspring.dto.response.AiInsightSymbolDto(ai.symbol, c.koreanName) " +
             "FROM AiInsight ai JOIN Coin c ON ai.symbol = c.symbol " +
             "WHERE ai.date = CURDATE()") // CURDATE() 함수를 사용하여 오늘 날짜 지정 (MySQL 전용)
     List<AiInsightSymbolDto> findTodaySymbolsAndKoreanNames(); // 매개변수 제거

@@ -2,8 +2,8 @@ package bit.bitgroundspring.controller;
 
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
-import bit.bitgroundspring.dto.CommentRequestDto;
-import bit.bitgroundspring.dto.CommentResponseDto;
+import bit.bitgroundspring.dto.request.CommentRequestDto;
+import bit.bitgroundspring.dto.response.CommentResponseDto;
 import bit.bitgroundspring.service.CommentService;
 import bit.bitgroundspring.security.token.AuthUser;
 import lombok.RequiredArgsConstructor;

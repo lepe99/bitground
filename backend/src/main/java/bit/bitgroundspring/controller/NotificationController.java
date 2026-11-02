@@ -5,7 +5,7 @@ import bit.bitgroundspring.security.token.AuthUser;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import bit.bitgroundspring.dto.projection.NotificationProjection;
 import bit.bitgroundspring.service.NotificationService;
-import bit.bitgroundspring.util.UserSseEmitters;
+import bit.bitgroundspring.service.UserSseEmitters;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;

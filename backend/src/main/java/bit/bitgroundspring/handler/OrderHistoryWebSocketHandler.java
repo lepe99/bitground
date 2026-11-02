@@ -1,6 +1,6 @@
 package bit.bitgroundspring.handler;
 
-import bit.bitgroundspring.dto.TradeDto;
+import bit.bitgroundspring.dto.response.TradeDto;
 import bit.bitgroundspring.service.OrderService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;

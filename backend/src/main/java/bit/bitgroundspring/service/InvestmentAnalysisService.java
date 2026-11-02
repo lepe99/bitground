@@ -6,13 +6,13 @@ import bit.bitgroundspring.common.error.ErrorCode;
 import bit.bitgroundspring.dto.InvestmentSummaryDto;
 import bit.bitgroundspring.entity.*;
 import bit.bitgroundspring.repository.OrderRepository;
-import bit.bitgroundspring.repository.RankRepository;
+import bit.bitgroundspring.repository.UserRankingRepository;
 import bit.bitgroundspring.repository.UserRepository;
 import bit.bitgroundspring.repository.SeasonRepository;
 import bit.bitgroundspring.repository.UserDailyBalanceRepository; // UserDailyBalanceRepository 임포트
 import bit.bitgroundspring.repository.CoinPriceHistoryRepository; // CoinPriceHistoryRepository 임포트
 import bit.bitgroundspring.repository.CoinRepository; // CoinRepository 임포트
-import bit.bitgroundspring.util.InitialCashUtil;
+import bit.bitgroundspring.service.InitialCashPolicy;
 
 import org.springframework.stereotype.Service;
 import lombok.RequiredArgsConstructor;
@@ -32,10 +32,10 @@ import java.util.stream.Collectors;
 public class InvestmentAnalysisService {
 
     private final OrderRepository orderRepository;
-    private final RankRepository userRankingRepository;
+    private final UserRankingRepository userRankingRepository;
     private final UserRepository userRepository;
     private final SeasonRepository seasonRepository;
-    private final InitialCashUtil initialCashUtil;
+    private final InitialCashPolicy initialCashPolicy;
     private final UserDailyBalanceRepository userDailyBalanceRepository;
     private final CoinPriceHistoryRepository coinPriceHistoryRepository;
     private final CoinRepository coinRepository;
@@ -62,7 +62,7 @@ public class InvestmentAnalysisService {
         Optional<UserRanking> userRankingOptional = userRankingRepository.findByUserAndSeason(user, season);
         UserRanking userRanking = userRankingOptional.orElse(null);
 
-        Long initialCashBalance = (long) initialCashUtil.getInitialCash();
+        Long initialCashBalance = (long) initialCashPolicy.getInitialCash();
 
         // 2. 거래 활동 요약 (Order 엔티티 기반)
         // season.getStatus() == Status.COMPLETED 조건 확인

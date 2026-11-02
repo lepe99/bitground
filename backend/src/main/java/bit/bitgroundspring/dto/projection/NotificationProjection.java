@@ -1,6 +1,6 @@
 package bit.bitgroundspring.dto.projection;
 
-import bit.bitgroundspring.dto.response.Message;
+import bit.bitgroundspring.entity.Message;
 
 import java.time.LocalDateTime;
 

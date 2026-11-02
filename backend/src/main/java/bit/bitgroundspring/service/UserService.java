@@ -3,12 +3,12 @@ package bit.bitgroundspring.service;
 import bit.bitgroundspring.aop.Loggable;
 import bit.bitgroundspring.common.error.BusinessException;
 import bit.bitgroundspring.common.error.ErrorCode;
-import bit.bitgroundspring.dto.TierDto;
+import bit.bitgroundspring.dto.response.TierDto;
 import bit.bitgroundspring.entity.Season;
 import bit.bitgroundspring.entity.User;
 import bit.bitgroundspring.security.token.AuthTokenService;
 import bit.bitgroundspring.storage.StorageService;
-import bit.bitgroundspring.repository.RankRepository;
+import bit.bitgroundspring.repository.UserRankingRepository;
 import bit.bitgroundspring.repository.SeasonRepository;
 import bit.bitgroundspring.repository.UserRepository;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,7 +24,7 @@ public class UserService {
     private final UserRepository userRepository;
     private final StorageService storageService;
     private final AuthTokenService authTokenService;
-    private final RankRepository rankRepository;
+    private final UserRankingRepository userRankingRepository;
     private final SeasonRepository seasonRepository;
 
     // 탈퇴하지 않은 사용자 조회 (없으면 USER_NOT_FOUND)
@@ -80,7 +80,7 @@ public class UserService {
         Season season = seasonRepository.findById(seasonId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.SEASON_NOT_FOUND));
 
-        return rankRepository.findByUserAndSeason(user, season)
+        return userRankingRepository.findByUserAndSeason(user, season)
                 .map(userRanking -> {
                     int tier = userRanking.getTier();
                     String tierName = getTierName(tier);

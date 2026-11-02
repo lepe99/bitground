@@ -1,4 +1,4 @@
-package bit.bitgroundspring.util;
+package bit.bitgroundspring.service;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -6,7 +6,7 @@ import org.springframework.stereotype.Component;
 import java.time.LocalDateTime;
 
 @Component
-public class InitialCashUtil {
+public class InitialCashPolicy {
     
     @Value("${scheduler.setting}")
     private String schedulerSetting;

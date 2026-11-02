@@ -1,6 +1,6 @@
 package bit.bitgroundspring.entity;
 
-import bit.bitgroundspring.dto.response.Message;
+import bit.bitgroundspring.entity.Message;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;

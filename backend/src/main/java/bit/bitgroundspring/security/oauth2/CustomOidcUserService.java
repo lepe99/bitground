@@ -2,7 +2,7 @@ package bit.bitgroundspring.security.oauth2;
 
 import bit.bitgroundspring.entity.User;
 import bit.bitgroundspring.repository.UserRepository;
-import bit.bitgroundspring.util.InitialCashUtil;
+import bit.bitgroundspring.service.InitialCashPolicy;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -28,7 +28,7 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class CustomOidcUserService extends OidcUserService {
     private final UserRepository userRepository;
-    private final InitialCashUtil initialCashUtil;
+    private final InitialCashPolicy initialCashPolicy;
     private final RestTemplate restTemplate;
     
     @Override
@@ -129,7 +129,7 @@ public class CustomOidcUserService extends OidcUserService {
                     .providerId(providerId)
                     .email(email)
                     .name(name)
-                    .cash((long) initialCashUtil.getInitialCash()) // 초기 캐시 설정
+                    .cash((long) initialCashPolicy.getInitialCash()) // 초기 캐시 설정
                     .profileImage(profileImage)
                     .build();
             

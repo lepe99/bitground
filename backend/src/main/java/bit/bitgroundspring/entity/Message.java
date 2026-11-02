@@ -1,4 +1,5 @@
-package bit.bitgroundspring.dto.response;
+package bit.bitgroundspring.entity;
+
 
 public enum Message {
     NOTICE, ORDER_EXECUTION, SEASON_UPDATE

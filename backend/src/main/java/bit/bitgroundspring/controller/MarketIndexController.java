@@ -1,6 +1,6 @@
 package bit.bitgroundspring.controller;
 
-import bit.bitgroundspring.dto.MarketIndexDto;
+import bit.bitgroundspring.dto.response.MarketIndexDto;
 import bit.bitgroundspring.service.MarketIndexService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;

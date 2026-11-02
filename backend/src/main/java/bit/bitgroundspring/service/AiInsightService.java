@@ -2,7 +2,7 @@ package bit.bitgroundspring.service;
 
 import bit.bitgroundspring.common.error.BusinessException;
 import bit.bitgroundspring.common.error.ErrorCode;
-import bit.bitgroundspring.dto.AiInsightSymbolDto;
+import bit.bitgroundspring.dto.response.AiInsightSymbolDto;
 import bit.bitgroundspring.dto.response.AiInsightResponse;
 import bit.bitgroundspring.repository.AiInsightRepository;
 import lombok.RequiredArgsConstructor;

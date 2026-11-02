@@ -1,6 +1,6 @@
 // src/main/java/bit/bitgroundspring/dto/AiInsightSymbolDto.java
 
-package bit.bitgroundspring.dto;
+package bit.bitgroundspring.dto.response;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;

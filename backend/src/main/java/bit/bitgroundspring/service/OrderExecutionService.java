@@ -4,7 +4,7 @@ import bit.bitgroundspring.common.error.BusinessException;
 import bit.bitgroundspring.common.error.ErrorCode;
 import bit.bitgroundspring.common.logging.TraceIdFilter;
 import bit.bitgroundspring.common.money.Money;
-import bit.bitgroundspring.dto.TradeDto;
+import bit.bitgroundspring.dto.response.TradeDto;
 import bit.bitgroundspring.entity.*;
 import bit.bitgroundspring.event.ReserveOrderExecutedEvent;
 import bit.bitgroundspring.event.TradeExecutedEvent;

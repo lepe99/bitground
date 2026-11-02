@@ -3,7 +3,7 @@ package bit.bitgroundspring.api;
 import bit.bitgroundspring.common.error.ErrorCode;
 import bit.bitgroundspring.entity.Post;
 import bit.bitgroundspring.entity.User;
-import bit.bitgroundspring.repository.BoardRepository;
+import bit.bitgroundspring.repository.PostRepository;
 import bit.bitgroundspring.repository.CommentRepository;
 import bit.bitgroundspring.repository.ReactionRepository;
 import bit.bitgroundspring.support.IntegrationTest;
@@ -26,7 +26,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class CommunityAuthorizationTest extends IntegrationTest {
 
     @Autowired
-    BoardRepository boardRepository;
+    PostRepository postRepository;
     @Autowired
     CommentRepository commentRepository;
     @Autowired
@@ -58,7 +58,7 @@ class CommunityAuthorizationTest extends IntegrationTest {
                 {"title":"t","content":"c","category":"CHAT",
                  "user":{"id":%d},"likes":999,"views":999}""".formatted(other.getId()));
 
-        Post post = boardRepository.findById(postId).orElseThrow();
+        Post post = postRepository.findById(postId).orElseThrow();
         assertThat(post.getUser().getId()).isEqualTo(author.getId());
         assertThat(post.getLikes()).isZero();
         assertThat(post.getViews()).isZero();
@@ -70,7 +70,7 @@ class CommunityAuthorizationTest extends IntegrationTest {
 
         mvc.perform(delete("/posts/" + postId).cookie(otherCookie)).andExpect(problem(ErrorCode.NOT_AUTHOR));
         mvc.perform(delete("/posts/" + postId).cookie(fixtures.login(fixtures.admin()))).andExpect(status().isNoContent());
-        assertThat(boardRepository.findById(postId).orElseThrow().getIsDeleted()).isTrue();
+        assertThat(postRepository.findById(postId).orElseThrow().getIsDeleted()).isTrue();
     }
 
     @Test
@@ -98,7 +98,7 @@ class CommunityAuthorizationTest extends IntegrationTest {
 
         assertThat(reactionRepository.findAll()).singleElement()
                 .satisfies(r -> assertThat(r.getUser().getId()).isEqualTo(other.getId()));
-        assertThat(boardRepository.findById(postId).orElseThrow().getLikes()).isEqualTo(1);
+        assertThat(postRepository.findById(postId).orElseThrow().getLikes()).isEqualTo(1);
     }
 
     @Test

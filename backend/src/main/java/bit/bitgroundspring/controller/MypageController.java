@@ -1,6 +1,6 @@
 package bit.bitgroundspring.controller;
 
-import bit.bitgroundspring.dto.TierDto;
+import bit.bitgroundspring.dto.response.TierDto;
 import bit.bitgroundspring.entity.User;
 import bit.bitgroundspring.service.UserService;
 import bit.bitgroundspring.security.token.AuthUser;

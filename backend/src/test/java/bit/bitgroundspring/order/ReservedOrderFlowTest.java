@@ -9,7 +9,7 @@ import bit.bitgroundspring.service.OrderExecutionService;
 import bit.bitgroundspring.service.OrderService;
 import bit.bitgroundspring.service.ReservedOrderBook;
 import bit.bitgroundspring.support.IntegrationTest;
-import bit.bitgroundspring.dto.CreateOrderRequest;
+import bit.bitgroundspring.dto.request.CreateOrderRequest;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

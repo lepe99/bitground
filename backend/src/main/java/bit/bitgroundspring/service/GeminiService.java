@@ -3,7 +3,7 @@
 package bit.bitgroundspring.service;
 
 import bit.bitgroundspring.aop.Loggable;
-import bit.bitgroundspring.dto.AiAdviceDto;
+import bit.bitgroundspring.dto.response.AiAdviceDto;
 import bit.bitgroundspring.dto.InvestmentSummaryDto;
 import bit.bitgroundspring.entity.UserDailyBalance; // UserDailyBalance import
 

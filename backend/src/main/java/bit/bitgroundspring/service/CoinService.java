@@ -1,6 +1,6 @@
 package bit.bitgroundspring.service;
 
-import bit.bitgroundspring.dto.CoinSymbolDto;
+import bit.bitgroundspring.dto.response.CoinSymbolDto;
 import bit.bitgroundspring.dto.response.CoinResponse;
 import bit.bitgroundspring.entity.Coin;
 import bit.bitgroundspring.repository.CoinRepository;

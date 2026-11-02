@@ -1,7 +1,7 @@
 package bit.bitgroundspring.api;
 
 import bit.bitgroundspring.common.error.ErrorCode;
-import bit.bitgroundspring.repository.BoardRepository;
+import bit.bitgroundspring.repository.PostRepository;
 import bit.bitgroundspring.support.IntegrationTest;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -33,7 +33,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class CommunityIntegrityTest extends IntegrationTest {
 
     @Autowired
-    BoardRepository boardRepository;
+    PostRepository postRepository;
     @Autowired
     ObjectMapper objectMapper;
 
@@ -84,7 +84,7 @@ class CommunityIntegrityTest extends IntegrationTest {
             pool.shutdown();
         }
 
-        assertThat(boardRepository.findById(postId).orElseThrow().getLikes()).isEqualTo(20);
+        assertThat(postRepository.findById(postId).orElseThrow().getLikes()).isEqualTo(20);
     }
 
     @Test
@@ -166,14 +166,14 @@ class CommunityIntegrityTest extends IntegrationTest {
                 <a href="javascript:alert(1)">링크</a><a href="https://example.com">정상</a>
                 """);
 
-        String saved = boardRepository.findById(postId).orElseThrow().getContent();
+        String saved = postRepository.findById(postId).orElseThrow().getContent();
         assertThat(saved)
                 .contains("<p class=\"ql-align-center\">안녕</p>")
                 .contains("src=\"https://cdn.example.com/a.png\"")
                 .contains("href=\"https://example.com\"")
                 .contains("rel=\"noopener noreferrer\"")
                 .doesNotContain("<script", "onerror", "javascript:", "position");
-        assertThat(boardRepository.findById(postId).orElseThrow().getHasImage()).isTrue();
+        assertThat(postRepository.findById(postId).orElseThrow().getHasImage()).isTrue();
     }
 
     private int comment(int postId, String content, Integer parentId) throws Exception {

@@ -1,4 +1,4 @@
-package bit.bitgroundspring.security.oauth2;
+package bit.bitgroundspring.controller;
 
 import bit.bitgroundspring.aop.Loggable;
 import bit.bitgroundspring.common.error.BusinessException;

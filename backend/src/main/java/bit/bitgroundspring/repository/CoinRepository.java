@@ -1,6 +1,6 @@
 package bit.bitgroundspring.repository;
 
-import bit.bitgroundspring.dto.CoinSymbolDto;
+import bit.bitgroundspring.dto.response.CoinSymbolDto;
 import bit.bitgroundspring.entity.Coin;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -16,7 +16,7 @@ public interface CoinRepository extends JpaRepository<Coin, Integer> {
     Optional<Coin> findBySymbol(String symbol);
 
     // symbol, korean_name 반환
-    @Query("SELECT new bit.bitgroundspring.dto.CoinSymbolDto(c.symbol, c.koreanName) "
+    @Query("SELECT new bit.bitgroundspring.dto.response.CoinSymbolDto(c.symbol, c.koreanName) "
             + "FROM Coin c WHERE c.isDeleted = false")
     List<CoinSymbolDto> findAllSymbols();
 

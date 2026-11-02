@@ -1,7 +1,7 @@
 package bit.bitgroundspring.controller;
 
-import bit.bitgroundspring.dto.AiInsightSymbolDto;
-import bit.bitgroundspring.dto.CoinSymbolDto;
+import bit.bitgroundspring.dto.response.AiInsightSymbolDto;
+import bit.bitgroundspring.dto.response.CoinSymbolDto;
 import bit.bitgroundspring.dto.response.AiInsightResponse;
 import bit.bitgroundspring.dto.response.CoinResponse;
 import bit.bitgroundspring.service.AiInsightService;

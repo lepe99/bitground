@@ -1,6 +1,6 @@
 package bit.bitgroundspring.dto.response;
 
-import bit.bitgroundspring.dto.PublicRankingDto;
+import bit.bitgroundspring.dto.response.PublicRankingDto;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;

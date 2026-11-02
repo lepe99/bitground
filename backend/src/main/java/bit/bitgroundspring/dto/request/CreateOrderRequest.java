@@ -1,4 +1,4 @@
-package bit.bitgroundspring.dto;
+package bit.bitgroundspring.dto.request;
 
 import bit.bitgroundspring.entity.OrderType;
 import jakarta.validation.constraints.NotNull;

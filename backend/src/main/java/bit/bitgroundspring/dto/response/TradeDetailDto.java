@@ -1,4 +1,4 @@
-package bit.bitgroundspring.dto;
+package bit.bitgroundspring.dto.response;
 
 import lombok.Builder;
 import lombok.Data;

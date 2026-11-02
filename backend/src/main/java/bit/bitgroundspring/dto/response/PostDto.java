@@ -1,4 +1,4 @@
-package bit.bitgroundspring.dto;
+package bit.bitgroundspring.dto.response;
 
 import bit.bitgroundspring.dto.projection.PastSeasonTierProjection;
 import bit.bitgroundspring.entity.Category;
@@ -12,7 +12,7 @@ import java.util.List;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class BoardDto {
+public class PostDto {
     private Integer id;
     private Integer userId;
     private String name;
@@ -34,8 +34,8 @@ public class BoardDto {
     private int highestTier;
     private List<PastSeasonTierProjection> pastSeasonTiers;
 
-    // 목록 조회용 생성자 (본문 제외, BoardRepository.findBoardList JPQL에서 사용)
-    public BoardDto(Integer id, Integer userId, String name, String profileImage,
+    // 목록 조회용 생성자 (본문 제외, PostRepository.findPostList JPQL에서 사용)
+    public PostDto(Integer id, Integer userId, String name, String profileImage,
                     String title, Integer tier, Integer likes, Integer dislikes,
                     Boolean isDeleted, LocalDateTime createdAt, LocalDateTime updatedAt,
                     Category category, Integer views, Long commentCount, Boolean hasImage) {
@@ -44,7 +44,7 @@ public class BoardDto {
     }
 
     // 상세 조회용 생성자 (기본 필드만)
-    public BoardDto(Integer id, Integer userId, String name, String profileImage,
+    public PostDto(Integer id, Integer userId, String name, String profileImage,
                     String title, String content, int tier, int likes, int dislikes,
                     boolean isDeleted, LocalDateTime createdAt, LocalDateTime updatedAt,
                     String category, int views, Long commentCount, boolean hasImage) {

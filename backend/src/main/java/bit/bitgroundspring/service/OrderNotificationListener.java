@@ -1,12 +1,12 @@
 package bit.bitgroundspring.service;
 
-import bit.bitgroundspring.dto.response.Message;
-import bit.bitgroundspring.dto.response.MessageType;
+import bit.bitgroundspring.entity.Message;
+import bit.bitgroundspring.entity.MessageType;
 import bit.bitgroundspring.dto.response.NotificationResponse;
 import bit.bitgroundspring.entity.User;
 import bit.bitgroundspring.event.ReserveOrderExecutedEvent;
 import bit.bitgroundspring.repository.UserRepository;
-import bit.bitgroundspring.util.UserSseEmitters;
+import bit.bitgroundspring.service.UserSseEmitters;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;

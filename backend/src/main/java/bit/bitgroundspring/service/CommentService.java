@@ -2,12 +2,12 @@ package bit.bitgroundspring.service;
 
 import bit.bitgroundspring.common.error.BusinessException;
 import bit.bitgroundspring.common.error.ErrorCode;
-import bit.bitgroundspring.dto.CommentRequestDto;
-import bit.bitgroundspring.dto.CommentResponseDto;
+import bit.bitgroundspring.dto.request.CommentRequestDto;
+import bit.bitgroundspring.dto.response.CommentResponseDto;
 import bit.bitgroundspring.entity.Comment;
 import bit.bitgroundspring.entity.Post;
 import bit.bitgroundspring.entity.User;
-import bit.bitgroundspring.repository.BoardRepository;
+import bit.bitgroundspring.repository.PostRepository;
 import bit.bitgroundspring.repository.CommentRepository;
 import bit.bitgroundspring.repository.UserRepository;
 import bit.bitgroundspring.security.token.AuthUser;
@@ -25,13 +25,13 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class CommentService {
     private final CommentRepository commentRepository;
-    private final BoardRepository boardRepository;
+    private final PostRepository postRepository;
     private final UserRepository userRepository;
 
     //댓글 저장
     @Transactional
     public void save(Integer userId, CommentRequestDto dto) {
-        Post post = boardRepository.findById(dto.getPostId())
+        Post post = postRepository.findById(dto.getPostId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.POST_NOT_FOUND));
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));

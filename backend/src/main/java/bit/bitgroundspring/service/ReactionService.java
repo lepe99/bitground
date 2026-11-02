@@ -3,7 +3,7 @@ package bit.bitgroundspring.service;
 import bit.bitgroundspring.common.error.BusinessException;
 import bit.bitgroundspring.common.error.ErrorCode;
 import bit.bitgroundspring.entity.*;
-import bit.bitgroundspring.repository.BoardRepository;
+import bit.bitgroundspring.repository.PostRepository;
 import bit.bitgroundspring.repository.CommentRepository;
 import bit.bitgroundspring.repository.ReactionRepository;
 import lombok.RequiredArgsConstructor;
@@ -16,7 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class ReactionService {
 
     private final ReactionRepository reactionRepository;
-    private final BoardRepository boardRepository;
+    private final PostRepository postRepository;
     private final CommentRepository commentRepository;
 
     @Transactional
@@ -47,7 +47,7 @@ public class ReactionService {
         int id = targetId.intValue();
         int updated;
         if (type == ReactionTargetType.POST) {
-            updated = liked ? boardRepository.addLikes(id, delta) : boardRepository.addDislikes(id, delta);
+            updated = liked ? postRepository.addLikes(id, delta) : postRepository.addDislikes(id, delta);
             if (updated == 0) throw new BusinessException(ErrorCode.POST_NOT_FOUND);
         } else {
             updated = liked ? commentRepository.addLikes(id, delta) : commentRepository.addDislikes(id, delta);

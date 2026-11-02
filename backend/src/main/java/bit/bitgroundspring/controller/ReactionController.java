@@ -1,7 +1,7 @@
 package bit.bitgroundspring.controller;
 
 import jakarta.validation.Valid;
-import bit.bitgroundspring.dto.ReactionDto;
+import bit.bitgroundspring.dto.request.ReactionDto;
 import bit.bitgroundspring.service.ReactionService;
 import bit.bitgroundspring.security.token.AuthUser;
 import lombok.RequiredArgsConstructor;

@@ -1,8 +1,8 @@
 package bit.bitgroundspring.controller;
 
-import bit.bitgroundspring.dto.TradeDetailDto;
-import bit.bitgroundspring.dto.TradeSummaryDto;
-import bit.bitgroundspring.dto.UserDto;
+import bit.bitgroundspring.dto.response.TradeDetailDto;
+import bit.bitgroundspring.dto.response.TradeSummaryDto;
+import bit.bitgroundspring.dto.response.UserDto;
 import bit.bitgroundspring.entity.Season;
 import bit.bitgroundspring.entity.User;
 import bit.bitgroundspring.security.token.AuthUser;
