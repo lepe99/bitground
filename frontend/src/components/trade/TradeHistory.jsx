@@ -1,19 +1,13 @@
-import React, {useEffect, useRef, useState} from 'react';
-import api from "../../api/axiosConfig.js";
+import React, {useEffect, useState} from 'react';
 import "../../styles/trade/TradeHistory.css"
+
+// 화면에 유지하는 최근 체결 건수 (새 체결이 계속 와도 목록이 끝없이 커지지 않도록)
+const MAX_ROWS = 30;
+const RECONNECT_BASE_MS = 1000;
+const RECONNECT_MAX_MS = 30000;
 
 export default function TradeHistory({symbol}) {
     const [history, setHistory] = useState([]);
-    const wsRef = useRef(null);
-    const prevSymbolRef = useRef(null);
-
-    // 1) 초기 REST 호출
-    useEffect(() => {
-        if (!symbol) return;
-        api.get('/trade/history', {params: {symbol}})
-            .then(res => setHistory(res.data.slice(0, 30)))
-            .catch(console.error);
-    }, [symbol]);
 
     const currency = symbol.split("-")[0];
     const displaySymbol = symbol.split("-")[1];
@@ -29,61 +23,48 @@ export default function TradeHistory({symbol}) {
         };
     };
 
-    // 2) WebSocket 연결 (마운트 시 단 한 번만)
+    // 종목마다 WebSocket 하나: 구독 직후 서버가 최근 체결(initial)을 보내고, 이후 새 체결(update)을 보낸다.
+    // 연결이 끊기면 지수 백오프로 다시 연결하고, 종목이 바뀌거나 화면을 떠나면 닫는다.
     useEffect(() => {
-        const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
-        const wsUrl = `${proto}://${window.location.host}/ws/trade/history`;
-        const ws = new WebSocket(wsUrl);
-        wsRef.current = ws;
+        if (!symbol) return;
 
-        ws.onopen = () => {
-            if (symbol) {
+        let ws;
+        let reconnectTimer;
+        let attempts = 0;
+        let disposed = false;
+        setHistory([]);
+
+        const connect = () => {
+            const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
+            ws = new WebSocket(`${proto}://${window.location.host}/ws/trade/history`);
+
+            ws.onopen = () => {
+                attempts = 0;
                 ws.send(JSON.stringify({action: 'subscribe', symbol}));
-                prevSymbolRef.current = symbol;
-            }
+            };
+            ws.onmessage = evt => {
+                let msg;
+                try {
+                    msg = JSON.parse(evt.data);
+                } catch {
+                    return;
+                }
+                setHistory(prev => (msg.type === 'initial' ? msg.data : [msg.data, ...prev]).slice(0, MAX_ROWS));
+            };
+            ws.onclose = () => {
+                if (disposed) return;
+                const delay = Math.min(RECONNECT_BASE_MS * 2 ** attempts, RECONNECT_MAX_MS);
+                attempts++;
+                reconnectTimer = setTimeout(connect, delay);
+            };
         };
-        ws.onmessage = evt => {
-            let msg;
-            try {
-                msg = JSON.parse(evt.data);
-            } catch {
-                return;
-            }
-            // 초기 메시지(type:"initial")는 data 배열, 업데이트(type:"update")는 data 객체
-            const payload = msg.type === 'initial'
-                ? msg.data
-                : [msg.data];
-            setHistory(prev => {
-                // "initial"일 땐 전체 덮어쓰기, "update"일 땐 새 항목만 앞에 추가
-                const next = msg.type === 'initial'
-                    ? payload
-                    : [payload[0], ...prev];
-                return next.slice(0, 30); // 최신 30개만 유지
-            });
+        connect();
+
+        return () => {
+            disposed = true;
+            clearTimeout(reconnectTimer);
+            ws?.close();
         };
-        ws.onerror = console.error;
-
-        return () => ws.close();
-    }, []); // 빈 deps
-
-    // 3) symbol 변경 시 subscribe/unsubscribe
-    useEffect(() => {
-        const ws = wsRef.current;
-        if (!ws || ws.readyState !== WebSocket.OPEN) return;
-
-        // 전에 구독하던 건 해제
-        if (prevSymbolRef.current && prevSymbolRef.current !== symbol) {
-            ws.send(JSON.stringify({
-                action: 'unsubscribe',
-                symbol: prevSymbolRef.current
-            }));
-        }
-        // 새 심볼 구독
-        if (symbol && prevSymbolRef.current !== symbol) {
-            ws.send(JSON.stringify({action: 'subscribe', symbol}));
-            setHistory([]); // 화면 전환 시 초기화
-            prevSymbolRef.current = symbol;
-        }
     }, [symbol]);
 
     return (
