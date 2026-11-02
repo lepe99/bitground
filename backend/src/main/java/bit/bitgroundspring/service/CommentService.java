@@ -16,8 +16,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.stream.Collectors;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -27,6 +29,7 @@ public class CommentService {
     private final UserRepository userRepository;
 
     //댓글 저장
+    @Transactional
     public void save(Integer userId, CommentRequestDto dto) {
         Post post = boardRepository.findById(dto.getPostId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.POST_NOT_FOUND));
@@ -44,18 +47,39 @@ public class CommentService {
         if(dto.getParentId() != null) {
             Comment parent = commentRepository.findById(dto.getParentId())
                     .orElseThrow(() -> new BusinessException(ErrorCode.COMMENT_NOT_FOUND));
+            // 다른 게시글의 댓글에 답글을 달 수 없도록
+            if (!parent.getPost().getId().equals(post.getId())) {
+                throw new BusinessException(ErrorCode.INVALID_INPUT, "같은 게시글의 댓글에만 답글을 달 수 있습니다.");
+            }
             comment.setParent(parent);
         }
 
         commentRepository.save(comment);
     }
+    /**
+     * 게시글의 댓글 트리
+     * 댓글 전체를 작성자와 함께 쿼리 한 번으로 가져와 메모리에서 부모-자식으로 엮는다.
+     * (기존: 댓글마다 작성자·자식 댓글을 지연 로딩하며 재귀로 순회해 댓글 수만큼 쿼리가 나감)
+     */
     @Transactional(readOnly = true)
     public List<CommentResponseDto> getCommentsByPostId(Integer postId) {
-        List<Comment> comments = commentRepository.findByPostIdAndParentIsNullOrderByCreatedAtAsc(postId);
+        List<Comment> comments = commentRepository.findAllWithUserByPostId(postId);
 
-        return comments.stream()
-                .map(this::toDto)
-                .collect(Collectors.toList());
+        Map<Integer, CommentResponseDto> byId = new LinkedHashMap<>();
+        comments.forEach(c -> byId.put(c.getId(), toDto(c)));
+
+        List<CommentResponseDto> roots = new ArrayList<>();
+        for (Comment c : comments) {
+            CommentResponseDto dto = byId.get(c.getId());
+            // getParent().getId()는 프록시를 초기화하지 않으므로 추가 쿼리가 없다
+            CommentResponseDto parent = c.getParent() == null ? null : byId.get(c.getParent().getId());
+            if (parent == null) {
+                roots.add(dto);
+            } else {
+                parent.getChildren().add(dto);
+            }
+        }
+        return roots;
     }
 
     @Transactional
@@ -89,15 +113,13 @@ public class CommentService {
                 .parentId(comment.getParent() != null ? comment.getParent().getId() : null)
                 .content(comment.getContent())
                 .userName(comment.getUser().getName())
-                .userTier(comment.getUser().getTier()) // ✅ 추가
-                .profileImage(comment.getUser().getProfileImage()) // ✅ 추가
+                .userTier(comment.getUser().getTier())
+                .profileImage(comment.getUser().getProfileImage())
                 .isDeleted(comment.getIsDeleted())
                 .createdAt(comment.getCreatedAt())
                 .likes(comment.getLikes())
                 .dislikes(comment.getDislikes())
-                .children(comment.getChildren().stream()
-                        .map(this::toDto)
-                        .collect(Collectors.toList()))
+                .children(new ArrayList<>())
                 .build();
     }
 }

@@ -23,7 +23,7 @@ const PostList = () => {
     const handleWrite = () => navigate('/community/write');
 
     const handlePostClick = (postId) => {
-        navigate(`/community/${postId}?forceViewCount=true`);
+        navigate(`/community/${postId}`);
     };
 
     const handleCategoryClick = (category) => {

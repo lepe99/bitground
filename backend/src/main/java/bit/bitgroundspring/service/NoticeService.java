@@ -3,6 +3,7 @@ package bit.bitgroundspring.service;
 import bit.bitgroundspring.aop.Loggable;
 import bit.bitgroundspring.common.error.BusinessException;
 import bit.bitgroundspring.common.error.ErrorCode;
+import bit.bitgroundspring.common.html.HtmlSanitizer;
 import bit.bitgroundspring.dto.NoticeRequestDto;
 import bit.bitgroundspring.dto.NoticeResponseDto;
 import bit.bitgroundspring.dto.response.Message;
@@ -25,6 +26,7 @@ public class NoticeService {
     private final NoticeRepository noticeRepository;
     private final UserRepository userRepository;
     private final UserSseEmitters userSseEmitters;
+    private final HtmlSanitizer htmlSanitizer;
 
     @Loggable("공지 등록")
     public Notice createNotice(Integer userId, NoticeRequestDto dto) {
@@ -34,10 +36,11 @@ public class NoticeService {
         Notice notice = Notice.builder()
                 .user(user)
                 .title(dto.getTitle())
-                .content(dto.getContent())
+                .content(htmlSanitizer.sanitize(dto.getContent()))
                 .build();
-        
-        // 사용자들에게 공지 등록 알림 전송
+        Notice saved = noticeRepository.save(notice);
+
+        // 저장이 끝난 뒤 사용자들에게 공지 등록 알림 전송 (기존: 저장 전에 알림부터 보냄)
         Map<String, Object> data = Map.of(
                 "title", dto.getTitle()
         );
@@ -48,7 +51,7 @@ public class NoticeService {
                 .build();
         userSseEmitters.sendToAll(notificationResponse);
 
-        return noticeRepository.save(notice);
+        return saved;
     }
 
 //    public Page<NoticeResponseDto> getPagedNoticeDtos(int page, int size) {

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import "../../styles/community/post.css";
-import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import api from "../../api/axiosConfig.js";
 import { useAuth } from '../../auth/useAuth.js';
 import {RiDeleteBinLine} from "react-icons/ri";
@@ -44,7 +44,6 @@ const PostDetail = () => {
     const { id } = useParams();
     const postId = parseInt(id);
     const navigate = useNavigate();
-    const location = useLocation();
     const user = useAuth();
     const { errorAlert, infoAlert } = useToast();
 
@@ -186,25 +185,18 @@ const PostDetail = () => {
     };
 
     useEffect(() => {
-        const searchParams = new URLSearchParams(location.search);
-        const forceViewCount = searchParams.get('forceViewCount');
+        // 조회수는 서버가 사용자 기준으로 중복을 걸러 올린다
         const fetchPost = async () => {
             try {
-                const response = forceViewCount
-                    ? await api.get(`/posts/${id}?forceViewCount=true`)
-                    : await api.get(`/posts/${id}`);
-
+                const response = await api.get(`/posts/${id}`);
                 setPost(response.data);
-                if (forceViewCount) {
-                    window.history.replaceState({}, '', `/community/${id}`);
-                }
             } catch (err) {
                 errorAlert(getErrorMessage(err, '게시글을 불러오는 데 실패했습니다.'));
                 navigate('/community');
             }
         };
         fetchPost();
-    }, [id, location.search, navigate]);
+    }, [id, navigate]);
 
     useEffect(() => {
         commentHandlers.reloadComments();

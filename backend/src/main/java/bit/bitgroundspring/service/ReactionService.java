@@ -42,19 +42,16 @@ public class ReactionService {
         }
     }
 
+    // 엔티티를 읽어 +1 해서 저장하지 않고 UPDATE ... SET likes = likes + :delta 로 원자적으로 증감
     private void updateCount(ReactionTargetType type, Long targetId, boolean liked, int delta) {
+        int id = targetId.intValue();
+        int updated;
         if (type == ReactionTargetType.POST) {
-            Post post = boardRepository.findById(targetId.intValue())
-                    .orElseThrow(() -> new BusinessException(ErrorCode.POST_NOT_FOUND));
-            if (liked) post.setLikes(post.getLikes() + delta);
-            else post.setDislikes(post.getDislikes() + delta);
-            boardRepository.save(post);
+            updated = liked ? boardRepository.addLikes(id, delta) : boardRepository.addDislikes(id, delta);
+            if (updated == 0) throw new BusinessException(ErrorCode.POST_NOT_FOUND);
         } else {
-            Comment comment = commentRepository.findById(targetId.intValue())
-                    .orElseThrow(() -> new BusinessException(ErrorCode.COMMENT_NOT_FOUND));
-            if (liked) comment.setLikes(comment.getLikes() + delta);
-            else comment.setDislikes(comment.getDislikes() + delta);
-            commentRepository.save(comment);
+            updated = liked ? commentRepository.addLikes(id, delta) : commentRepository.addDislikes(id, delta);
+            if (updated == 0) throw new BusinessException(ErrorCode.COMMENT_NOT_FOUND);
         }
     }
 }

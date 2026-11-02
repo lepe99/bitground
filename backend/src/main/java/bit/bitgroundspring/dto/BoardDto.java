@@ -1,6 +1,7 @@
 package bit.bitgroundspring.dto;
 
 import bit.bitgroundspring.dto.projection.PastSeasonTierProjection;
+import bit.bitgroundspring.entity.Category;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -33,7 +34,16 @@ public class BoardDto {
     private int highestTier;
     private List<PastSeasonTierProjection> pastSeasonTiers;
 
-    // 목록 조회용 생성자 (기본 필드만)
+    // 목록 조회용 생성자 (본문 제외, BoardRepository.findBoardList JPQL에서 사용)
+    public BoardDto(Integer id, Integer userId, String name, String profileImage,
+                    String title, Integer tier, Integer likes, Integer dislikes,
+                    Boolean isDeleted, LocalDateTime createdAt, LocalDateTime updatedAt,
+                    Category category, Integer views, Long commentCount, Boolean hasImage) {
+        this(id, userId, name, profileImage, title, null, tier, likes, dislikes, Boolean.TRUE.equals(isDeleted),
+                createdAt, updatedAt, category.name(), views, commentCount, Boolean.TRUE.equals(hasImage));
+    }
+
+    // 상세 조회용 생성자 (기본 필드만)
     public BoardDto(Integer id, Integer userId, String name, String profileImage,
                     String title, String content, int tier, int likes, int dislikes,
                     boolean isDeleted, LocalDateTime createdAt, LocalDateTime updatedAt,

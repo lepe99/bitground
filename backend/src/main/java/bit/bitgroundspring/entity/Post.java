@@ -51,6 +51,11 @@ public class Post {
     @Column(name = "content", nullable = false, columnDefinition = "mediumtext")
     private String content;
     
+    // 목록에서 본문 없이 이미지 아이콘을 보여주기 위해 저장 시 계산
+    @Column(name = "has_image", nullable = false)
+    @Builder.Default
+    private Boolean hasImage = false;
+    
     @Column(name = "likes", nullable = false, columnDefinition = "int default 0")
     @Builder.Default
     private Integer likes = 0;
