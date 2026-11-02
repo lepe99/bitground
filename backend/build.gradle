@@ -37,9 +37,16 @@ dependencies {
     developmentOnly 'org.springframework.boot:spring-boot-devtools'
     runtimeOnly 'com.mysql:mysql-connector-j'
     annotationProcessor 'org.projectlombok:lombok'
+    testCompileOnly 'org.projectlombok:lombok'
+    testAnnotationProcessor 'org.projectlombok:lombok'
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.springframework.security:spring-security-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
+    // 통합 테스트: 실제 MySQL·Redis 컨테이너
+    testImplementation 'org.springframework.boot:spring-boot-testcontainers'
+    testImplementation 'org.testcontainers:junit-jupiter'
+    testImplementation 'org.testcontainers:mysql'
 
     // object storage (AWS S3, 로컬은 S3Mock)
     implementation platform('software.amazon.awssdk:bom:2.29.0')
@@ -62,4 +69,6 @@ dependencies {
 
 tasks.named('test') {
     useJUnitPlatform()
+    // Docker Engine 29+는 API 1.40 미만을 거부하므로 Testcontainers(docker-java)가 쓸 API 버전을 명시
+    systemProperty 'api.version', '1.44'
 }

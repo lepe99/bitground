@@ -1,13 +1,11 @@
 package bit.bitgroundspring;
 
+import bit.bitgroundspring.support.IntegrationTest;
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
 
-@SpringBootTest
-class BitGroundSpringApplicationTests {
+class BitGroundSpringApplicationTests extends IntegrationTest {
 
     @Test
     void contextLoads() {
     }
-
 }
