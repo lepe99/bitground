@@ -122,7 +122,7 @@ func run(ctx context.Context, db *sql.DB, cfg config.Config, now time.Time) erro
 	}
 	if flags.Split {
 		errs = append(errs, step("스플릿(현금 지급)", func() error {
-			return service.UpdateSplit(ctx, db, cfg)
+			return service.UpdateSplit(ctx, db, cfg, now)
 		}))
 	}
 
@@ -146,7 +146,7 @@ func run(ctx context.Context, db *sql.DB, cfg config.Config, now time.Time) erro
 			errs = append(errs, errors.New("랭킹 계산 실패로 시즌 정산을 건너뜀"))
 		} else {
 			errs = append(errs, step("시즌 정산", func() error {
-				return service.UpdateSeason(ctx, db, cfg, seasonID, coinPrices)
+				return service.UpdateSeason(ctx, db, cfg, now, seasonID, coinPrices)
 			}))
 		}
 	}

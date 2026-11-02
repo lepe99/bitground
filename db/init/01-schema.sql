@@ -182,6 +182,16 @@ CREATE TABLE `reactions` (
   CONSTRAINT `FKqmewaibcp5bxtlqxc2cawhuln` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- 스케줄러(Go) 정산 실행 기록: 같은 기간의 시즌 정산·스플릿이 두 번 실행되지 않도록 막는다
+-- (Lambda 재시도·중복 호출 대비). notified_at은 백엔드 알림까지 끝났는지 표시
+CREATE TABLE `scheduler_runs` (
+  `kind` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `period` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `created_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  `notified_at` datetime(6) DEFAULT NULL,
+  PRIMARY KEY (`kind`,`period`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE `seasons` (
   `end_at` date DEFAULT NULL,
   `id` int NOT NULL AUTO_INCREMENT,
