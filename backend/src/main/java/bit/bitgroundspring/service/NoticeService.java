@@ -23,8 +23,8 @@ public class NoticeService {
     private final UserRepository userRepository;
     private final UserSseEmitters userSseEmitters;
 
-    public Notice createNotice(NoticeRequestDto dto) {
-        User user = userRepository.findById(dto.getUserId())
+    public Notice createNotice(Integer userId, NoticeRequestDto dto) {
+        User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("유저 없음"));
 
         Notice notice = Notice.builder()

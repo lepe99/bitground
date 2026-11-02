@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -50,7 +51,9 @@ public class SecurityConfig {
                         .requestMatchers("/auth/refresh", "/oauth2/**", "/error", "/favicon.ico", "/test", "/ws/**", "/actuator/*", // 인증, 테스트
                                 "/coins/**", "/coins", "/news", "/market-index/**", "/ai-insights/**", "/public/**", // 공개 API
                                 "/auth/logout", "/seasons/update").permitAll()
-                        .requestMatchers("/inquiries/*/answer", "/api/docs/**").hasRole("ADMIN")
+                        .requestMatchers("/api/docs/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/notices").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/notices/*").hasRole("ADMIN")
                         .anyRequest().authenticated()
                 )
                 .oauth2Login(oauth2Login -> oauth2Login

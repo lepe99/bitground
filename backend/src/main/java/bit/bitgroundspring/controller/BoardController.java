@@ -9,6 +9,7 @@ import bit.bitgroundspring.naver.NcpObjectStorageService;
 import bit.bitgroundspring.repository.BoardRepository;
 import bit.bitgroundspring.repository.CommentRepository;
 import bit.bitgroundspring.repository.UserRepository;
+import bit.bitgroundspring.security.token.AuthUser;
 import bit.bitgroundspring.service.BoardService;
 import bit.bitgroundspring.service.RankService;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +21,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
@@ -63,18 +65,20 @@ public class BoardController {
 
     // ✅ 게시글 등록 (FormData 기반)
     @PostMapping("/form")
-    public ResponseEntity<?> createPost(@RequestBody Post post) {
+    public ResponseEntity<?> createPost(@AuthenticationPrincipal AuthUser authUser, @RequestBody Post request) {
         try {
-            if (post.getUser() == null || post.getUser().getId() == null) {
-                return ResponseEntity.badRequest().body("userId 누락");
-            }
-
-            // DB에서 영속 객체로 교체
-            User user = userRepository.findById(post.getUser().getId())
+            // 작성자는 요청 본문이 아니라 로그인 토큰 기준으로 정한다
+            User user = userRepository.findById(authUser.id())
                     .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
-            post.setUser(user);
-            post.setTier(user.getTier());
+            // 클라이언트가 보낸 값 중 제목/내용/카테고리만 사용 (조회수·좋아요 등 임의 설정 방지)
+            Post post = Post.builder()
+                    .user(user)
+                    .tier(user.getTier())
+                    .category(request.getCategory())
+                    .title(request.getTitle())
+                    .content(request.getContent())
+                    .build();
 
             boardRepository.save(post);
             return ResponseEntity.ok("글 등록 성공");
@@ -158,28 +162,15 @@ public class BoardController {
         return ResponseEntity.ok(dto);
     }
 
-    //좋아요 버튼 기능
-    @PostMapping("/{id}/like")
-    public ResponseEntity<?> likePost(@PathVariable Integer id) {
-        Post post = boardRepository.findById(id).orElseThrow();
-        post.setLikes(post.getLikes() + 1);
-        boardRepository.save(post);
-        return ResponseEntity.ok().body(post.getLikes());
-    }
-
-    //싫어요 버튼 기능
-    @PostMapping("/{id}/dislike")
-    public ResponseEntity<?> dislikePost(@PathVariable Integer id) {
-        Post post = boardRepository.findById(id).orElseThrow();
-        post.setDislikes(post.getDislikes() + 1);
-        boardRepository.save(post);
-        return ResponseEntity.ok().body(post.getDislikes());
-    }
-
     @DeleteMapping("/{id}")
-    public ResponseEntity<?> deletePost(@PathVariable Integer id) {
+    public ResponseEntity<?> deletePost(@AuthenticationPrincipal AuthUser authUser, @PathVariable Integer id) {
         Post post = boardRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "게시글이 없습니다."));
+
+        // 작성자 본인 또는 관리자만 삭제 가능
+        if (!post.getUser().getId().equals(authUser.id()) && !authUser.admin()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "삭제 권한이 없습니다.");
+        }
 
         post.setIsDeleted(true);
         boardRepository.save(post);

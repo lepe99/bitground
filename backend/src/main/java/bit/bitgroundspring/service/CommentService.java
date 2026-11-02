@@ -8,10 +8,12 @@ import bit.bitgroundspring.entity.User;
 import bit.bitgroundspring.repository.BoardRepository;
 import bit.bitgroundspring.repository.CommentRepository;
 import bit.bitgroundspring.repository.UserRepository;
-import jakarta.persistence.EntityNotFoundException;
+import bit.bitgroundspring.security.token.AuthUser;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -25,10 +27,10 @@ public class CommentService {
     private final UserRepository userRepository;
 
     //댓글 저장
-    public void save(CommentRequestDto dto) {
+    public void save(Integer userId, CommentRequestDto dto) {
         Post post = boardRepository.findById(dto.getPostId())
                 .orElseThrow(() -> new IllegalArgumentException("게시글이 존재하지 않습니다"));
-        User user = userRepository.findById(dto.getUserId())
+        User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("사용자가 존재하지 않습니다"));
 
         Comment comment = Comment.builder()
@@ -57,12 +59,13 @@ public class CommentService {
     }
 
     @Transactional
-    public void deleteComment(Integer commentId, Integer userId) {
+    public void deleteComment(Integer commentId, AuthUser authUser) {
         Comment comment = commentRepository.findById(commentId)
                 .orElseThrow(() -> new RuntimeException("댓글 없음"));
 
-        if (!comment.getUser().getId().equals(userId)) {
-            throw new IllegalStateException("삭제 권한이 없습니다.");
+        // 작성자 본인 또는 관리자만 삭제 가능
+        if (!comment.getUser().getId().equals(authUser.id()) && !authUser.admin()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "삭제 권한이 없습니다.");
         }
 
         // 자식 댓글 먼저 삭제
@@ -73,20 +76,6 @@ public class CommentService {
         }
 
         commentRepository.delete(comment); // 부모 댓글 삭제
-    }
-
-    @Transactional
-    public void likeComment(Integer commentId) {
-        Comment comment = commentRepository.findById(commentId)
-                .orElseThrow(() -> new EntityNotFoundException("댓글을 찾을 수 없습니다."));
-        comment.setLikes(comment.getLikes() + 1);
-    }
-
-    @Transactional
-    public void dislikeComment(Integer commentId) {
-        Comment comment = commentRepository.findById(commentId)
-                .orElseThrow(() -> new EntityNotFoundException("댓글을 찾을 수 없습니다."));
-        comment.setDislikes(comment.getDislikes() + 1);
     }
 
     public long countByPostId(Integer postId) {

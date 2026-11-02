@@ -82,7 +82,6 @@ const PostWrite = () => {
         }
 
         const formData = {
-            user: { id: user.user.id },
             title,
             content,
             category

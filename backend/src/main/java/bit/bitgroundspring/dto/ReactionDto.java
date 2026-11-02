@@ -9,7 +9,6 @@ import lombok.*;
 @AllArgsConstructor
 @Builder
 public class ReactionDto {
-    private Long userId;
     private ReactionTargetType targetType;
     private Long targetId;
     private Boolean liked;

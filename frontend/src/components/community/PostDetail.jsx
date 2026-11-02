@@ -107,13 +107,11 @@ const PostDetail = () => {
                 <div className="comment-content">{comment.content}</div>
                 <div className="comment-actions">
                     <button className="comment-action-btn" onClick={() => sendReaction({
-                        userId: user.user.id,
                         targetType: 'COMMENT',
                         targetId: comment.id,
                         liked: true
                     })}>👍 {comment.likes}</button>
                     <button className="comment-action-btn" onClick={() => sendReaction({
-                        userId: user.user.id,
                         targetType: 'COMMENT',
                         targetId: comment.id,
                         liked: false
@@ -153,7 +151,6 @@ const PostDetail = () => {
             if (!commentContent.trim()) return;
             api.post("/comments", {
                 postId: id,
-                userId: user.user.id,
                 content: commentContent,
                 parentId: null
             }).then(() => {
@@ -165,7 +162,6 @@ const PostDetail = () => {
             if (!replyContent.trim()) return;
             api.post("/comments", {
                 postId: id,
-                userId: user.user.id,
                 content: replyContent,
                 parentId
             }).then(() => {
@@ -178,9 +174,7 @@ const PostDetail = () => {
             const confirmed = window.confirm("댓글을 삭제하시겠습니까?");
             if (!confirmed) return;
             try {
-                await api.delete(`/comments/${commentId}`, {
-                    params: { userId: user.user.id }
-                });
+                await api.delete(`/comments/${commentId}`);
                 commentHandlers.reloadComments();
             } catch (err) {
                 errorAlert("댓글 삭제 실패");
@@ -320,14 +314,12 @@ const PostDetail = () => {
                     />
                     <div className='post-detail-footer'>
                         <button className='likebtn' style={{ marginRight: '10px' }} onClick={() => sendReaction({
-                            userId: user.user.id,
                             targetType: 'POST',
                             targetId: postId,
                             liked: true
                         })}>👍 좋아요({post.likes})</button>
 
                         <button className='dislikebtn' onClick={() => sendReaction({
-                            userId: user.user.id,
                             targetType: 'POST',
                             targetId: postId,
                             liked: false

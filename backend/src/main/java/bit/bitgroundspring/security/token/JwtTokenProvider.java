@@ -116,21 +116,22 @@ public class JwtTokenProvider {
                 .parseClaimsJws(token)
                 .getBody();
         
-        String username = claims.getSubject();
-
         // 권한 정보 추출
         Collection<? extends GrantedAuthority> authorities =
                 Arrays.stream(claims.get("auth").toString().split(","))
                         .map(SimpleGrantedAuthority::new)
                         .collect(Collectors.toList());
-        
+
+        String provider = (String) claims.get("provider");
+        boolean admin = authorities.stream().anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
+        AuthUser principal = new AuthUser(claims.get("userId", Integer.class), claims.getSubject(), provider, admin);
+
         // 인증된 사용자 정보를 담은 객체 생성
         // 두 번째 파라미터(credentials)는 보안상 이유로 null로 설정
         UsernamePasswordAuthenticationToken authentication =
-                new UsernamePasswordAuthenticationToken(username, null, authorities);
-        
+                new UsernamePasswordAuthenticationToken(principal, null, authorities);
+
         // JWT 클레임 정보를 details에 저장
-        String provider = (String) claims.get("provider");
         // 필요한 다른 클레임도 추가
         authentication.setDetails(provider);
         

@@ -3,8 +3,10 @@ package bit.bitgroundspring.controller;
 import bit.bitgroundspring.dto.CommentRequestDto;
 import bit.bitgroundspring.dto.CommentResponseDto;
 import bit.bitgroundspring.service.CommentService;
+import bit.bitgroundspring.security.token.AuthUser;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -18,8 +20,9 @@ public class CommentController {
 
     // 댓글 등록
     @PostMapping
-    public ResponseEntity<?> createComment(@RequestBody CommentRequestDto dto) {
-        commentService.save(dto);
+    public ResponseEntity<?> createComment(@AuthenticationPrincipal AuthUser authUser,
+                                           @RequestBody CommentRequestDto dto) {
+        commentService.save(authUser.id(), dto);
         return ResponseEntity.ok().build();
     }
 
@@ -33,21 +36,9 @@ public class CommentController {
     // 댓글 삭제
     @DeleteMapping("/{commentId}")
     public ResponseEntity<?> deleteComment(
-            @PathVariable Integer commentId,
-            @RequestParam Integer userId) {
-        commentService.deleteComment(commentId, userId);
-        return ResponseEntity.ok().build();
-    }
-
-    @PostMapping("/{commentId}/like")
-    public ResponseEntity<Void> likeComment(@PathVariable Integer commentId) {
-        commentService.likeComment(commentId);
-        return ResponseEntity.ok().build();
-    }
-
-    @PostMapping("/{commentId}/dislike")
-    public ResponseEntity<Void> dislikeComment(@PathVariable Integer commentId) {
-        commentService.dislikeComment(commentId);
+            @AuthenticationPrincipal AuthUser authUser,
+            @PathVariable Integer commentId) {
+        commentService.deleteComment(commentId, authUser);
         return ResponseEntity.ok().build();
     }
 
