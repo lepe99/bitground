@@ -2,7 +2,7 @@ import "../../styles/main/AltCard.css";
 import { GrCircleQuestion } from "react-icons/gr";
 import { useState, useRef, useEffect } from "react";
 
-export default function altCard({ title, subtitle, value, avgValue, children }) {
+export default function AltCard({ title, subtitle, value, avgValue, children }) {
     const isUp = value >= avgValue;
     const diffValue = Math.abs(value - avgValue);
     const diffRate = ((diffValue / avgValue) * 100).toFixed(2);

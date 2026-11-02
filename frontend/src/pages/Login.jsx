@@ -25,7 +25,7 @@ export default function Main() {
                 <div className={"login-title"}>
                     <p className={"text-login"}>로그인</p>
                     <p className={"text-login-check"}>방문하신 사이트의 주소가 아래와 일치하는지 확인하세요.</p>
-                    <div className={"text-addr"}><CiLock/>https://www.bitground.kr</div>
+                    <div className={"text-addr"}><CiLock/>{window.location.origin}</div>
                 </div>
                 <div className={"login-content"}>
                     <button onClick={() => login('kakao')} className={"kakao-btn"}>카카오 로그인</button>

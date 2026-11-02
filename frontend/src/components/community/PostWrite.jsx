@@ -15,7 +15,7 @@ const PostWrite = () => {
     const [title, setTitle] = useState('');
     const [content, setContent] = useState('');
     const [category, setCategory] = useState('CHAT');
-    const user = useAuth();
+    const {user} = useAuth();
     const {errorAlert, infoAlert} = useToast();
 
 
@@ -106,24 +106,24 @@ const PostWrite = () => {
                     <div className='writer-profile'>
                         <div className="user-icon-div">
                             <div className="post-user-icon">
-                                {user.user.tier !== 0 ? (
+                                {user?.tier !== 0 ? (
                                 <>
                                 <img
-                                    src={tierImageMap[user.user.tier]}
+                                    src={tierImageMap[user?.tier]}
                                     alt=""
                                     className="post-tier-image"
                                 />
-                                {user.user.profileImage && (
+                                {user?.profileImage && (
                                     <img
-                                        src={user.user.profileImage}
+                                        src={user?.profileImage}
                                         alt=""
                                         className="post-rank-profile-image"
                                     />
                                 )}
                                 </>
-                                ) : (user.user.profileImage && (
+                                ) : (user?.profileImage && (
                                     <img
-                                        src={user.user.profileImage}
+                                        src={user?.profileImage}
                                         alt=""
                                         className="post-rank-profile-image"
                                     />
@@ -132,7 +132,7 @@ const PostWrite = () => {
                             </div>
                         </div>
                         <div className='writer-details'>
-                            <span className='writer-nickname'>{user.user.name}</span>
+                            <span className='writer-nickname'>{user?.name}</span>
                         </div>
                     </div>
                     <select

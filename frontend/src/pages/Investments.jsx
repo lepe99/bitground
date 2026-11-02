@@ -19,7 +19,6 @@ export default function Investments() {
     const [activeTab, setActiveTab] = useState('보유자산');
     const [favoriteMarkets, setFavoriteMarkets] = useState([]);
     const [ownedMarkets, setOwnedMarkets] = useState([]);
-    const [seasonId, setSeasonId] = useState(null);
     const [availableCash, setAvailableCash] = useState(0);
     const [userAssets, setUserAssets] = useState([]);
     const [cash, setCash] = useState(0);
@@ -32,19 +31,6 @@ export default function Investments() {
         setSelectedMarket,
         isWsConnected
     } = useContext(TickerContext);
-
-    // ✅ 현재 시즌 ID 불러오기
-    useEffect(() => {
-        const fetchSeasonId = async () => {
-            try {
-                const res = await api.get("/seasons/current-id");
-                setSeasonId(res.data);
-            } catch (e) {
-                console.error("현재 시즌 ID 불러오기 실패", e);
-            }
-        };
-        fetchSeasonId();
-    }, []);
 
     // ✅ 사용자 ID로 보유자산 + 캐시 불러오기
     useEffect(() => {

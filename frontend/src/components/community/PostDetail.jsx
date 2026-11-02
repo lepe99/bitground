@@ -44,7 +44,7 @@ const PostDetail = () => {
     const { id } = useParams();
     const postId = parseInt(id);
     const navigate = useNavigate();
-    const user = useAuth();
+    const {user} = useAuth();
     const { errorAlert, infoAlert } = useToast();
 
     const [post, setPost] = useState(null);
@@ -257,7 +257,7 @@ const PostDetail = () => {
                 <div className='post-detail-content'>
                     <div className='post-detail-header'>
                         <h2 className='post-detail-title'>[{post.category}] {post.title}
-                            {user.user.id === post.userId && (
+                            {user?.id === post.userId && (
                                 <RiDeleteBinLine className='deletebtn' onClick={handleDelete}/>
                             )}</h2>
                         <div className='post-detail-info'>
@@ -337,8 +337,8 @@ const PostDetail = () => {
                                     comment={comment}
                                     onReply={setReplyTargetId}
                                     onDelete={commentHandlers.deleteComment}
-                                    currentUserId={user.user.id}
-                                    user={user.user}
+                                    currentUserId={user?.id}
+                                    user={user}
                                     replyTargetId={replyTargetId}
                                 />
                                 {replyTargetId === comment.id && (

@@ -2,8 +2,10 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react-swc'
 
 // https://vite.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [react()],
+  // 운영 빌드에서는 디버그용 console.log/info/debug 호출을 제거한다 (warn·error는 남김)
+  esbuild: mode === 'production' ? { pure: ['console.log', 'console.info', 'console.debug'] } : {},
   server: {
     port: 5173,
     proxy: {
@@ -19,4 +21,4 @@ export default defineConfig({
       }
     },
   },
-});
+}));
