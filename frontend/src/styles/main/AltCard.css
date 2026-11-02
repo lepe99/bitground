@@ -1,0 +1,53 @@
+.alt-card {
+    background-color: #ffffff;
+    border-radius: 16px;
+    box-shadow: 0 2px 20px rgba(0, 0, 0, 0.05);
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    padding: 20px;
+    flex: 1;
+    height: 180px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.alt-card-content {
+    display: flex;
+    flex: 1;
+    gap: 5px;
+}
+
+.alt-card-info {
+    width: 150px;
+}
+
+.alt-card-title {
+    font-size: 2rem;
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.alt-card-subtitle {
+    font-size: 0.9rem;
+    color: #696969;
+    margin-bottom: 12px;
+}
+
+.alt-card-value {
+    font-size: 2rem;
+    color: #2979ff;
+    font-weight: 700;
+    margin-bottom: 4px;
+}
+
+.alt-card-diff {
+    font-size: 0.9rem;
+    color: #2979ff;
+}
+
+.alt-card-chart {
+    flex: 1;
+}
+.alt-card-chart span{
+    font-size: 0.8rem;
+}

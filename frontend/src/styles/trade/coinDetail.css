@@ -1,0 +1,125 @@
+/* CoinDetail 기본 박스 */
+.coin-detail {
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+/* ① 제목 & 즐겨찾기 */
+.coin-header {
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid #0000000d;
+    padding-bottom: 15px;
+}
+
+.coin-detail-name {
+    margin: 0;
+    font-size: 1.3rem;
+    font-weight: bold;
+}
+
+.coin-code {
+    font-size: 0.85rem;
+    font-weight: normal;
+    color: #8c8c8c;
+}
+.favorite-btn {
+    margin-left: 10px;
+    cursor: pointer;
+    font-size: 1.25rem;
+    stroke: #8c8c8c;
+}
+.favorite-btn:hover {
+    fill: #fc5754;
+}
+.favorite-btn.filled {
+    fill: #fc5754;
+    stroke: none;
+}
+.btn-heart {
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+}
+/* ② 가격 & 변동 */
+.coin-detail-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 5px;
+    /*gap: 30px;*/
+}
+.coin-price-section {
+    display: flex;
+    /*align-items: baseline;*/
+    gap: 10px;
+    flex-direction: column;
+    width: 100%;
+}
+.coin-price {
+    font-size: 2rem;
+    min-font-size: 1.25rem;
+    font-weight: bold;
+}
+.coin-price.up {
+    color: #FC5754;
+}
+.coin-price.down {
+    color: #2979ff;
+}
+.unit {
+    margin-left: 4px;
+    font-weight: normal;
+}
+.unit.up {
+    color: #FC5754;
+}
+.unit.down {
+    color: #2979ff;
+}
+.coin-change {
+    display: flex;
+    gap: 10px;
+}
+.change-rate {
+    color: #8C8C8C;
+}
+
+/* ③ 24H 고가·저가 */
+.coin-stats {
+    display: flex;
+    flex-direction: column;
+    width: 300px;
+}
+.stat {
+    display: flex;
+    align-items: center;
+    white-space: nowrap;
+    justify-content: space-between;
+}
+.stat:first-child {
+    border-bottom: 1px solid #0000000d;
+    padding-bottom: 12px;
+    margin-bottom: 12px;
+}
+.label {
+    font-size: 1rem;
+}
+.sub-label {
+    font-size: 0.85rem;
+    color: #8c8c8c;
+}
+.value {
+    font-size: 1rem;
+    font-weight: bold;
+    margin-top: 4px;
+}
+.value.high {
+    color: #FC5754;
+}
+.value.low {
+    color: #2979ff;
+}

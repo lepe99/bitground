@@ -1,0 +1,115 @@
+.user-tooltip {
+    position: fixed;
+    z-index: 9999;
+    padding: 16px;
+    border-radius: 16px;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 12px;
+    max-width: 250px;
+    width: 250px;
+
+    /* 애니메이션 */
+    transform: scale(0.95);
+    opacity: 0;
+    transition: transform 0.2s ease, opacity 0.2s ease;
+    transform-origin: top center;
+}
+
+.user-tooltip.visible {
+    transform: scale(1);
+    opacity: 1;
+}
+
+
+.tooltip-avatar {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    object-fit: cover;
+    margin-bottom: 12px;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.tooltip-info {
+    text-align: center;
+    width: 100%;
+}
+
+.nickname {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: 6px;
+}
+
+.highest-tier {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 500;
+    margin-bottom: 10px;
+}
+
+/* 티어별 색상 지정 */
+.tier-1 { color: #8B4513; }     /* Bronze */
+.tier-2 { color: #c0c0c0; }     /* Silver */
+.tier-3 { color: #ffd700; }     /* Gold */
+.tier-4 { color: #87CEEB; }     /* Platinum */
+.tier-5 { color: #50C878; }     /* Diamond */
+.tier-6 { color: #FF4500; }     /* Master */
+.tier-7 {  background: linear-gradient(90deg, #8A2BE2, #00BFFF); /* 보라 → 하늘 */
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+
+    /* Firefox 지원용 */
+    background-clip: text;
+    color: transparent;}     /* Grandmaster */
+
+.tier-icon {
+    width: 20px;
+    height: 20px;
+    margin-right: 4px;
+    vertical-align: middle;
+}
+
+.past-tiers {
+    margin-top: 10px;
+    font-size: 0.85rem;
+    color: #444;
+    border-top: 1px solid #eee;
+    padding-top: 8px;
+    width: 100%;
+}
+
+.tier-row {
+    display: flex;
+    align-items: center;
+    margin-top: 4px;
+    justify-content: center;
+}
+
+.season-text {
+    margin-left: 6px;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+
+/* community 전용 작은 폰트 적용 */
+.community-tooltip .tooltip-info .nickname{
+    font-size: 0.9rem;
+}
+.community-tooltip .tooltip-info .highest-tier{
+    font-size: 0.9rem;
+}

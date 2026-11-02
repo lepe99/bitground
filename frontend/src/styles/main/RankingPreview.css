@@ -1,0 +1,66 @@
+.ranking-preview {
+    border: 1px solid rgba(0,0,0,0.05);
+    width: 50%;
+    border-radius: 12px;
+    padding: 1rem;
+    background-color: #ffffff;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+    margin: 0 auto;
+}
+
+.ranking-preview-title {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 10px 10px 20px 10px;
+}
+.ranking-preview-title h2{
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+.ranking-preview-time{
+    display: flex;
+    flex-direction: column;
+}
+.ranking-preview-time p{
+    font-size: 0.8rem;
+    color: #8c8c8c;
+}
+
+.ranking-preview-list {
+    list-style: none;
+    padding: 0;
+}
+
+.ranking-user {
+    display: flex;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.ranking-number {
+    font-weight: 500;
+    margin-right: 10px;
+    width: 40px;
+    text-align: center;
+}
+
+.profile-img {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    margin-right: 8px;
+}
+
+.tier-img {
+    width: 24px;
+    margin: 0 8px;
+}
+
+.total-value {
+    margin-left: auto;
+    font-weight: bold;
+}

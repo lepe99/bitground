@@ -1,0 +1,106 @@
+.mypage{
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.mypage-container {
+    display: flex;
+    flex-direction: column;
+    /*align-items: center;*/
+    height: 100vh;
+    width: 80%;
+    position: relative;
+    gap: 50px;
+}
+
+.mypage-title span{
+    font-size: 2.5rem;
+    font-weight: bold;
+}
+
+.mypage-list{
+    display: flex;
+    flex-direction: column;
+    width: 15%;
+    align-items: center;
+    min-width: 150px;
+}
+.mypage-list div:hover{
+    cursor: pointer;
+    background-color: #FC5754;
+    color: white;
+}
+.mypage-list .active{
+    color: white;
+    background-color: #FC5754;
+}
+
+.invest-info{
+    display: flex;
+    width: 100%;
+    border-top: 1px solid #343434;
+    border-bottom: 1px solid #343434;
+    padding: 15px 0;
+    justify-content: center;
+}
+
+.my-info{
+    display: flex;
+    justify-content: center;
+    width: 100%;
+    border-bottom: 1px solid #343434;
+    padding: 15px 0;
+}
+
+.mypage-content{
+    display: flex;
+    flex-direction: row;
+    gap: 20px;
+    width: 100%;
+}
+
+.mypage-content .content-list{
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    align-items: center;
+}
+
+@media (max-width: 768px) {
+    .mypage{
+        width: 100vw;
+    }
+    .mypage-container {
+        width: 90%;
+        gap: 30px;
+    }
+
+    .mypage-content {
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .mypage-list {
+        flex-direction: row;
+        justify-content: center;
+        width: 100%;
+    }
+
+    .mypage-list div {
+        flex: 1;
+        padding: 10px 0;
+    }
+
+    .mypage-content .content-list {
+        align-items: stretch;
+    }
+    .my-info{
+        border-top: 1px solid #343434;
+    }
+    .season-rank-tier{
+        font-size: 1rem!important;
+    }
+
+}

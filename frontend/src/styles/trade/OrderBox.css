@@ -1,0 +1,164 @@
+.trade-form-wrapper{
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.trade-tabs{
+    display: flex;
+    align-items: center;
+    flex-direction: row;
+    justify-content: space-between;
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.trade-sellbuy-tab{
+    display: flex;
+    gap: 30px;
+}
+
+.trade-tabs span{
+    font-size: 1rem;
+    color: rgba(0,0,0,0.3);
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.trade-tabs span.active{
+    color: #ffffff;
+}
+.trade-tabs span:hover{
+    color: #ffffff;
+}
+
+.order-box-content{
+    display: flex;
+    flex-direction: column;
+}
+
+/*매수*/
+
+.buy-form,.sell-form{
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    margin: 5px;
+}
+.order-radio-section{
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    margin-left: 5px;
+}
+
+.order-label{
+    font-size: 1rem;
+    color: #fff;
+}
+
+.radio-group{
+    display: flex;
+    gap: 15px;
+}
+.radio-group input{
+    vertical-align: middle;
+}
+.radio-group label{
+    color: #fff;
+}
+.buy-money{
+    height: 40px;
+    width: 250px;
+    border: none;
+    background: none;
+    color: #fff;
+    font-size: 1.8rem;
+    text-align: right;
+}
+
+.buy-section{
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+}
+.label>span{
+    font-size: 0.8rem;
+    color: rgba(0,0,0,0.3);
+}
+.buy-price-insert{
+    height: 40px;
+    width: 250px;
+    border-radius: 5px;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    text-align: right;
+}
+.buy-section .label{
+    color: #ffffff;
+}
+
+.buy-count{
+    display: flex;
+    flex-direction: column;
+}
+
+.buy-count-insert{
+    height: 40px;
+    width: 250px;
+    border-radius: 5px;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    text-align: right;
+}
+
+.buy-total-cost{
+    height: 40px;
+    width: 250px;
+    border-radius: 5px;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    text-align: right;
+}
+.percent-buttons{
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    margin-top: 5px;
+}
+.percent-buttons button{
+
+    color: #fff;
+    background-color: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    border-radius: 5px;
+    cursor: pointer;
+    padding: 5px;
+    width: 20%;
+}
+
+.sell-btn{
+    display: flex;
+    width: 100%;
+    justify-content: center;
+    font-weight: 500;
+    align-items: center;
+    background-color: #fff;
+    color: #2979ff;
+    border: 1px solid #0000000d;
+    height: 40px;
+    margin-top: 20px;
+    border-radius: 20px;
+}
+
+.buy-btn{
+    display: flex;
+    width: 100%;
+    justify-content: center;
+    font-weight: 500;
+    align-items: center;
+    background-color: #fff;
+    color: #fc5754;
+    border: 1px solid #0000000d;
+    height: 40px;
+    margin-top: 20px;
+    border-radius: 20px;
+}

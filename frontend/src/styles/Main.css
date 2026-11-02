@@ -1,0 +1,178 @@
+@import url('https://fonts.cdnfonts.com/css/crimson-text');
+
+@keyframes fadeInText {
+    from { opacity: 0;
+    transform: translateY(20px); }
+    to { opacity: 1;
+    transform: translateY(0); }
+}
+
+@keyframes ipadEnter {
+    from{
+        transform: translateX(-50%) translateY(100px);
+    }
+    to{
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+.main-container{
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 90px;
+    margin-bottom: 100px;
+}
+
+.banner-container{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    width: 100%;
+    height: 680px;
+    min-width: fit-content;
+    white-space: nowrap;
+}
+
+.text-banner{
+    font-family: 'Crimson Text', sans-serif;
+    font-size: 9rem;
+    font-weight: 400;
+    text-align: center;
+    width: 100%;
+    opacity: 0;
+    animation: fadeInText 1s ease-out forwards;
+    animation-delay: 0.3s;
+    min-font-size: 5rem;
+}
+
+.mask-wrapper {
+    position: relative;
+    width: 100%;
+    height: 500px; /* 원하는 만큼 보이는 범위 */
+    overflow: hidden; /* 핵심: 이 안에서만 아래 부분 가려짐 */
+    display: flex;
+    align-items: flex-end;
+}
+
+.banner-back{
+    background: linear-gradient(180deg, rgba(252, 87, 84, 1) 0%, rgba(255, 65, 61, 1) 100%);
+    border-radius: 30px 30px 0 0;
+    height: 300px;
+    position: relative;
+    width: 90%;
+    overflow: visible;
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+.ipad{
+    background-color: #343434;
+    border-left: 2px solid #ffffff80;
+    border-right: 2px solid #ffffff80;
+    border-top: 2px solid #ffffff80;
+    border-radius: 24px 24px 0 0;
+    position: relative;
+    overflow: hidden;
+    width: 1000px;
+    height: 500px;
+    top: -200px;
+    left: 50%;
+    transform: translateX(-50%) translateY(100px);
+    animation: ipadEnter 1s ease-out forwards;
+    animation-delay: 0.3s;
+    min-width: 500px;
+}
+
+.ipad-screen{
+    background-image: url('../assets/banner2.png');
+    background-size: cover;
+    background-position: 0 -15px;
+    border-radius: 16px 16px 0 0;
+    height: 480px;
+    width: 956px;
+    position: relative;
+    top: 20px;
+    left: 20px;
+}
+
+/*시장가*/
+.market-price-container {
+    display: flex;
+    width: 80%;
+    margin: 0 auto;
+    justify-content: center;  /* 가운데 정렬 */
+    align-items: flex-start;  /* 위 정렬 */
+    gap: 20px;                /* 두 컴포넌트 간 간격 */
+    flex-wrap: wrap;          /* 사이즈 작아지면 줄바꿈 */
+}
+
+.market-price-container > * {
+    flex: 1 1 400px;           /* 최소 400px 유지하면서 줄바꿈 허용 */
+    max-width: 600px;          /* 너무 커지지 않게 제한 */
+}
+
+
+/* 768px 이하일 때 (태블릿 및 모바일) */
+@media screen and (max-width: 768px) {
+    .main-container{
+        gap: 30px;
+    }
+    .banner-container {
+        width: 100vw;
+        height: 250px;
+        white-space: normal;
+    }
+
+    .text-banner {
+        font-size: 4rem;
+        padding: 0 1rem;
+        line-height: 1.2;
+    }
+
+    .mask-wrapper {
+        height: 250px;
+    }
+
+    .banner-back {
+        width: 100vw;
+        height: 140px;
+        border-radius: 20px 20px 0 0;
+    }
+
+    .ipad {
+        width: 80%;
+        height: 180px;
+        top: -40px;
+        min-width: auto;
+        left: 50%;
+        transform: translateX(-50%) translateY(0);
+    }
+    .ipad-screen {
+        background-size: cover;
+        background-position: 0 5px;
+        border-radius: 16px 16px 0 0;
+        height: 180px;
+        width: 94%;
+        position: relative;
+        top: 10px;
+        left: 10px;
+    }
+    .market-price-container {
+        gap: 5px;
+    }
+
+    .market-card,
+    .market-card-content,
+    .market-card-chart,
+    .alt-card,
+    .alt-card-content,
+    .alt-card-chart{
+        width: 80%;
+    }
+    .ranking-preview{
+        width: 80% !important;
+    }
+
+}

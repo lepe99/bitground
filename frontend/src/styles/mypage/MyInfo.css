@@ -1,0 +1,151 @@
+/* 카드 전체 감싸는 영역 */
+.info-edit-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 0 20px;
+    width: 100%;
+}
+.info-edit-title div{
+    font-size: 2rem;
+    font-weight: 500;
+    margin-bottom: 2px;
+}
+.info-edit-title{
+    width: 100%;
+    padding-bottom: 15px;
+}
+
+/*닉네임 변경 css 시작*/
+
+/* 수정 영역 카드 */
+.info-edit-container {
+    /*background: linear-gradient(to bottom right, #f7f7f7, #ffffff);*/
+    /*border-radius: 12px;*/
+    /*box-shadow: 0 2px 20px rgba(0,0,0,0.05);*/
+    /*border: 1px solid rgba(0, 0, 0, 0.05);*/
+    /*padding: 2.5rem 2rem;*/
+    /*max-width: 400px;*/
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+.info-edit-basic div{
+    font-size: 1.1rem;
+    font-weight: 500;
+    margin-bottom: 2px;
+    padding-top: 15px;
+    border-top: 1px solid rgba(0, 0, 0, 0.05);;
+}
+
+.form-group{
+    width: 300px;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 600;
+}
+
+.form-group input[type="text"],
+.form-group input[type="email"]{
+    width: 100%;
+    padding: 8px;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    border-radius: 5px;
+}
+
+/* 포커스 되었을 때 스타일 변경 */
+.form-group input[type="text"]:focus,
+.form-group input[type="email"]:focus {
+    border: 1px solid #fc5754;
+    box-shadow: 0 2px 20px rgba(0, 0, 0, 0.05); /* 테두리 강조 효과 */
+    outline: none;
+}
+
+.form-edit-file{
+    display: flex;
+    gap: 20px;
+}
+
+.preview-image {
+    width: 100px;
+    height: 100px;
+    object-fit: cover;
+    border-radius: 50%;
+    border: 1px solid #ddd;
+}
+
+/* 커스텀 업로드 버튼 */
+.custom-upload-btn {
+    background-color: #fc5754;
+    color: white;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    padding: 10px 20px;
+    border-radius: 20px;
+    height: 40px;
+    cursor: pointer;
+    font-weight: 500;
+}
+
+.upload-icon {
+    stroke: white; /* or stroke: currentColor; */
+}
+
+.custom-upload-btn:hover {
+    background-color: #fb3d3a;
+    color: white;
+}
+
+
+/* 반응형 대응 */
+@media (max-width: 480px) {
+    .form-group {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .preview-image {
+        margin-top: 10px;
+    }
+}
+
+.edit-btns{
+    display: flex;
+    margin-top: 30px;
+    gap: 15px;
+    justify-content: center;
+    min-width: fit-content;
+    white-space: nowrap;
+}
+
+.edit-submit-btn {
+    background-color: #343434;
+    color: white;
+    border: 1px solid #00000026;
+    padding: 10px 20px 10px 20px;
+    border-radius: 20px;
+    cursor: pointer;
+}
+
+.edit-submit-btn:hover {
+    background-color: rgb(99, 99, 99);
+}
+
+.delete-account-btn{
+    background-color: #fff;
+    border: 1px solid #00000026;
+    padding: 10px 20px 10px 20px;
+    border-radius: 20px;
+    cursor: pointer;
+}
+.delete-account-btn:hover{
+    background-color: #f2f2f2;
+}
+
+/*닉네임 변경 css 끝*/

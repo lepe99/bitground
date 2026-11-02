@@ -1,0 +1,25 @@
+# Secrets (커밋 금지: 예시 파일만 커밋)
+.env
+.env.*
+!.env.example
+**/src/main/resources/application*.yml
+**/src/main/resources/application*.yaml
+!**/src/main/resources/application*.example.yml
+*.pem
+*.key
+*.p12
+
+# Build outputs
+node_modules/
+dist/
+build/
+.gradle/
+bootstrap
+*.zip
+
+# IDE / OS
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db

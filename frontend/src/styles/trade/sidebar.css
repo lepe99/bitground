@@ -1,0 +1,238 @@
+/* ── Sidebar Wrapper ───────────────────── */
+.sidebar-wrapper {
+    display: flex;
+    flex-direction: column;
+    max-height: 1100px;
+    /*border-radius: 12px;*/
+    overflow-x: hidden;
+    min-width: 350px;
+}
+
+/* ── Sticky Header ─────────────────────── */
+.sidebar-header {
+    position: sticky;
+    top: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 12px 16px;
+    background-color: #fff;
+    flex: 0 0 auto;
+}
+.table-container {
+    flex: 1 1 auto;
+    overflow-y: auto;
+}
+/* ── Search Box ────────────────────────── */
+.search-box {
+    position: relative;
+}
+
+.search-box input {
+    width: 100%;
+    height: 40px;
+    padding: 0 20px 0 40px;
+    border-radius: 20px;
+    /* border color removed */
+    font-size: 0.9rem;
+    border: 1px solid #0000000d;
+}
+
+.icon-search {
+    position: absolute;
+    top: 50%;
+    left: 16px;
+    transform: translateY(-50%);
+    width: 16px;
+    height: 15px;
+    fill: #8c8c8c;
+}
+
+/* ── Tabs ──────────────────────────────── */
+.side-tabs {
+    display: flex;
+    justify-content: space-between;
+    /*overflow-x: auto;*/
+    margin: 0 20px 0 20px;
+    white-space: nowrap;
+}
+
+.side-tab {
+    flex-shrink: 0;
+    padding: 6px 10px;
+    margin-bottom: 5px;
+    background: none;
+    border: none;
+    font-size: 1rem;
+    cursor: pointer;
+    /* color removed */
+}
+
+.side-tab.active {
+    /* color / border-bottom color removed */
+    border-bottom: 2px solid #fc5754;
+    font-weight: 600;
+    color: #fc5754;
+}
+
+/* ── Ticker Table ─────────────────────── */
+.ticker-table {
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: collapse;
+    min-width: fit-content;
+}
+
+/*.scroll-body{*/
+/*    overflow-y: auto;*/
+/*}*/
+
+.ticker-table thead th {
+    padding: 10px;
+    font-size: 0.85rem;
+    font-weight: normal;
+    text-align: center;
+    color: #8c8c8c;
+    cursor: pointer;
+    position: sticky;
+    top: 0;
+    background: #f7f7f7;
+}
+
+.ticker-table tbody td {
+    padding: 12px 8px;
+    /* border-bottom color removed */
+    vertical-align: middle;
+}
+
+.ticker-table tbody tr:hover {
+    cursor: pointer;
+    background-color: #f7f7f7;
+}
+
+.ticker-table tbody tr.selected {
+    /* background color removed */
+}
+
+/* Column-specific alignment */
+.ticker-table tbody td:nth-child(1) { text-align: left;  }
+.ticker-table tbody td:nth-child(2),
+.ticker-table tbody td:nth-child(3) { text-align: right; }
+
+/* ── Cell Contents ────────────────────── */
+.cell-name {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    white-space: normal;
+}
+
+.btn-heart {
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+}
+
+.icon-heart {
+    width: 16px; height: 16px;
+    stroke: #8c8c8c;
+}
+.icon-heart.filled {
+    fill: #fc5754;
+    stroke: none;
+}
+.icon-heart:hover {
+    fill: #fc5754;
+}
+
+.btn-heart:hover .icon-heart,
+.ticker-table tbody tr.selected .icon-heart {
+    /* fill color removed */
+}
+
+.info .name {
+    font-weight: 500;
+}
+
+.info .code {
+    font-size: 0.75rem;
+    color: #8c8c8c;
+    font-weight: 300;
+    /* text color removed */
+}
+
+/* Price & Change */
+.cell-price {
+    font-weight: 600;
+}
+
+.cell-change {
+    font-size: 0.85rem;
+}
+
+.cell-change .rate {
+    display: block;
+    font-weight: 500;
+}
+
+.cell-change .amt {
+    /* text color removed */
+}
+
+/* ── Responsive ───────────────────────── */
+@media (max-width: 600px) {
+    .sidebar-header {
+        padding: 8px 12px;
+        gap: 6px;
+    }
+
+    .search-box input {
+        height: 32px;
+        padding: 0 10px 0 38px;
+        font-size: 0.85rem;
+    }
+
+    .icon-search {
+        left: 10px;
+        width: 14px;
+        height: 14px;
+    }
+
+    .side-tabs {
+        gap: 8px;
+    }
+
+    .side-tab {
+        padding: 4px 8px;
+        font-size: 0.8rem;
+    }
+
+    .ticker-table thead th {
+        padding: 8px;
+        font-size: 0.8rem;
+    }
+
+    .ticker-table tbody td {
+        padding: 10px 6px;
+        font-size: 0.8rem;
+    }
+}
+
+.price-box {
+    min-width: 100px;
+    min-height: 36px;
+    border-radius: 3px;
+    transition: border 0.3s;
+    float: right;
+    align-content: center;
+    padding: 3px;
+}
+
+.price-box.highlight-up {
+    border: 1px solid #E93E2A;
+}
+
+.price-box.highlight-down {
+    border: 1px solid #2979ff;
+}

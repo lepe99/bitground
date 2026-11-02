@@ -1,0 +1,139 @@
+@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css");
+
+*, body {
+    font-family: Pretendard, sans-serif;
+    color: #343434;
+    font-size: 0.9rem;
+    font-weight: 300;
+    margin: 0;
+}
+
+*, *::before, *::after {
+    box-sizing: border-box;
+}
+
+body{
+    min-height: 100vh;
+    /*!*background: linear-gradient(to bottom, #f2f2f2, #ffffff);*!*/
+    /*background-repeat: no-repeat;         !* 줄무늬 방지 *!*/
+    /*background-size: cover;               !* 영역 전체에 맞추기 *!*/
+    /*background-attachment: fixed;         !* 고정 느낌 주기 (선택사항) *!*/
+}
+
+/* ===== 로딩 오버레이 ====== */
+/* 오버레이: 화면 전체를 덮고 클릭 */
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    pointer-events: all; /* 클릭 방지용 */
+}
+
+
+/* 스피너 */
+.loading-spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid #ccc;
+    border-top: 4px solid #333;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+/* 특정 영역에서만 로딩 표시 */
+.loading-non-overlay {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    min-height: 100px;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+}
+
+/* ===== 토스트 메시지 ====== */
+/* Toast Container */
+.toast-container {
+    position: fixed;
+    top: 7rem;
+    right: 1rem;
+    z-index: 50;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+/* Base Toast Styles */
+.toast-base {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem;
+    pointer-events: all;
+    border-radius: 0.5rem;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    min-width: 20rem;
+    max-width: 28rem;
+    transform: translateX(100%);
+    opacity: 0;
+    transition: all 0.3s ease-in-out;
+}
+
+/* Toast Animation States */
+.toast-visible {
+    transform: translateX(0);
+    opacity: 1;
+}
+
+.toast-hidden {
+    transform: translateX(100%);
+    opacity: 0;
+}
+
+/* Toast Types */
+.toast-default {
+    background-color: white;
+    color: #1f2937;
+    border: 1px solid #e5e7eb;
+}
+
+.toast-error * {
+    color: white;
+}
+
+.toast-error {
+    background-color: #ef4444;
+}
+
+
+/* Toast Elements */
+.toast-icon {
+    flex-shrink: 0;
+}
+
+.toast-message {
+    flex: 1;
+    font-size: 0.875rem;
+    font-weight: 500;
+    white-space: pre-wrap;
+}
+
+/*반응형 전체적용*/
+
+@media screen and (max-width: 768px) {
+    html {
+        font-size: 70%; /* 전체 폰트 크기 70%로 줄임 */
+    }
+}

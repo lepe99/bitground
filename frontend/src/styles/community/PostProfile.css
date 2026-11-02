@@ -1,0 +1,99 @@
+.post-profile-card {
+    width: 100%;
+    max-width: fit-content;
+    margin: 0 auto;
+    background: white;
+    border-radius: 16px;
+    padding: 16px;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    overflow-x: auto;
+}
+
+.post-profile-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.profile-image {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 1px solid #ddd;
+}
+
+.profile-info {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+}
+
+.profile-name {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: #333;
+}
+
+.tier-icon {
+    width: 20px;
+    height: 20px;
+    vertical-align: middle;
+    margin: 0 4px;
+}
+
+.post-profile-tiers {
+    margin-top: 10px;
+}
+
+.tiers-list {
+    display: flex;
+    gap: 8px;
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    align-items: center;
+    justify-content: center;
+}
+
+.tier-item {
+    background: #f9f9f9;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    border-radius: 5px;
+    padding: 8px;
+    text-align: center;
+    width: 120px;
+}
+
+.tier-season {
+    font-size: 0.8rem;
+    margin-bottom: 5px;
+}
+
+.tier-info {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    justify-content: center;
+}
+
+/* 아이콘 glow 애니메이션 */
+.grandmaster-icon {
+    animation: glow 2s infinite ease-in-out;
+    width: 20px;
+    height: 20px;
+}
+
+@keyframes glow {
+    0%   { filter: drop-shadow(0 0 0px #7f00ff); }
+    50%  { filter: drop-shadow(0 0 4px #7f00ff); }
+    100% { filter: drop-shadow(0 0 0px #7f00ff); }
+}
+
+/* 텍스트 강조 */
+.tier-rank.grandmaster {
+    color: #7f00ff;
+    font-weight: 600;
+}

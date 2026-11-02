@@ -1,0 +1,41 @@
+.ranking-wrapper {
+    height: 100%; /* 고정 높이 설정 */
+    padding: 16px;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+    border: 1px solid rgba(0,0,0,0.05);
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    overflow-y: auto;
+}
+
+.current-season-name {
+    font-size: 1.2rem;
+    font-weight: 600;
+    margin-bottom: 4px;
+    display: flex;
+    justify-content: space-between;
+}
+
+.ranking-header {
+    display: flex;
+    align-items: center;
+    padding-bottom: 15px;
+    font-size: 1rem;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    flex-shrink: 0;
+    margin-bottom: 15px;
+    justify-content: space-between;
+}
+
+.ranking-time {
+    color: #8c8c8c;
+    font-size: 0.8rem;
+}
+
+.rank-question{
+    cursor: pointer;
+    font-size: 1rem;
+}
