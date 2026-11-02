@@ -1,5 +1,6 @@
 package bit.bitgroundspring.service;
 
+import bit.bitgroundspring.aop.Loggable;
 import bit.bitgroundspring.common.error.BusinessException;
 import bit.bitgroundspring.common.error.ErrorCode;
 import bit.bitgroundspring.dto.*;
@@ -135,6 +136,7 @@ public class OrderService {
     
     // 예약 주문 생성 메서드
     @Transactional
+    @Loggable("예약 주문 접수")
     public Order createReserveOrder(Integer userId, CreateOrderRequest request) {
         validateOrderRequest(request);
 
@@ -241,6 +243,7 @@ public class OrderService {
         }
     }
     
+    @Loggable("예약 주문 취소")
     public void cancelOrder(Integer orderId, Integer userId) {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.ORDER_NOT_FOUND));
@@ -285,6 +288,7 @@ public class OrderService {
         }
     }
 
+    @Loggable("시즌 갱신")
     public void seasonUpdate(String seasonFlag) {
         // 대부분의 로직은 go serverless로 처리, 나머지 것들을 수행하자
 

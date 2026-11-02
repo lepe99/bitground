@@ -180,5 +180,19 @@ class ApiResponseContractTest extends IntegrationTest {
         void 로그아웃은_204() throws Exception {
             mvc.perform(post("/auth/logout")).andExpect(status().isNoContent());
         }
+
+        @Test
+        void 모든_응답에_X_Trace_Id_헤더가_있고_에러_본문의_traceId와_같다() throws Exception {
+            String header = mvc.perform(get("/users/me"))
+                    .andExpect(header().exists("X-Trace-Id"))
+                    .andReturn().getResponse().getHeader("X-Trace-Id");
+            mvc.perform(get("/users/me").header("X-Trace-Id", "client-trace-12345"))
+                    .andExpect(header().string("X-Trace-Id", "client-trace-12345"))
+                    .andExpect(jsonPath("$.traceId").value("client-trace-12345"));
+            // 안전하지 않은 값(로그 인젝션)은 이어받지 않고 새로 만든다
+            mvc.perform(get("/coins").header("X-Trace-Id", "bad value <script>"))
+                    .andExpect(header().string("X-Trace-Id", org.hamcrest.Matchers.matchesPattern("[0-9a-f]{16}")));
+            org.assertj.core.api.Assertions.assertThat(header).matches("[0-9a-f]{16}");
+        }
     }
 }

@@ -12,9 +12,11 @@ import bit.bitgroundspring.repository.OrderRepository;
 import bit.bitgroundspring.repository.UserAssetRepository;
 import bit.bitgroundspring.repository.UserRepository;
 import bit.bitgroundspring.util.UserSseEmitters;
+import bit.bitgroundspring.common.logging.TraceIdFilter;
 import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -78,6 +80,8 @@ public class OrderExecutionService {
                 String[] parts = message.split(":");
                 if (parts.length >= 3) {
                     Integer orderId = Integer.parseInt(parts[0]);
+                    // 요청이 아닌 스케줄러 작업이므로 주문 단위로 traceId를 붙여 체결 로그를 묶는다
+                    MDC.put(TraceIdFilter.TRACE_ID, "exec-" + orderId);
                     double executionPrice = Double.parseDouble(parts[1]);
                     long timestamp = Long.parseLong(parts[2]);
                     
@@ -91,6 +95,8 @@ public class OrderExecutionService {
             }
         } catch (Exception e) {
             log.error("Error processing order execution queue", e);
+        } finally {
+            MDC.remove(TraceIdFilter.TRACE_ID);
         }
     }
     

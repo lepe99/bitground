@@ -1,5 +1,6 @@
 package bit.bitgroundspring.config;
 
+import bit.bitgroundspring.common.logging.MdcTaskDecorator;
 import org.springframework.aop.interceptor.AsyncUncaughtExceptionHandler;
 import org.springframework.aop.interceptor.SimpleAsyncUncaughtExceptionHandler;
 import org.springframework.context.annotation.Bean;
@@ -24,6 +25,7 @@ public class AsyncConfig implements AsyncConfigurer {
         executor.setMaxPoolSize(6);
         executor.setQueueCapacity(100);
         executor.setThreadNamePrefix("OrderExecution-");
+        executor.setTaskDecorator(new MdcTaskDecorator()); // traceId·userId 전파
         executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
         executor.setWaitForTasksToCompleteOnShutdown(true);
         executor.setAwaitTerminationSeconds(10);
@@ -38,6 +40,7 @@ public class AsyncConfig implements AsyncConfigurer {
         executor.setMaxPoolSize(8);
         executor.setQueueCapacity(200);
         executor.setThreadNamePrefix("PriceUpdate-");
+        executor.setTaskDecorator(new MdcTaskDecorator()); // traceId·userId 전파
         executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
         executor.setWaitForTasksToCompleteOnShutdown(true);
         executor.setAwaitTerminationSeconds(10);
@@ -53,6 +56,7 @@ public class AsyncConfig implements AsyncConfigurer {
         executor.setMaxPoolSize(8);
         executor.setQueueCapacity(100);
         executor.setThreadNamePrefix("WebSocket-IO-");
+        executor.setTaskDecorator(new MdcTaskDecorator()); // traceId·userId 전파
         executor.initialize();
         return executor;
     }

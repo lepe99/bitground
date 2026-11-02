@@ -25,7 +25,8 @@ public final class ProblemMatchers {
                 jsonPath("$.title").exists(),
                 jsonPath("$.detail").exists(),
                 jsonPath("$.instance").exists(),
-                jsonPath("$.timestamp").exists()
+                jsonPath("$.timestamp").exists(),
+                jsonPath("$.traceId").exists()
         );
     }
 }

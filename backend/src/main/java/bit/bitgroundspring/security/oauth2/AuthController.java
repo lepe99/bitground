@@ -1,5 +1,6 @@
 package bit.bitgroundspring.security.oauth2;
 
+import bit.bitgroundspring.aop.Loggable;
 import bit.bitgroundspring.common.error.BusinessException;
 import bit.bitgroundspring.common.error.ErrorCode;
 import bit.bitgroundspring.security.token.JwtTokenProvider;
@@ -37,6 +38,7 @@ public class AuthController {
      * 성공: 204 + 새 jwt_token/refresh_token 쿠키, 실패: 401 REFRESH_TOKEN_MISSING / REFRESH_TOKEN_INVALID
      */
     @PostMapping("/refresh")
+    @Loggable("토큰 재발급")
     public ResponseEntity<Void> refreshToken(
             @CookieValue(name = "refresh_token", required = false) String refreshToken,
             HttpServletResponse response) {
@@ -67,6 +69,7 @@ public class AuthController {
 
     // 로그아웃: 쿠키 삭제 + 리프레시 토큰 폐기 (토큰이 없어도 204)
     @PostMapping("/logout")
+    @Loggable("로그아웃")
     public ResponseEntity<Void> logout(
             @CookieValue(name = "refresh_token", required = false) String refreshToken,
             HttpServletResponse response) {

@@ -1,5 +1,7 @@
 package bit.bitgroundspring.common.error;
 
+import bit.bitgroundspring.common.logging.TraceIdFilter;
+import org.slf4j.MDC;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 
@@ -17,7 +19,8 @@ import java.time.OffsetDateTime;
  *   "detail": "주문 가능 금액이 부족합니다.",
  *   "instance": "/trade",
  *   "code": "INSUFFICIENT_CASH",
- *   "timestamp": "2026-11-02T16:30:00+09:00"
+ *   "timestamp": "2026-11-02T16:30:00+09:00",
+ *   "traceId": "3f9c2a1b7d4e8f60"
  * }
  * </pre>
  */
@@ -42,6 +45,11 @@ public final class ProblemDetails {
         }
         problem.setProperty("code", code.name());
         problem.setProperty("timestamp", OffsetDateTime.now());
+        // 사용자가 오류를 신고할 때 서버 로그를 바로 찾을 수 있도록
+        String traceId = MDC.get(TraceIdFilter.TRACE_ID);
+        if (traceId != null) {
+            problem.setProperty("traceId", traceId);
+        }
         return problem;
     }
 }

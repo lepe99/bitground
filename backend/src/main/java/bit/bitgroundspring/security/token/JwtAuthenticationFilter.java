@@ -1,11 +1,13 @@
 package bit.bitgroundspring.security.token;
 
+import bit.bitgroundspring.common.logging.TraceIdFilter;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.MDC;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.util.StringUtils;
@@ -30,6 +32,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (StringUtils.hasText(token) && jwtTokenProvider.validateToken(token)) {
             Authentication authentication = jwtTokenProvider.getAuthentication(token);
             SecurityContextHolder.getContext().setAuthentication(authentication);
+            // 이후 로그에 사용자 ID가 함께 남도록 (TraceIdFilter가 요청 종료 시 정리)
+            if (authentication.getPrincipal() instanceof AuthUser user) {
+                MDC.put(TraceIdFilter.USER_ID, String.valueOf(user.id()));
+            }
         }
         
         chain.doFilter(request, response);
@@ -45,7 +51,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 path.startsWith("/oauth2/") ||
                 path.startsWith("/actuator/") ||
                 path.equals("/error") ||
-                path.equals("/test") ||
                 path.startsWith("/public/");
     }
     

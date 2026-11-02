@@ -2,6 +2,7 @@
 
 package bit.bitgroundspring.service;
 
+import bit.bitgroundspring.aop.Loggable;
 import bit.bitgroundspring.common.error.BusinessException;
 import bit.bitgroundspring.common.error.ErrorCode;
 import bit.bitgroundspring.dto.AiAdviceDto;
@@ -41,6 +42,7 @@ public class AiAdviceService {
      * @return 생성되거나 조회된 AiAdviceDto
      */
     @Transactional
+    @Loggable("AI 조언")
     public AiAdviceDto generateOrGetAiAdviceForUserAndSeason(Integer userId, Integer seasonId) {
         log.info("[AiAdviceService] generateOrGetAiAdviceForUserAndSeason 요청 시작: User ID={}, Season ID={}", userId, seasonId);
         try {

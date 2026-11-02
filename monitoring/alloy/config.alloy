@@ -1,0 +1,60 @@
+// Grafana Alloy: 백엔드 컨테이너 로그(JSON)를 수집해 Loki로 보낸다.
+// 백엔드는 LOGGING_STRUCTURED_FORMAT_CONSOLE=logstash 로 실행되어야 JSON으로 출력된다.
+
+discovery.docker "containers" {
+  host = "unix:///var/run/docker.sock"
+
+  filter {
+    name   = "name"
+    values = ["bitground-backend"]
+  }
+}
+
+discovery.relabel "containers" {
+  targets = discovery.docker.containers.targets
+
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/(.*)"
+    target_label  = "container"
+  }
+}
+
+loki.source.docker "backend" {
+  host       = "unix:///var/run/docker.sock"
+  targets    = discovery.relabel.containers.output
+  labels     = { app = "bitground-backend" }
+  forward_to = [loki.process.backend.receiver]
+}
+
+loki.process "backend" {
+  stage.json {
+    expressions = {
+      level   = "level",
+      logger  = "logger_name",
+      traceId = "traceId",
+      userId  = "userId",
+    }
+  }
+
+  // level 은 값 종류가 적어 라벨로, traceId·userId 는 값이 많아 구조화 메타데이터로 둔다
+  stage.labels {
+    values = { level = "" }
+  }
+
+  stage.structured_metadata {
+    values = {
+      traceId = "",
+      userId  = "",
+      logger  = "",
+    }
+  }
+
+  forward_to = [loki.write.local.receiver]
+}
+
+loki.write "local" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}

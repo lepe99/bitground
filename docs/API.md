@@ -45,7 +45,8 @@
   "detail": "주문 가능 금액이 부족합니다.",
   "instance": "/trade",
   "code": "INSUFFICIENT_CASH",
-  "timestamp": "2026-11-02T16:30:00+09:00"
+  "timestamp": "2026-11-02T16:30:00+09:00",
+  "traceId": "3f9c2a1b7d4e8f60"
 }
 ```
 
@@ -55,6 +56,7 @@
 | `detail` | 사용자에게 보여줄 수 있는 메시지 |
 | `code` | 서비스 에러 코드 — 프론트는 이 값으로 분기 |
 | `instance` | 요청 경로 |
+| `traceId` | 요청 추적 ID — 서버 로그(Loki)에서 이 값으로 해당 요청의 로그를 찾을 수 있음 |
 | `errors` | (검증 실패 시) `[{ "field": "title", "message": "제목을 입력해주세요." }]` |
 
 - 예상하지 못한 예외는 `500 INTERNAL_ERROR`로 응답하고, 내부 메시지·스택트레이스는 응답에 넣지 않고 로그로만 남깁니다.
@@ -114,7 +116,13 @@
 | | `UNSUPPORTED_FILE_TYPE` | 415 | jpg, png, gif, webp 이미지만 업로드할 수 있습니다. |
 | | `FILE_UPLOAD_FAILED` | 500 | 파일 업로드에 실패했습니다. |
 
-## 4. 인증 흐름 관련 응답
+## 4. 요청 추적 ID
+
+- 모든 응답에 `X-Trace-Id` 헤더가 붙고, 에러 응답 본문에는 `traceId`로도 들어갑니다.
+- 요청에 `X-Trace-Id`(영문·숫자·`-`, 8~64자)를 보내면 그 값을 그대로 이어서 씁니다. 형식이 맞지 않으면 새로 발급합니다.
+- 서버 로그에는 `[traceId,userId]`가 함께 남습니다. JSON 로그(`LOGGING_STRUCTURED_FORMAT_CONSOLE=logstash`)에서는 필드로 들어갑니다.
+
+## 5. 인증 흐름 관련 응답
 
 | 엔드포인트 | 성공 | 실패 |
 |---|---|---|

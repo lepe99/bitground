@@ -173,7 +173,11 @@ management:
         enabled: true
 
 # logging 설정 (파일 대신 표준 출력으로 남긴다)
+# - 모든 로그에 [traceId,userId] 를 붙인다 (TraceIdFilter, JwtAuthenticationFilter가 MDC에 기록)
+# - Loki 수집용 JSON 로그: 환경변수 LOGGING_STRUCTURED_FORMAT_CONSOLE=logstash
 logging:
+  pattern:
+    level: "%5p [%X{traceId:-},%X{userId:-}]"
   level:
     bit.bitgroundspring: INFO
     org.springframework.security: INFO
@@ -184,6 +188,7 @@ logging:
   aop:
     max-string-length: 100
     max-collection-size: 3
+    slow-threshold-ms: 500 # 이 시간 이상 걸린 @Loggable 호출은 WARN
 
 gemini:
   api-key: ${GEMINI_API_KEY:}

@@ -1,167 +1,172 @@
 package bit.bitgroundspring.aop;
 
+import bit.bitgroundspring.common.error.BusinessException;
+import jakarta.servlet.ServletRequest;
+import jakarta.servlet.ServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
+import org.aspectj.lang.reflect.MethodSignature;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.stereotype.Component;
+import org.springframework.util.ClassUtils;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Collection;
 import java.util.Map;
+import java.util.regex.Pattern;
 
+/**
+ * 공통 로깅 AOP. 클래스나 메서드에 {@link Loggable} 을 붙이면 적용된다.
+ *
+ * <ul>
+ *   <li>INFO  : 호출 결과와 실행 시간 — {@code [주문 접수] OrderService.createReserveOrder 12ms}</li>
+ *   <li>WARN  : 느린 호출(logging.aop.slow-threshold-ms 이상)과 비즈니스 예외(에러 코드 포함)</li>
+ *   <li>ERROR : 예상하지 못한 예외 (스택트레이스는 GlobalExceptionHandler가 한 번만 남김)</li>
+ *   <li>DEBUG : 인자·반환값 — 토큰·비밀번호 등 민감 값과 파일 내용은 마스킹</li>
+ * </ul>
+ * 로그에는 TraceIdFilter가 넣은 traceId·userId가 함께 찍혀 Loki에서 요청 단위로 추적할 수 있다.
+ */
 @Aspect
 @Component
 @Slf4j
 public class LoggingAspect {
-    
+
+    // 이름만 보고 값을 가리는 파라미터
+    private static final Pattern SENSITIVE_NAME = Pattern.compile("(?i).*(token|password|secret|key|authorization|cookie).*");
+    private static final String MASK = "****";
+
     @Value("${logging.aop.max-string-length:200}")
     private int maxStringLength;
-    
+
     @Value("${logging.aop.max-collection-size:5}")
     private int maxCollectionSize;
-    
-    @Around("@within(loggable) || @annotation(loggable)")
-    public Object logExecutionTime(ProceedingJoinPoint joinPoint, Loggable loggable) throws Throwable {
-        String className = joinPoint.getTarget().getClass().getSimpleName();
-        String methodName = joinPoint.getSignature().getName();
-        String description = loggable.value().isEmpty() ? "" : "[" + loggable.value() + "]";
-        Object[] args = joinPoint.getArgs();
-        
-        // 입력 인자 로깅 (길이 제한 적용)
-        String argsString = formatArguments(args);
-        log.info(">>>>{} {}.{} - Arguments: {}", description, className, methodName, argsString);
-        
+
+    @Value("${logging.aop.slow-threshold-ms:500}")
+    private long slowThresholdMs;
+
+    @Around("@within(bit.bitgroundspring.aop.Loggable) || @annotation(bit.bitgroundspring.aop.Loggable)")
+    public Object log(ProceedingJoinPoint joinPoint) throws Throwable {
+        MethodSignature signature = (MethodSignature) joinPoint.getSignature();
+        String target = joinPoint.getTarget().getClass().getSimpleName() + "." + signature.getName();
+        String label = label(signature, joinPoint.getTarget().getClass());
+
+        if (log.isDebugEnabled()) {
+            log.debug("{}{} args={}", label, target, formatArguments(signature.getParameterNames(), joinPoint.getArgs()));
+        }
+
+        long start = System.nanoTime();
         try {
             Object result = joinPoint.proceed();
-            // 반환값 로깅 (길이 제한 적용)
-            String resultString = formatValue(result);
-            log.info("<<<<{} {}.{} (Success) - Return: {}", description, className, methodName, resultString);
+            long elapsed = elapsedMs(start);
+            if (elapsed >= slowThresholdMs) {
+                log.warn("{}{} {}ms (SLOW, threshold {}ms)", label, target, elapsed, slowThresholdMs);
+            } else {
+                log.info("{}{} {}ms", label, target, elapsed);
+            }
+            if (log.isDebugEnabled()) {
+                log.debug("{}{} return={}", label, target, formatValue(result));
+            }
             return result;
-        } catch (Exception e) {
-            log.error("!!!!{} {}.{} (Error: {})", description, className, methodName, e.getMessage());
+        } catch (BusinessException e) {
+            // 잔액 부족 등 예상된 실패: 에러 코드로 집계할 수 있게 남긴다
+            log.warn("{}{} {}ms FAILED code={} detail={}", label, target, elapsedMs(start), e.getErrorCode(), e.getMessage());
+            throw e;
+        } catch (Throwable e) {
+            log.error("{}{} {}ms ERROR {}: {}", label, target, elapsedMs(start), e.getClass().getSimpleName(), e.getMessage());
             throw e;
         }
     }
-    
-    // 인자 배열을 포맷팅
-    private String formatArguments(Object[] args) {
-        if (args == null || args.length == 0) {
-            return "[]";
+
+    // 메서드에 붙은 값 우선, 없으면 클래스에 붙은 값
+    private String label(MethodSignature signature, Class<?> targetClass) {
+        Loggable loggable = AnnotatedElementUtils.findMergedAnnotation(signature.getMethod(), Loggable.class);
+        if (loggable == null || loggable.value().isEmpty()) {
+            loggable = AnnotatedElementUtils.findMergedAnnotation(targetClass, Loggable.class);
         }
-        
-        StringBuilder sb = new StringBuilder("[");
+        return loggable == null || loggable.value().isEmpty() ? "" : "[" + loggable.value() + "] ";
+    }
+
+    private long elapsedMs(long startNanos) {
+        return (System.nanoTime() - startNanos) / 1_000_000;
+    }
+
+    String formatArguments(String[] names, Object[] args) {
+        if (args == null || args.length == 0) {
+            return "{}";
+        }
+        StringBuilder sb = new StringBuilder("{");
         for (int i = 0; i < args.length; i++) {
             if (i > 0) {
                 sb.append(", ");
             }
-            sb.append(formatValue(args[i]));
+            String name = names != null && i < names.length ? names[i] : "arg" + i;
+            sb.append(name).append('=');
+            sb.append(SENSITIVE_NAME.matcher(name).matches() ? MASK : formatValue(args[i]));
         }
-        sb.append("]");
-        
-        return truncateString(sb.toString(), maxStringLength);
+        return truncate(sb.append('}').toString());
     }
-    
-    // 개별 값을 포맷팅
-    private String formatValue(Object value) {
+
+    String formatValue(Object value) {
         if (value == null) {
             return "null";
         }
-        
-        // 문자열 처리
-        if (value instanceof String) {
-            return truncateString("\"" + value + "\"", maxStringLength);
+        if (value instanceof CharSequence s) {
+            return truncate("\"" + s + "\"");
         }
-        
-        // 컬렉션 처리
+        // 파일은 내용 대신 메타데이터만
+        if (value instanceof MultipartFile file) {
+            return "MultipartFile(name=%s, type=%s, size=%d)".formatted(file.getOriginalFilename(), file.getContentType(), file.getSize());
+        }
+        if (value instanceof byte[] bytes) {
+            return "byte[" + bytes.length + "]";
+        }
+        if (value instanceof ServletRequest || value instanceof ServletResponse) {
+            return value.getClass().getSimpleName();
+        }
         if (value instanceof Collection<?> collection) {
-            if (collection.isEmpty()) {
-                return "[]";
-            }
-            
             StringBuilder sb = new StringBuilder("[");
             int count = 0;
             for (Object item : collection) {
-                if (count > 0) {
-                    sb.append(", ");
-                }
                 if (count >= maxCollectionSize) {
-                    sb.append("... (").append(collection.size() - maxCollectionSize).append(" more)");
+                    sb.append(", ... (").append(collection.size() - maxCollectionSize).append(" more)");
                     break;
                 }
+                if (count++ > 0) {
+                    sb.append(", ");
+                }
                 sb.append(formatValue(item));
-                count++;
             }
-            sb.append("]");
-            
-            return truncateString(sb.toString(), maxStringLength);
+            return truncate(sb.append(']').toString());
         }
-        
-        // Map 처리
         if (value instanceof Map<?, ?> map) {
-            if (map.isEmpty()) {
-                return "{}";
-            }
-            
             StringBuilder sb = new StringBuilder("{");
             int count = 0;
             for (Map.Entry<?, ?> entry : map.entrySet()) {
-                if (count > 0) {
-                    sb.append(", ");
-                }
                 if (count >= maxCollectionSize) {
-                    sb.append("... (").append(map.size() - maxCollectionSize).append(" more)");
+                    sb.append(", ... (").append(map.size() - maxCollectionSize).append(" more)");
                     break;
                 }
-                sb.append(formatValue(entry.getKey())).append("=").append(formatValue(entry.getValue()));
-                count++;
+                if (count++ > 0) {
+                    sb.append(", ");
+                }
+                String key = String.valueOf(entry.getKey());
+                sb.append(key).append('=')
+                        .append(SENSITIVE_NAME.matcher(key).matches() ? MASK : formatValue(entry.getValue()));
             }
-            sb.append("}");
-            
-            return truncateString(sb.toString(), maxStringLength);
+            return truncate(sb.append('}').toString());
         }
-        
-        // 배열 처리
-        if (value.getClass().isArray()) {
-            if (value instanceof byte[]) {
-                return "byte[" + ((byte[]) value).length + "]";
-            } else if (value instanceof Object[] array) {
-                if (array.length == 0) {
-                    return "[]";
-                }
-                
-                StringBuilder sb = new StringBuilder("[");
-                for (int i = 0; i < Math.min(array.length, maxCollectionSize); i++) {
-                    if (i > 0) {
-                        sb.append(", ");
-                    }
-                    sb.append(formatValue(array[i]));
-                }
-                if (array.length > maxCollectionSize) {
-                    sb.append("... (").append(array.length - maxCollectionSize).append(" more)");
-                }
-                sb.append("]");
-                
-                return truncateString(sb.toString(), maxStringLength);
-            }
+        try {
+            return truncate(value.toString());
+        } catch (RuntimeException e) {
+            // 지연 로딩 엔티티 등 toString 실패가 본 로직을 깨지 않도록
+            return ClassUtils.getShortName(value.getClass()); // 익명 클래스도 이름이 비지 않도록
         }
-        
-        // 기본 객체 처리
-        String valueString = value.toString();
-        return truncateString(valueString, maxStringLength);
     }
-    
-    
-    // 문자열 길이 제한
-    private String truncateString(String str, int maxLength) {
-        if (str == null) {
-            return "null";
-        }
-        
-        if (str.length() <= maxLength) {
-            return str;
-        }
-        
-        return str.substring(0, maxLength - 3) + "...";
+
+    private String truncate(String s) {
+        return s.length() <= maxStringLength ? s : s.substring(0, maxStringLength) + "...(" + s.length() + " chars)";
     }
 }

@@ -1,5 +1,6 @@
 package bit.bitgroundspring.storage;
 
+import bit.bitgroundspring.aop.Loggable;
 import bit.bitgroundspring.common.error.BusinessException;
 import bit.bitgroundspring.common.error.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -38,6 +39,7 @@ public class StorageService {
      * 이미지를 업로드하고 공개 URL을 반환한다.
      * 파일명은 원본 이름을 쓰지 않고 UUID로 만들어 경로 조작과 덮어쓰기를 막는다.
      */
+    @Loggable("이미지 업로드")
     public String uploadImage(String directory, MultipartFile file) {
         if (file == null || file.isEmpty()) {
             throw new BusinessException(ErrorCode.FILE_EMPTY);

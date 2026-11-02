@@ -2,6 +2,7 @@
 
 package bit.bitgroundspring.service;
 
+import bit.bitgroundspring.aop.Loggable;
 import bit.bitgroundspring.dto.AiAdviceDto;
 import bit.bitgroundspring.dto.InvestmentSummaryDto;
 import bit.bitgroundspring.entity.UserDailyBalance; // UserDailyBalance import
@@ -50,6 +51,7 @@ public class GeminiService {
      * @throws IOException HTTP 요청/응답 처리 중 오류 발생 시
      * @throws InterruptedException HTTP 요청 중 인터럽트 발생 시
      */
+    @Loggable("Gemini 호출")
     public AiAdviceDto generateInvestmentAdvice(InvestmentSummaryDto summary) throws IOException, InterruptedException {
         String prompt = buildPrompt(summary);
         log.info("[GeminiService] AI 조언 생성 요청 프롬프트:\n{}", prompt);

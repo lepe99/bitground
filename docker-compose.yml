@@ -1,8 +1,9 @@
 # 로컬 개발 환경
 #   인프라만 (MySQL, Redis, S3Mock):     docker compose up -d
 #   + 백엔드 컨테이너:                   docker compose --profile app up -d --build
-#   + Pinpoint APM (트랜잭션 추적):      PINPOINT_ENABLED=true docker compose --profile app --profile monitoring up -d --build
-#                                        Pinpoint Web: http://localhost:8080
+#   + 모니터링 (Pinpoint APM, 로그 수집):
+#       PINPOINT_ENABLED=true LOG_FORMAT=logstash docker compose --profile app --profile monitoring up -d --build
+#       Pinpoint Web: http://localhost:8080   Grafana(Loki 로그): http://localhost:3000
 services:
   mysql:
     image: mysql:8.0
@@ -68,6 +69,8 @@ services:
       PINPOINT_ENABLED: ${PINPOINT_ENABLED:-false}
       PINPOINT_COLLECTOR_HOST: pinpoint-collector
       PINPOINT_PROFILE: ${PINPOINT_PROFILE:-local}
+      # logstash 로 두면 JSON 로그 출력 (Alloy → Loki 수집용), 비우면 텍스트
+      LOGGING_STRUCTURED_FORMAT_CONSOLE: ${LOG_FORMAT:-}
     ports:
       - "8090:8090"
     depends_on:
@@ -177,8 +180,46 @@ services:
       pinpoint-redis:
         condition: service_started
 
+  # ── monitoring 프로필: 로그 수집 (Alloy → Loki → Grafana) ────────────────
+  loki:
+    profiles: ["monitoring"]
+    image: grafana/loki:3.7.1
+    container_name: loki
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - loki-data:/loki
+
+  alloy:
+    profiles: ["monitoring"]
+    image: grafana/alloy:v1.21.3
+    container_name: alloy
+    command: run /etc/alloy/config.alloy
+    volumes:
+      - ./monitoring/alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro # 컨테이너 로그 수집
+    depends_on:
+      - loki
+
+  grafana:
+    profiles: ["monitoring"]
+    image: grafana/grafana:13.3.0
+    container_name: grafana
+    environment:
+      # 로컬 시연용: 로그인 없이 조회
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - loki
+
 volumes:
   mysql-data:
   s3-data:
   pinpoint-hbase-data:
   pinpoint-mysql-data:
+  loki-data:

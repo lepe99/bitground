@@ -1,5 +1,6 @@
 package bit.bitgroundspring.service;
 
+import bit.bitgroundspring.aop.Loggable;
 import bit.bitgroundspring.common.error.BusinessException;
 import bit.bitgroundspring.common.error.ErrorCode;
 import bit.bitgroundspring.dto.TierDto;
@@ -51,6 +52,7 @@ public class UserService {
 
     // 유저 업데이트
     @Transactional
+    @Loggable("회원 정보 수정")
     public User updateUser(Integer userId, String name, String email, String imageUrl) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
@@ -75,6 +77,7 @@ public class UserService {
     }
 
     //isDeleted -> 1
+    @Loggable("회원 탈퇴")
     public void softDeleteUser(Integer userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));

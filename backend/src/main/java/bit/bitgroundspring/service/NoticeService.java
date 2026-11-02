@@ -1,5 +1,6 @@
 package bit.bitgroundspring.service;
 
+import bit.bitgroundspring.aop.Loggable;
 import bit.bitgroundspring.common.error.BusinessException;
 import bit.bitgroundspring.common.error.ErrorCode;
 import bit.bitgroundspring.dto.NoticeRequestDto;
@@ -25,6 +26,7 @@ public class NoticeService {
     private final UserRepository userRepository;
     private final UserSseEmitters userSseEmitters;
 
+    @Loggable("공지 등록")
     public Notice createNotice(Integer userId, NoticeRequestDto dto) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
