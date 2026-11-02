@@ -1,0 +1,6 @@
+# 로컬 산출물·비밀값은 빌드 컨텍스트에서 제외
+node_modules
+dist
+.env
+.env.*
+!.env.example

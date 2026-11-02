@@ -35,15 +35,27 @@ RUN wget -qO /tmp/agent.tgz "https://github.com/pinpoint-apm/pinpoint/releases/d
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
 
-COPY --from=pinpoint /opt/pinpoint-agent /opt/pinpoint-agent
+# root가 아닌 전용 사용자로 실행
+RUN addgroup -S app && adduser -S -G app app
+
+# Pinpoint 에이전트는 실행 중 자기 디렉터리에 로그를 쓰므로 소유자를 앱 사용자로
+COPY --from=pinpoint --chown=app:app /opt/pinpoint-agent /opt/pinpoint-agent
 
 # builder 단계에서 만들어진 JAR 복사
 ARG JAR_FILE=build/libs/*.jar
 COPY --from=builder /app/${JAR_FILE} app.jar
 
 # PINPOINT_ENABLED=true 일 때만 에이전트를 붙여 실행
-COPY docker-entrypoint.sh /app/docker-entrypoint.sh
-RUN chmod +x /app/docker-entrypoint.sh
+COPY --chmod=755 docker-entrypoint.sh /app/docker-entrypoint.sh
 
-EXPOSE 8090
+USER app
+
+# 컨테이너 메모리 한도 기준으로 힙을 잡는다 (1GB 인스턴스에서 메타스페이스·OS·Redis 몫을 남기도록 60%)
+# OOM이 나면 비정상 상태로 버티지 않고 종료해 재시작되게 한다
+ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=60.0 -XX:+ExitOnOutOfMemoryError"
+
+EXPOSE 8090 8091
+# 관리 포트의 liveness 프로브로 상태 확인 (busybox wget 사용)
+HEALTHCHECK --interval=30s --timeout=3s --start-period=60s --retries=3   CMD wget -qO- http://127.0.0.1:8091/actuator/health/liveness > /dev/null || exit 1
+
 ENTRYPOINT ["/app/docker-entrypoint.sh"]
