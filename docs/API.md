@@ -72,6 +72,7 @@
 | 404 | 대상 없음 |
 | 409 | 현재 상태와 충돌 (이미 처리됨, 진행 중인 시즌 없음 등) |
 | 422 | 형식은 맞지만 비즈니스 규칙상 처리 불가 (잔액 부족 등) |
+| 429 | 요청 횟수 제한 초과 (`Retry-After` 헤더에 다시 시도할 수 있는 초) |
 | 5xx | 서버·외부 서비스 오류 |
 
 ## 3. 에러 코드
@@ -84,6 +85,7 @@
 | | `RESOURCE_NOT_FOUND` | 404 | 요청한 리소스를 찾을 수 없습니다. |
 | | `METHOD_NOT_ALLOWED` | 405 | 지원하지 않는 HTTP 메서드입니다. |
 | | `UNSUPPORTED_MEDIA_TYPE` | 415 | 지원하지 않는 요청 형식입니다. |
+| | `TOO_MANY_REQUESTS` | 429 | 요청이 너무 많습니다. 잠시 후 다시 시도해주세요. |
 | | `INTERNAL_ERROR` | 500 | 서버 오류가 발생했습니다. |
 | | `EXTERNAL_API_ERROR` | 502 | 외부 서비스 호출에 실패했습니다. |
 | 인증·권한 | `UNAUTHORIZED` | 401 | 로그인이 필요합니다. |
@@ -142,3 +144,17 @@
 | 엔드포인트 | 인증 | 설명 |
 |---|---|---|
 | `POST /seasons/update` (`seasonFlag=season\|split`) | `X-Scheduler-Key` 헤더 (공유 키) | Go 스케줄러가 시즌 정산·스플릿 완료를 알림. 실패 시 `403 INVALID_SECRET_KEY` |
+
+## 7. 요청 횟수 제한
+
+비용이 크거나 남용되기 쉬운 API는 1분 고정 윈도로 횟수를 제한합니다. 초과하면 `429 TOO_MANY_REQUESTS`와 `Retry-After` 헤더를 돌려줍니다.
+
+| 대상 | 기준 | 1분당 |
+|---|---|---|
+| `POST /trade`, `POST /trade/reserve` (주문) | 사용자 | 30 |
+| `POST /uploads/images`, `PUT /users/me` (이미지 업로드) | 사용자 | 10 |
+| `GET /mypage/ai-advice` (Gemini 호출) | 사용자 | 5 |
+| `GET /oauth2/authorization/**` (로그인 시도) | IP | 20 |
+| `POST /auth/refresh` | IP | 30 |
+
+규칙: `backend/src/main/java/bit/bitgroundspring/common/ratelimit/RateLimitFilter.java`
