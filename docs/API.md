@@ -126,7 +126,19 @@
 
 | 엔드포인트 | 성공 | 실패 |
 |---|---|---|
-| `POST /auth/refresh` | `204` + 새 `jwt_token`·`refresh_token` 쿠키 (Refresh Token Rotation) | `401 REFRESH_TOKEN_MISSING` / `REFRESH_TOKEN_INVALID` |
-| `POST /auth/logout` | `204` + 쿠키 삭제, 리프레시 토큰 폐기 | — |
+| `POST /auth/refresh` | `204` + 새 `jwt_token`·`refresh_token` 쿠키 (Refresh Token Rotation) | `401 REFRESH_TOKEN_MISSING` / `REFRESH_TOKEN_INVALID` + 쿠키 삭제 |
+| `POST /auth/logout` | `204` + 쿠키 삭제, 이 기기 세션의 리프레시 토큰 폐기 | — |
+| `DELETE /users/me` (탈퇴) | `204` + 쿠키 삭제, 모든 기기 세션 폐기 | — |
+
+- 재발급할 때마다 사용자 존재·탈퇴 여부와 현재 권한을 DB에서 다시 확인합니다. 권한이 바뀌면 다음 재발급부터 반영됩니다.
+- **재사용 탐지**: 이미 교체된 리프레시 토큰이 다시 들어오면 탈취로 보고 그 세션(토큰 패밀리) 전체를 폐기합니다.
+  교체 후 10초 안에 같은 토큰이 다시 오는 경우(같은 브라우저의 동시 요청)는 세션을 유지하고 새 쿠키 없이 `204`를 돌려줍니다.
+- **탈퇴**: 리프레시 토큰을 모두 폐기하고, 이미 발급된 액세스 토큰도 즉시 무효가 됩니다(만료 전이라도 `401`).
 
 프론트 axios 인터셉터는 `401`을 받으면 `/auth/refresh`로 한 번 재발급을 시도하고, 재발급도 실패하면 로그아웃합니다.
+
+## 6. 스케줄러 내부 API
+
+| 엔드포인트 | 인증 | 설명 |
+|---|---|---|
+| `POST /seasons/update` (`seasonFlag=season\|split`) | `X-Scheduler-Key` 헤더 (공유 키) | Go 스케줄러가 시즌 정산·스플릿 완료를 알림. 실패 시 `403 INVALID_SECRET_KEY` |

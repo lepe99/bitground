@@ -3,9 +3,7 @@ package bit.bitgroundspring.security.oauth2;
 import bit.bitgroundspring.aop.Loggable;
 import bit.bitgroundspring.common.error.BusinessException;
 import bit.bitgroundspring.common.error.ErrorCode;
-import bit.bitgroundspring.security.token.JwtTokenProvider;
-import bit.bitgroundspring.security.token.RefreshToken;
-import bit.bitgroundspring.security.token.RefreshTokenService;
+import bit.bitgroundspring.security.token.AuthTokenService;
 import bit.bitgroundspring.util.CookieUtil;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -23,8 +21,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class AuthController {
 
-    private final RefreshTokenService refreshTokenService;
-    private final JwtTokenProvider jwtTokenProvider;
+    private final AuthTokenService authTokenService;
     private final CookieUtil cookieUtil;
 
     @Value("${jwt.expired_time}")
@@ -36,6 +33,7 @@ public class AuthController {
     /**
      * 액세스 토큰 재발급 (Refresh Token Rotation).
      * 성공: 204 + 새 jwt_token/refresh_token 쿠키, 실패: 401 REFRESH_TOKEN_MISSING / REFRESH_TOKEN_INVALID
+     * 탈퇴한 사용자, 폐기·만료된 토큰, 이미 교체된 토큰(재사용 → 세션 전체 폐기)은 401
      */
     @PostMapping("/refresh")
     @Loggable("토큰 재발급")
@@ -46,28 +44,22 @@ public class AuthController {
             throw new BusinessException(ErrorCode.REFRESH_TOKEN_MISSING);
         }
 
-        RefreshToken stored = refreshTokenService.getRefreshToken(refreshToken)
-                .orElseThrow(() -> new BusinessException(ErrorCode.REFRESH_TOKEN_INVALID));
-
-        RefreshToken refreshTokenEntity = RefreshToken.builder()
-                .userId(stored.getUserId())
-                .provider(stored.getProvider())
-                .providerId(stored.getProviderId())
-                .role(stored.getRole())
-                .build();
-
-        // 새 액세스 토큰 발급 + 리프레시 토큰 교체(기존 토큰 폐기)
-        String newJwtToken = jwtTokenProvider.createTokenByRefresh(refreshTokenEntity);
-        String newRefreshToken = refreshTokenService.rotateRefreshToken(refreshToken, refreshTokenEntity);
-
-        cookieUtil.addCookie(response, "jwt_token", newJwtToken, jwtExpiredTime);
-        cookieUtil.addCookie(response, "refresh_token", newRefreshToken, refreshExpiredTime);
-
-        log.info("[login] token refresh. - userId: {}", refreshTokenEntity.getUserId());
+        try {
+            // 교체 직후 같은 브라우저의 동시 요청이면 새 토큰 없이 204 (먼저 끝난 요청이 이미 새 쿠키를 받음)
+            authTokenService.refresh(refreshToken).ifPresent(tokens -> {
+                cookieUtil.addCookie(response, "jwt_token", tokens.accessToken(), jwtExpiredTime);
+                cookieUtil.addCookie(response, "refresh_token", tokens.refreshToken(), refreshExpiredTime);
+            });
+        } catch (BusinessException e) {
+            // 쓸 수 없는 토큰이 브라우저에 남아 재시도가 반복되지 않도록 쿠키를 지운다
+            cookieUtil.deleteCookie(response, "jwt_token");
+            cookieUtil.deleteCookie(response, "refresh_token");
+            throw e;
+        }
         return ResponseEntity.noContent().build();
     }
 
-    // 로그아웃: 쿠키 삭제 + 리프레시 토큰 폐기 (토큰이 없어도 204)
+    // 로그아웃: 쿠키 삭제 + 이 세션의 리프레시 토큰 폐기 (토큰이 없어도 204)
     @PostMapping("/logout")
     @Loggable("로그아웃")
     public ResponseEntity<Void> logout(
@@ -76,10 +68,8 @@ public class AuthController {
         cookieUtil.deleteCookie(response, "jwt_token");
         cookieUtil.deleteCookie(response, "refresh_token");
 
-        if (refreshToken != null) {
-            refreshTokenService.getRefreshToken(refreshToken)
-                    .ifPresent(token -> log.info("[login] logout success. - userId: {}", token.getUserId()));
-            refreshTokenService.deleteRefreshToken(refreshToken);
+        if (refreshToken != null && !refreshToken.isEmpty()) {
+            authTokenService.logout(refreshToken);
         }
         return ResponseEntity.noContent().build();
     }

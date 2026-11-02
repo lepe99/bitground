@@ -6,7 +6,6 @@ import bit.bitgroundspring.repository.SeasonRepository;
 import bit.bitgroundspring.repository.UserAssetRepository;
 import bit.bitgroundspring.repository.UserRepository;
 import bit.bitgroundspring.security.token.JwtTokenProvider;
-import bit.bitgroundspring.security.token.RefreshToken;
 import jakarta.servlet.http.Cookie;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.test.context.TestComponent;
@@ -91,12 +90,6 @@ public class TestFixtures {
 
     // 실제 로그인과 같은 형식의 JWT를 jwt_token 쿠키로 발급
     public Cookie login(User user) {
-        String token = jwtTokenProvider.createTokenByRefresh(RefreshToken.builder()
-                .userId(user.getId())
-                .provider(user.getProvider())
-                .providerId(user.getProviderId())
-                .role(user.getRole())
-                .build());
-        return new Cookie("jwt_token", token);
+        return new Cookie("jwt_token", jwtTokenProvider.createToken(user));
     }
 }

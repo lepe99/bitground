@@ -7,6 +7,7 @@ import bit.bitgroundspring.dto.TierDto;
 import bit.bitgroundspring.entity.Season;
 import bit.bitgroundspring.entity.User;
 import bit.bitgroundspring.entity.UserRanking;
+import bit.bitgroundspring.security.token.AuthTokenService;
 import bit.bitgroundspring.storage.StorageService;
 import bit.bitgroundspring.repository.RankRepository;
 import bit.bitgroundspring.repository.SeasonRepository;
@@ -36,6 +37,7 @@ public class UserService {
     
     private final UserRepository userRepository;
     private final StorageService storageService;
+    private final AuthTokenService authTokenService;
     
     // 소셜 로그인 ID로 사용자 조회
     public Optional<User> getUserBySocialId(String provider, String providerId) {
@@ -86,6 +88,8 @@ public class UserService {
         user.setEmail(null);
         user.setProviderId(null);
         userRepository.save(user);
+        // 모든 기기의 리프레시 토큰과 이미 발급된 액세스 토큰을 즉시 무효화
+        authTokenService.revokeAll(userId);
     }
 
     //mypage trade info

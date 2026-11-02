@@ -5,6 +5,7 @@ import bit.bitgroundspring.security.oauth2.CustomOidcUserService;
 import bit.bitgroundspring.security.oauth2.OidcAuthenticationFailureHandler;
 import bit.bitgroundspring.security.oauth2.OidcAuthenticationSuccessHandler;
 import bit.bitgroundspring.security.token.JwtAuthenticationFilter;
+import bit.bitgroundspring.security.token.AccessTokenBlocklist;
 import bit.bitgroundspring.security.token.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -31,6 +32,7 @@ public class SecurityConfig {
     private final OidcAuthenticationSuccessHandler oidcAuthenticationSuccessHandler;
     private final OidcAuthenticationFailureHandler oidcAuthenticationFailureHandler;
     private final JwtTokenProvider jwtTokenProvider;
+    private final AccessTokenBlocklist accessTokenBlocklist;
     private final ProblemDetailSecurityHandler problemDetailSecurityHandler;
 
     @Value("${react.host}")
@@ -64,7 +66,7 @@ public class SecurityConfig {
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
-                .addFilterBefore(new JwtAuthenticationFilter(jwtTokenProvider),
+                .addFilterBefore(new JwtAuthenticationFilter(jwtTokenProvider, accessTokenBlocklist),
                         UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

@@ -3,9 +3,7 @@ package bit.bitgroundspring.security.oauth2;
 import bit.bitgroundspring.util.CookieUtil;
 import bit.bitgroundspring.entity.User;
 import bit.bitgroundspring.repository.UserRepository;
-import bit.bitgroundspring.security.token.JwtTokenProvider;
-import bit.bitgroundspring.security.token.RefreshToken;
-import bit.bitgroundspring.security.token.RefreshTokenService;
+import bit.bitgroundspring.security.token.AuthTokenService;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -25,10 +23,9 @@ import java.util.Optional;
 @RequiredArgsConstructor
 @Slf4j
 public class OidcAuthenticationSuccessHandler extends SimpleUrlAuthenticationSuccessHandler {
-    private final JwtTokenProvider jwtTokenProvider;
     private final UserRepository userRepository;
     private final CookieUtil cookieUtil;
-    private final RefreshTokenService refreshTokenService;
+    private final AuthTokenService authTokenService;
     
     @Value("${react.host}")
     private String reactHost;
@@ -59,19 +56,10 @@ public class OidcAuthenticationSuccessHandler extends SimpleUrlAuthenticationSuc
         User user = userOptional.get();
         int userId = user.getId();
         
-        // JWT 토큰, Refresh 토큰 생성
-        String token = jwtTokenProvider.createToken(authentication, userId, provider);
-        RefreshToken refreshTokenEntity = RefreshToken.builder()
-                .userId(userId)
-                .provider(provider)
-                .providerId(providerId)
-                .role(user.getRole())
-                .build();
-        String refreshToken = refreshTokenService.createRefreshToken(refreshTokenEntity);
-        
-        // JWT 토큰, Refresh 토큰 쿠키에 저장
-        cookieUtil.addCookie(response, "jwt_token", token, jwtExpiredTime);
-        cookieUtil.addCookie(response, "refresh_token", refreshToken, refreshExpiredTime);
+        // JWT 토큰, Refresh 토큰 생성 후 쿠키에 저장
+        AuthTokenService.Tokens tokens = authTokenService.issue(user);
+        cookieUtil.addCookie(response, "jwt_token", tokens.accessToken(), jwtExpiredTime);
+        cookieUtil.addCookie(response, "refresh_token", tokens.refreshToken(), refreshExpiredTime);
         
         // 정상 로그인 처리
         String targetUrl = UriComponentsBuilder.fromUriString(reactHost + "/auth/callback")

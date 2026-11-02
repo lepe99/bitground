@@ -9,6 +9,8 @@ import bit.bitgroundspring.security.token.AuthUser;
 import bit.bitgroundspring.service.OrderService;
 import bit.bitgroundspring.service.SeasonService;
 import bit.bitgroundspring.service.UserService;
+import bit.bitgroundspring.util.CookieUtil;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -24,6 +26,7 @@ public class UserController {
     private final UserService userService;
     private final SeasonService seasonService;
     private final OrderService orderService;
+    private final CookieUtil cookieUtil;
 
     // 내 정보 조회
     @GetMapping("/me")
@@ -44,10 +47,12 @@ public class UserController {
         return toDto(userService.updateUser(user.getId(), name, email, imageUrl));
     }
 
-    // 회원 탈퇴 (is_deleted = 1)
+    // 회원 탈퇴 (is_deleted = 1) + 모든 세션 폐기, 로그인 쿠키 삭제
     @DeleteMapping("/me")
-    public ResponseEntity<Void> deleteCurrentUser(@AuthenticationPrincipal AuthUser authUser) {
+    public ResponseEntity<Void> deleteCurrentUser(@AuthenticationPrincipal AuthUser authUser, HttpServletResponse response) {
         userService.softDeleteUser(userService.getActiveUser(authUser.id()).getId());
+        cookieUtil.deleteCookie(response, "jwt_token");
+        cookieUtil.deleteCookie(response, "refresh_token");
         return ResponseEntity.noContent().build();
     }
 

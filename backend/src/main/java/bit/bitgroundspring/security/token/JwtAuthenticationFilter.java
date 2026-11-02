@@ -8,7 +8,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.MDC;
-import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -20,6 +19,7 @@ import java.io.IOException;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
     
     private final JwtTokenProvider jwtTokenProvider;
+    private final AccessTokenBlocklist accessTokenBlocklist;
     
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
@@ -28,14 +28,18 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         // 쿠키에서 jwt_token 값 추출
         String token = extractJwtFromCookies(request);
         
-        // JWT 토큰이 존재하고 유효한 경우 인증 처리
-        if (StringUtils.hasText(token) && jwtTokenProvider.validateToken(token)) {
-            Authentication authentication = jwtTokenProvider.getAuthentication(token);
-            SecurityContextHolder.getContext().setAuthentication(authentication);
-            // 이후 로그에 사용자 ID가 함께 남도록 (TraceIdFilter가 요청 종료 시 정리)
-            if (authentication.getPrincipal() instanceof AuthUser user) {
-                MDC.put(TraceIdFilter.USER_ID, String.valueOf(user.id()));
-            }
+        // JWT 토큰이 존재하고 유효하며, 탈퇴 등으로 무효화되지 않은 경우 인증 처리
+        if (StringUtils.hasText(token)) {
+            jwtTokenProvider.parse(token)
+                    .filter(claims -> !accessTokenBlocklist.isRevoked(claims.get("userId", Integer.class), claims.getIssuedAt()))
+                    .map(jwtTokenProvider::getAuthentication)
+                    .ifPresent(authentication -> {
+                        SecurityContextHolder.getContext().setAuthentication(authentication);
+                        // 이후 로그에 사용자 ID가 함께 남도록 (TraceIdFilter가 요청 종료 시 정리)
+                        if (authentication.getPrincipal() instanceof AuthUser user) {
+                            MDC.put(TraceIdFilter.USER_ID, String.valueOf(user.id()));
+                        }
+                    });
         }
         
         chain.doFilter(request, response);
