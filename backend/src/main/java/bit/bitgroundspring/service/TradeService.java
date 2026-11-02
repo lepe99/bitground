@@ -1,6 +1,7 @@
 package bit.bitgroundspring.service;
 
 import bit.bitgroundspring.aop.Loggable;
+import bit.bitgroundspring.client.UpbitClient;
 import bit.bitgroundspring.common.error.BusinessException;
 import bit.bitgroundspring.common.error.ErrorCode;
 import bit.bitgroundspring.common.money.Money;
@@ -12,19 +13,12 @@ import bit.bitgroundspring.event.TradeExecutedEvent;
 import bit.bitgroundspring.repository.*;
 import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -35,13 +29,10 @@ public class TradeService {
     private final OrderRepository orderRepository;
     private final SeasonRepository seasonRepository;
     private final ApplicationEventPublisher eventPublisher;
-    private final RestTemplate restTemplate;
+    private final UpbitClient upbitClient;
 
     /** 슬리피지 허용 범위: 0.5% */
     private static final double SLIPPAGE_TOLERANCE = 0.005;
-
-    @Value("${upbit.api.ticker-url}")
-    private String tickerUrl;
 
     @Transactional
     @Loggable("시장가 주문")
@@ -58,13 +49,8 @@ public class TradeService {
         Season season = seasonRepository.findByStatus(Status.PENDING)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NO_ACTIVE_SEASON));
         
-        // 2) 현재 시장가 조회 (float로 받으면 큰 가격에서 자릿수가 잘리므로 문자열 그대로 BigDecimal로)
-        String url = tickerUrl.replace("{symbol}", req.getSymbol());
-        ResponseEntity<List<Map<String,Object>>> resp = restTemplate.exchange(
-                url, HttpMethod.GET, HttpEntity.EMPTY,
-                new org.springframework.core.ParameterizedTypeReference<>() {}
-        );
-        BigDecimal marketPrice = new BigDecimal(resp.getBody().get(0).get("trade_price").toString());
+        // 2) 현재 시장가 조회
+        BigDecimal marketPrice = upbitClient.currentPrice(req.getSymbol());
 
         // 3) 주문 종류 분기
         BigDecimal execPrice = marketPrice;

@@ -4,8 +4,6 @@ import bit.bitgroundspring.security.token.AuthUser;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import bit.bitgroundspring.dto.OrderDto;
 import bit.bitgroundspring.dto.projection.OrderProjection;
-import bit.bitgroundspring.repository.SeasonRepository;
-import bit.bitgroundspring.security.token.JwtTokenProvider;
 import bit.bitgroundspring.service.OrderService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -18,8 +16,6 @@ import java.util.List;
 @RequiredArgsConstructor
 public class OrderController {
     private final OrderService orderService;
-    private final JwtTokenProvider jwtTokenProvider;
-    private final SeasonRepository seasonRepository;
 
     @GetMapping("/{seasonId}")
     public List<OrderProjection> getOrders(

@@ -5,7 +5,6 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import bit.bitgroundspring.dto.projection.UserAssetProjection;
 import bit.bitgroundspring.dto.response.UserAssetOwnedResponseDto;
 import bit.bitgroundspring.dto.response.UserAssetResponse;
-import bit.bitgroundspring.repository.UserRepository;
 import bit.bitgroundspring.service.UserAssetService;
 import bit.bitgroundspring.service.UserService;
 import lombok.RequiredArgsConstructor;
@@ -19,7 +18,6 @@ import java.util.List;
 @RequiredArgsConstructor
 public class UserAssetController {
     private final UserAssetService assetService;
-    private final UserRepository userRepository;
     private final UserService userService;
 
 
