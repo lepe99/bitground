@@ -3,6 +3,7 @@ import { RiDeleteBinLine } from "react-icons/ri";
 import api from '../../api/axiosConfig';
 import { useAuth } from '../../auth/useAuth';
 import { useToast } from '../Toast.jsx';
+import { sanitize } from '../../utils/sanitize.js';
 
 const Notice = ({keyword}) => {
     const [notices, setNotices] = useState([]);
@@ -112,7 +113,7 @@ const Notice = ({keyword}) => {
                             <tr>
                                 <td className="ask-title" colSpan="5">
                                     <div>
-                                        공지사항 : <div dangerouslySetInnerHTML={{ __html: notice.content }} />
+                                        공지사항 : <div dangerouslySetInnerHTML={{ __html: sanitize(notice.content) }} />
                                     </div>
                                 </td>
                             </tr>

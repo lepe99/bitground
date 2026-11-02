@@ -7,6 +7,7 @@ import {RiDeleteBinLine} from "react-icons/ri";
 import { tierImageMap } from "./tierImageUtil.js";
 import PostProfile   from "./PostProfile.jsx";
 import {useToast} from "../Toast.jsx";
+import { sanitize } from '../../utils/sanitize.js';
 
 const formatDate = (dateString) => {
     const date = new Date(dateString);
@@ -305,7 +306,7 @@ const PostDetail = () => {
                             </div>
                         </div>
                     </div>
-                    <div className='post-detail-body' dangerouslySetInnerHTML={{ __html: post.content }}></div>
+                    <div className='post-detail-body' dangerouslySetInnerHTML={{ __html: sanitize(post.content) }}></div>
                     <PostProfile
                         profileImage={post.profileImage}
                         name={post.name}
