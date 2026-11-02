@@ -5,7 +5,7 @@ import OrderBox from "../components/trade/OrderBox";
 import TradeHistory from "../components/trade/TradeHistory";
 import "../styles/trade/Trade.css";
 import TradingViewWidget from "../components/trade/TradingViewWidget";
-import api from "../api/axiosConfig.js";
+import {addFavorite, fetchAvailableAssets, fetchFavorites, fetchOwnedAssets, removeFavorite} from "../api/assetApi.js";
 import {AuthContext} from "../auth/AuthContext.js";
 import {TickerContext} from "../ticker/TickerProvider.jsx";
 import {useToast} from "../components/Toast.jsx";
@@ -26,8 +26,7 @@ export default function Trade() {
 
     const fetchOwned = async () => {
         try {
-            const res = await api.get(`/assets/owned`, { withCredentials: true });
-            const userAssets = res.data.userAssets || [];
+            const userAssets = (await fetchOwnedAssets()).userAssets || [];
             const symbols = userAssets.map(asset => asset.symbol);
             return symbols;
         } catch (err) {
@@ -37,11 +36,11 @@ export default function Trade() {
     };
 
     const handleOrderPlaced = () => {
-        api.get("/assets")
-            .then(async res => {
-                setCash(res.data.cash);
+        fetchAvailableAssets()
+            .then(async assets => {
+                setCash(assets.cash);
 
-                const userAssetsMap = res.data.userAssets.reduce((acc, asset) => {
+                const userAssetsMap = assets.userAssets.reduce((acc, asset) => {
                     acc[asset.symbol] = { amount: asset.amount, avgPrice: asset.avgPrice };
                     return acc;
                 }, {});
@@ -61,8 +60,7 @@ export default function Trade() {
 
 
     useEffect(() => {
-        api.get('/favorites')
-            .then(res => setFavoriteMarkets(res.data));
+        fetchFavorites().then(setFavoriteMarkets);
         handleOrderPlaced(); // 초기 자산 정보 로딩
     }, [user.id]);
 
@@ -75,9 +73,7 @@ export default function Trade() {
 
     const toggleFav = symbol => {
         const isFav = favoriteMarkets.includes(symbol);
-        const req = isFav
-            ? api.delete(`/favorites/${symbol}`)
-            : api.post('/favorites', null, {params: {symbol}});
+        const req = isFav ? removeFavorite(symbol) : addFavorite(symbol);
 
         req.then(() => {
             setFavoriteMarkets(prev =>

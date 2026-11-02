@@ -9,15 +9,15 @@ import Loading from "../components/Loading.jsx";
 // (Quill 에디터, Recharts, 거래소 화면 등이 첫 화면 번들에 섞이지 않도록)
 const Callback = lazy(() => import("../pages/auth/Callback.jsx"));
 const Login = lazy(() => import("../pages/Login.jsx"));
-const CoinTrends = lazy(() => import("../components/CoinTrends.jsx"));
+const CoinTrends = lazy(() => import("../pages/CoinTrends.jsx"));
 const Rank = lazy(() => import("../pages/Rank.jsx"));
 const Mypage = lazy(() => import("../pages/Mypage.jsx"));
 const NoticePage = lazy(() => import("../pages/NoticePage.jsx"));
 const Trade = lazy(() => import("../pages/Trade.jsx"));
 const Investments = lazy(() => import("../pages/Investments.jsx"));
-const PostList = lazy(() => import("../components/community/PostList.jsx"));
-const PostWrite = lazy(() => import("../components/community/PostWrite.jsx"));
-const PostDetail = lazy(() => import("../components/community/PostDetail.jsx"));
+const PostList = lazy(() => import("../pages/community/PostList.jsx"));
+const PostWrite = lazy(() => import("../pages/community/PostWrite.jsx"));
+const PostDetail = lazy(() => import("../pages/community/PostDetail.jsx"));
 const TickerProvider = lazy(() =>
     import("../ticker/TickerProvider.jsx").then(m => ({default: m.TickerProvider})));
 

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { fetchPublicRanking } from '../../api/fetchPublicRanking';
+import { fetchPublicRanking } from '../../api/rankApi.js';
 import '../../styles/main/RankingPreview.css';
 import bronze from '../../assets/images/bronze.webp';
 import silver from '../../assets/images/silver.webp';

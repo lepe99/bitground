@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import "../../styles/community/post.css";
 import { useNavigate, useParams } from 'react-router-dom';
-import api from "../../api/axiosConfig.js";
+import {
+    createComment, deleteComment, deletePost, fetchCommentCount, fetchComments, fetchPost, sendReaction as postReaction
+} from "../../api/communityApi.js";
 import { useAuth } from '../../auth/useAuth.js';
 import {RiDeleteBinLine} from "react-icons/ri";
-import { tierImageMap } from "./tierImageUtil.js";
-import PostProfile   from "./PostProfile.jsx";
-import {useToast} from "../Toast.jsx";
+import { tierImageMap } from "../../components/community/tierImageUtil.js";
+import PostProfile   from "../../components/community/PostProfile.jsx";
+import {useToast} from "../../components/Toast.jsx";
 import { sanitize } from '../../utils/sanitize.js';
 import {getErrorMessage} from '../../api/apiError.js';
 
@@ -146,26 +148,18 @@ const PostDetail = () => {
 
     const commentHandlers = {
         reloadComments: () => {
-            api.get(`/comments/post/${id}`).then(res => setComments(res.data));
+            fetchComments(id).then(setComments);
         },
         submitComment: () => {
             if (!commentContent.trim()) return;
-            api.post("/comments", {
-                postId: id,
-                content: commentContent,
-                parentId: null
-            }).then(() => {
+            createComment({postId: id, content: commentContent}).then(() => {
                 setCommentContent("");
                 commentHandlers.reloadComments();
             });
         },
         submitReply: (parentId) => {
             if (!replyContent.trim()) return;
-            api.post("/comments", {
-                postId: id,
-                content: replyContent,
-                parentId
-            }).then(() => {
+            createComment({postId: id, content: replyContent, parentId}).then(() => {
                 setReplyContent("");
                 setReplyTargetId(null);
                 commentHandlers.reloadComments();
@@ -175,7 +169,7 @@ const PostDetail = () => {
             const confirmed = window.confirm("댓글을 삭제하시겠습니까?");
             if (!confirmed) return;
             try {
-                await api.delete(`/comments/${commentId}`);
+                await deleteComment(commentId);
                 commentHandlers.reloadComments();
             } catch (err) {
                 errorAlert(getErrorMessage(err, '댓글 삭제 실패'));
@@ -188,8 +182,7 @@ const PostDetail = () => {
         // 조회수는 서버가 사용자 기준으로 중복을 걸러 올린다
         const fetchPost = async () => {
             try {
-                const response = await api.get(`/posts/${id}`);
-                setPost(response.data);
+                setPost(await fetchPost(id));
             } catch (err) {
                 errorAlert(getErrorMessage(err, '게시글을 불러오는 데 실패했습니다.'));
                 navigate('/community');
@@ -200,23 +193,17 @@ const PostDetail = () => {
 
     useEffect(() => {
         commentHandlers.reloadComments();
-        api.get(`/comments/post/${postId}/count`).then(res => setCommentCount(res.data));
+        fetchCommentCount(postId).then(setCommentCount);
     }, [id]);
 
-    const sendReaction = async ({ userId, targetType, targetId, liked }) => {
+    const sendReaction = async ({ targetType, targetId, liked }) => {
         try {
-            await api.post('/reactions', {
-                userId,
-                targetType,
-                targetId,
-                liked
-            });
+            await postReaction({targetType, targetId, liked});
 
             if (targetType === 'POST') {
-                const res = await api.get(`/posts/${targetId}`);
-                setPost(res.data); // 게시글 갱신
+                setPost(await fetchPost(targetId)); // 게시글 갱신
             } else {
-                commentHandlers.reloadComments();  // ✅ 이렇게 고쳐야 함!
+                commentHandlers.reloadComments();
             }
         } catch (err) {
             console.error("리액션 실패", err);
@@ -227,7 +214,7 @@ const PostDetail = () => {
         if (!window.confirm("정말 이 게시글을 삭제하시겠습니까?")) return;
 
         try {
-            await api.delete(`/posts/${postId}`);
+            await deletePost(postId);
             infoAlert("게시글이 삭제되었습니다.");
             navigate("/community"); // 글 목록 페이지로 이동
         } catch (error) {

@@ -1,9 +1,6 @@
-// src/components/CoinTrends/CoinTrends.jsx
-
 import React, { useState, useEffect, useRef } from 'react';
-import { fetchNews } from '../api/news'; // '../api/news' 경로 유지
+import { fetchNews } from '../api/newsApi.js';
 import '../styles/CoinTrends.css'; // 새로운 CSS 파일 임포트
-import api from '../api/axiosConfig'; // Axios 인스턴스 임포트 (AI 인사이트를 위해 필요)
 
 import {
   fetchTop5HighTradePriceCoins,
@@ -11,8 +8,9 @@ import {
   fetchTop5PriceDecreaseCoins,
   fetchWarningCoins,
   fetchAlertCoins,
-  fetchTodayInsightSymbols // 오늘자 AI 인사이트 심볼 목록을 가져오는 API 호출 함수
-} from '../api/coinService.js';
+  fetchTodayInsightSymbols, // 오늘자 AI 인사이트 심볼 목록
+  fetchCoinInsight
+} from '../api/coinApi.js';
 
 // 뉴스 검색 드롭다운에 사용되는 인기 코인 목록입니다.
 const POPULAR_COINS = ['KRW-BTC', 'KRW-ETH', 'KRW-XRP', 'KRW-SOL'];
@@ -89,8 +87,7 @@ export default function CoinTrends() {
           setSelectedCoinSymbol(initialSymbol);
 
           // 초기 로딩 시 기본 선택된 심볼의 AI 분석 데이터도 함께 가져옴
-          const initialInsightRes = await api.get(`/coins/${initialSymbol}/insight`); //
-          setSelectedCoinAnalysis(initialInsightRes.data);
+          setSelectedCoinAnalysis(await fetchCoinInsight(initialSymbol));
         } else {
           setSelectedCoinAnalysis(null);
         }
@@ -117,8 +114,7 @@ export default function CoinTrends() {
       }
       setLoadingAnalysis(true); // 선택 변경 시 로딩 시작
       try {
-        const insightRes = await api.get(`/coins/${selectedCoinSymbol}/insight`); // /api/ 접두사 제거
-        setSelectedCoinAnalysis(insightRes.data);
+        setSelectedCoinAnalysis(await fetchCoinInsight(selectedCoinSymbol));
       } catch (error) {
         console.error(`선택된 코인(${selectedCoinSymbol})의 AI 인사이트를 불러오는 데 실패했습니다:`, error);
         setSelectedCoinAnalysis(null);

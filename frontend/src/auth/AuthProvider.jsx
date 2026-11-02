@@ -1,6 +1,6 @@
 import React, {useState, useEffect, useCallback, useRef} from 'react';
 import {AuthContext} from './AuthContext.js';
-import api from '../api/axiosConfig.js';
+import {fetchMe, logout as logoutRequest} from '../api/authApi.js';
 
 export const AuthProvider = ({children}) => {
     const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -16,9 +16,9 @@ export const AuthProvider = ({children}) => {
 
         try {
             // 백엔드에 현재 사용자 정보를 요청하는 API (쿠키에 유효한 AT가 있다면 성공)
-            const response = await api.get('/users/me');
-            if (response.data) {
-                setUser(response.data);
+            const me = await fetchMe();
+            if (me) {
+                setUser(me);
                 setIsLoggedIn(true);
             }
         } catch (error) {
@@ -43,7 +43,7 @@ export const AuthProvider = ({children}) => {
 
     const logout = useCallback(async () => {
         try {
-            await api.post('/auth/logout');
+            await logoutRequest();
         } catch (error) {
             alert("로그아웃 중 오류가 발생했습니다. 다시 시도해주세요.");
             console.error('Logout failed:', error);

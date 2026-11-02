@@ -1,5 +1,6 @@
 import React, {useEffect, useState,useRef} from 'react';
-import api from "../../api/axiosConfig.js";
+import {fetchCurrentRanking, fetchSeasonRanking} from "../../api/rankApi.js";
+import {fetchSeasons} from "../../api/seasonApi.js";
 import DistributionChart from './DistributionChart.jsx';
 import '../../styles/rank/Ranking.css';
 import {useAuth} from '../../auth/useAuth.js';
@@ -49,8 +50,8 @@ export default function Ranking() {
     useEffect(() => {
         const fetchDetailedRankings = async () => {
             try {
-                const response = await api.get(`/rank/current`);
-                const data = Array.isArray(response.data) ? response.data : [];
+                const current = await fetchCurrentRanking();
+                const data = Array.isArray(current) ? current : [];
 
                 setRankings(data);
 
@@ -85,11 +86,9 @@ export default function Ranking() {
 
     // 시즌 정보 로딩
     useEffect(() => {
-        const fetchSeasons = async () => {
+        const loadSeasons = async () => {
             try {
-                const response = await api.get('/seasons');
-
-                const seasonData = response.data
+                const seasonData = (await fetchSeasons())
                     .filter(season => season.status !== 'PENDING')
                     .map(season => ({
                         id: season.id,
@@ -112,7 +111,7 @@ export default function Ranking() {
                 console.error('현재 시즌 정보 로딩 실패:', error);
             }
         };
-        fetchSeasons();
+        loadSeasons();
     }, []);
 
     // 과거 시즌 랭킹 로딩
@@ -125,8 +124,8 @@ export default function Ranking() {
 
             setPastLoading(true);
             try {
-                const response = await api.get(`/rank/${selectedSeason}`);
-                const seasonData = Array.isArray(response.data) ? response.data : [];
+                const ranking = await fetchSeasonRanking(selectedSeason);
+                const seasonData = Array.isArray(ranking) ? ranking : [];
 
                 setPastRankingsMap(prevMap => ({
                     ...prevMap,

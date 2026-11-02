@@ -7,7 +7,7 @@ import {useLocation} from "react-router-dom";
 import {FaRegBell} from "react-icons/fa6";
 import {useEffect, useState} from "react";
 import {useToast} from "../components/Toast.jsx";
-import api from "../api/axiosConfig.js";
+import {fetchNotifications, markAllNotificationsRead} from "../api/notificationApi.js";
 
 export default function Header() {
     const navigate = useNavigate();
@@ -49,13 +49,9 @@ export default function Header() {
                 if (isLoading) return;
                 setIsLoading(true);
                 try {
-                    const response = await api.get('/notifications', {
-                        params: {
-                            page: currentPage, size: pageSize, sort: 'createdAt,desc',
-                        },
-                    });
-                    const data = response.data.content || response.data;
-                    const total = response.data.totalPages || 1;
+                    const result = await fetchNotifications({page: currentPage, size: pageSize});
+                    const data = result.content || result;
+                    const total = result.totalPages || 1;
 
                     // 첫 페이지면 알림 목록을 초기화하고, 아니면 이전 알림에 새로운 알림을 추가
                     if (currentPage === 0) {
@@ -116,7 +112,7 @@ export default function Header() {
             // 안읽은 알림을 읽음처리하는 API 호출
             const markNotificationsAsRead = async () => {
                 try {
-                    await api.patch('/notifications');
+                    await markAllNotificationsRead();
                     setUnreadNotificationsCount(0); // 알림 개수를 0으로 초기화
                 } catch (error) {
                     console.error('알림 읽음 처리 중 오류 발생:', error);

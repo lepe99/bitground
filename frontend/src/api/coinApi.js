@@ -1,4 +1,3 @@
-// src/components/api/coinService.js
 
 import api from "./axiosConfig.js"; // axiosConfig.js에서 설정된 'api' 인스턴스를 임포트
 

@@ -3,10 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import ReactQuill from 'react-quill-new';
 import 'react-quill-new/dist/quill.snow.css';
 import '../../styles/community/post.css';
-import api from '../../api/axiosConfig.js';
+import {createPost} from '../../api/communityApi.js';
+import {uploadImage} from '../../api/uploadApi.js';
 import { useAuth } from '../../auth/useAuth.js';
-import { tierImageMap } from './tierImageUtil';
-import {useToast} from "../Toast.jsx";
+import { tierImageMap } from '../../components/community/tierImageUtil';
+import {useToast} from "../../components/Toast.jsx";
 import {getErrorMessage} from '../../api/apiError.js';
 
 const PostWrite = () => {
@@ -28,14 +29,8 @@ const PostWrite = () => {
         input.onchange = async () => {
             const file = input.files[0];
             if (file) {
-                const formData = new FormData();
-                formData.append('file', file);
                 try {
-                    const res = await api.post('/uploads/images', formData, {
-                        headers: { 'Content-Type': 'multipart/form-data' },
-                    });
-
-                    const imageUrl = res.data.url;
+                    const imageUrl = await uploadImage(file);
                     const editor = quillRef.current?.getEditor();
                     let range = editor?.getSelection();
                     if (!range) {
@@ -82,16 +77,8 @@ const PostWrite = () => {
             return;
         }
 
-        const formData = {
-            title,
-            content,
-            category
-        };
-
         try {
-            await api.post('/posts/form', formData, {
-                headers: { 'Content-Type': 'application/json' }
-            });
+            await createPost({title, content, category});
             infoAlert('게시글이 등록되었습니다!');
             navigate('/community');
         } catch (err) {

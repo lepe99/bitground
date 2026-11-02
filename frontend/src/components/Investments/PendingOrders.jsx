@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useContext } from 'react';
 import { useToast } from "../Toast.jsx"; // 알림 토스트 훅
-import api from '../../api/axiosConfig'; // Axios 인스턴스
+import {cancelOrder, fetchPendingOrders} from '../../api/orderApi.js';
 import { TickerContext } from "../../ticker/TickerProvider"; // 실시간 시세 컨텍스트
 import {getErrorMessage} from '../../api/apiError.js';
 
@@ -15,9 +15,9 @@ export default function PendingOrders() {
 
     // 예약 주문 목록 불러오기
     const fetchOrders = () => {
-        api.get('/orders/reserve')
-            .then(res => {
-                setPendingOrders(Array.isArray(res.data) ? res.data : []);
+        fetchPendingOrders()
+            .then(orders => {
+                setPendingOrders(Array.isArray(orders) ? orders : []);
                 setSelectedIds([]);
             })
             .catch(err => {
@@ -72,7 +72,7 @@ export default function PendingOrders() {
         }
         if (!window.confirm('선택한 주문을 모두 취소하시겠습니까?')) return;
 
-        Promise.all(selectedIds.map(id => api.delete(`/orders/${id}`)))
+        Promise.all(selectedIds.map(id => cancelOrder(id)))
             .then(() => {
                 infoAlert('주문이 취소되었습니다.');
                 fetchOrders();

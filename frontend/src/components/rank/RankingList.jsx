@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import api from '../../api/axiosConfig.js';
+import {fetchUserRankDetail} from '../../api/rankApi.js';
 import bronzeLine from '../../assets/images/bronze_line.webp';
 import silverLine from '../../assets/images/silver_line.webp';
 import goldLine from '../../assets/images/gold_line.webp';
@@ -67,8 +67,7 @@ export default function RankingList({
             try {
 
                 if (!fetchedDetailedCache.current[item.userId]) {
-                    const response = await api.get(`/rank/detail/${item.userId}`);
-                    fetchedDetailedCache.current[item.userId] = response.data;
+                    fetchedDetailedCache.current[item.userId] = await fetchUserRankDetail(item.userId);
                 }
 
                 const detailed = fetchedDetailedCache.current[item.userId];

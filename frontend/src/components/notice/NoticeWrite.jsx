@@ -2,7 +2,8 @@ import React, { useCallback, useMemo, useRef, useState } from 'react';
 import ReactQuill from 'react-quill-new';
 import 'react-quill-new/dist/quill.snow.css';
 import '../../styles/notice/notice.css';
-import api from '../../api/axiosConfig.js';
+import {createNotice} from '../../api/noticeApi.js';
+import {uploadImage} from '../../api/uploadApi.js';
 import { useAuth } from '../../auth/useAuth.js';
 import {useToast} from "../Toast.jsx";
 import {getErrorMessage} from '../../api/apiError.js';
@@ -24,14 +25,8 @@ const NoticeWrite = ({ onDone }) => {
         input.onchange = async () => {
             const file = input.files[0];
             if (file) {
-                const formData = new FormData();
-                formData.append('file', file);
                 try {
-                    const res = await api.post('/uploads/images', formData, {
-                        headers: { 'Content-Type': 'multipart/form-data' },
-                    });
-
-                    const imageUrl = res.data.url;
+                    const imageUrl = await uploadImage(file);
                     const editor = quillRef.current?.getEditor();
                     let range = editor?.getSelection();
                     if (!range) {
@@ -81,12 +76,8 @@ const NoticeWrite = ({ onDone }) => {
             return;
         }
 
-        const formData = { title, content };
-
         try {
-            await api.post('/notices', formData, {
-                headers: { 'Content-Type': 'application/json' }
-            });
+            await createNotice({title, content});
             infoAlert('공지사항이 등록되었습니다!');
             onDone();
         } catch (err) {

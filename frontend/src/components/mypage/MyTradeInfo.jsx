@@ -1,9 +1,8 @@
 import React, { useEffect, useState } from "react";
 import '../../styles/mypage/MyTradeInfo.css';
 import MyTradeAI from "./MyTradeAI.jsx";
-import { fetchTradeSummary } from "../../api/fetchTradeSummary.js";
-import { fetchTradeDetails } from "../../api/fetchTradeDetails.js";
-import api from "../../api/axiosConfig.js";
+import {fetchAiAdvice, fetchMyTier, fetchTradeDetails, fetchTradeSummary} from "../../api/mypageApi.js";
+import {fetchSeasons} from "../../api/seasonApi.js";
 import Loading from "../Loading.jsx";
 import bronze from '../../assets/images/bronze.webp';
 import silver from '../../assets/images/silver.webp';
@@ -63,12 +62,10 @@ export default function MyTradeInfo() {
 
     // 시즌 목록을 불러오는 useEffect
     useEffect(() => {
-        const fetchSeasons = async () => {
+        const loadSeasons = async () => {
             try {
-                // 서버에서 시즌 목록을 가져옴
-                const res = await api.get('/seasons');
                 // 완료된 시즌만 필터링
-                const completedSeasons = res.data.filter(s => s.status === 'COMPLETED');
+                const completedSeasons = (await fetchSeasons()).filter(s => s.status === 'COMPLETED');
                 setSeasons(completedSeasons);
                 // 완료된 시즌이 있으면 가장 최신 시즌을 기본 선택
                 if (completedSeasons.length > 0) {
@@ -78,27 +75,23 @@ export default function MyTradeInfo() {
                 console.error("시즌 목록 불러오기 실패", err);
             }
         };
-        fetchSeasons();
+        loadSeasons();
     }, []); // 컴포넌트 마운트 시 한 번만 실행
 
     // 선택된 시즌이 변경될 때마다 사용자 티어를 불러오는 useEffect
     useEffect(() => {
         if (!selectedSeason) return; // 선택된 시즌이 없으면 실행하지 않음
 
-        const fetchMyTier = async () => {
+        const loadMyTier = async () => {
             try {
-                // 서버에서 사용자 티어 정보를 가져옴
-                const res = await api.get('/mypage/tier', {
-                    params: { seasonId: selectedSeason } // 선택된 시즌 ID를 파라미터로 전달
-                });
-                setMyTier(res.data); // 티어 정보 상태 업데이트 (예: { tier: 3, tierName: "Gold", tierImage: "..." })
+                setMyTier(await fetchMyTier(selectedSeason)); // 예: { tier: 3, tierName: "Gold" }
             } catch (err) {
                 console.error('내 티어 불러오기 실패', err);
                 setMyTier(null); // 실패 시 티어 정보 초기화
             }
         };
 
-        fetchMyTier();
+        loadMyTier();
     }, [selectedSeason]); // selectedSeason이 변경될 때마다 실행
 
     // 선택된 시즌이 변경될 때 AI 조언 데이터를 불러오는 useEffect (새로 추가)
@@ -108,19 +101,16 @@ export default function MyTradeInfo() {
             return;
         }
 
-        const fetchAiAdvice = async () => {
+        const loadAiAdvice = async () => {
             try {
-                const res = await api.get(`/mypage/ai-advice`, {
-                    params: { seasonId: selectedSeason }
-                });
                 // AI 조언 데이터가 있다면 상태 업데이트, 없으면 null
-                setAiAdvice(res.data || null);
+                setAiAdvice((await fetchAiAdvice(selectedSeason)) || null);
             } catch (err) {
                 console.error("AI 조언 불러오기 실패", err);
                 setAiAdvice(null); // 실패 시 AI 조언 초기화
             }
         };
-        fetchAiAdvice();
+        loadAiAdvice();
     }, [selectedSeason]); // selectedSeason이 변경될 때마다 실행
 
     // 요약 + 상세 데이터 동시 로딩

@@ -1,6 +1,7 @@
 import { useState, useEffect, useContext } from 'react';
 import { AuthContext } from "../../auth/AuthContext"; // 사용자 인증 정보
-import api from "../../api/axiosConfig"; // Axios 인스턴스
+import {fetchSeasons} from "../../api/seasonApi.js";
+import {fetchSeasonOrders} from "../../api/orderApi.js";
 
 // 🔢 숫자 포맷 함수 (소수점 자리 자동 조정)
 function formatNumber(value, digits = undefined, trimZeros = true) {
@@ -34,10 +35,10 @@ export default function TradeHistory() {
 
     // 📅 시즌 목록 가져오기 (최초 실행 시)
     useEffect(() => {
-        api.get('/seasons')
-            .then(res => {
-                setSeasonOptions(res.data);
-                setSelectedSeasonId(res.data[0]?.id || null); // 첫 번째 시즌 자동 선택
+        fetchSeasons()
+            .then(seasons => {
+                setSeasonOptions(seasons);
+                setSelectedSeasonId(seasons[0]?.id || null); // 첫 번째 시즌 자동 선택
             })
             .catch(err => console.error('시즌 목록 로딩 실패:', err));
     }, []);
@@ -46,11 +47,8 @@ export default function TradeHistory() {
     useEffect(() => {
         if (!selectedSeasonId || !user?.id) return;
 
-        api.get(`/orders/${selectedSeasonId}`, { withCredentials: true })
-            .then(res => {
-                console.log('✅ 주문 응답 데이터:', res.data);
-                setOrders(res.data);
-            })
+        fetchSeasonOrders(selectedSeasonId)
+            .then(setOrders)
             .catch(err => {
                 console.error('주문 내역 로딩 실패:', err);
                 setOrders([]);

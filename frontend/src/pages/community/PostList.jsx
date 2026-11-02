@@ -1,9 +1,9 @@
 import "../../styles/community/post.css";
 import {useNavigate} from 'react-router-dom';
-import api from "../../api/axiosConfig.js";
+import {fetchPosts as fetchPostPage} from "../../api/communityApi.js";
 import {useEffect, useState} from "react";
 import {HiOutlinePhoto} from "react-icons/hi2";
-import {tierImageMap} from "./tierImageUtil.js";
+import {tierImageMap} from "../../components/community/tierImageUtil.js";
 
 /**
  * 게시글 목록 페이지 컴포넌트
@@ -71,16 +71,14 @@ const PostList = () => {
 
     const fetchPosts = async (page = 0, category = currentCategory, sort = sortOrder) => {
         try {
-            const res = await api.get(`/posts/list`, {
-                params: {
-                    page,
-                    size: 15,
-                    category: category === '전체' ? null : category,
-                    sort
-                }
+            const data = await fetchPostPage({
+                page,
+                size: 15,
+                category: category === '전체' ? null : category,
+                sort
             });
-            setPosts(res.data.content);
-            setTotalPages(res.data.totalPages);
+            setPosts(data.content);
+            setTotalPages(data.totalPages);
         } catch (err) {
             console.error('게시글 불러오기 실패:', err);
         }

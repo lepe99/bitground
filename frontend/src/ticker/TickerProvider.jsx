@@ -1,5 +1,5 @@
 import React, {createContext, useState, useEffect, useMemo} from 'react';
-import api from "../api/axiosConfig.js";
+import {fetchCoinSymbols} from "../api/coinApi.js";
 
 // Upbit 공개 시세 WebSocket. 인증이 필요 없어 브라우저가 직접 연결한다 (우리 서버를 거쳐 중계하지 않음)
 const UPBIT_WS_URL = 'wss://api.upbit.com/websocket/v1';
@@ -31,9 +31,9 @@ export function TickerProvider({ children }) {
 
     // (1) markets 불러오기
     useEffect(() => {
-        api.get('/coins/symbols')
-            .then(res => {
-                setMarkets(res.data.map(c => ({
+        fetchCoinSymbols()
+            .then(symbols => {
+                setMarkets(symbols.map(c => ({
                     market: c.symbol,
                     name: c.koreanName
                 })));

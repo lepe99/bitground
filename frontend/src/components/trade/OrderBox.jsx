@@ -1,6 +1,6 @@
 import React, {useEffect, useRef, useState} from 'react';
 import '../../styles/trade/OrderBox.css';
-import api from '../../api/axiosConfig.js';
+import {placeOrder, placeReserveOrder} from '../../api/orderApi.js';
 import {useToast} from "../Toast.jsx";
 import {getErrorMessage} from '../../api/apiError.js';
 
@@ -228,21 +228,20 @@ export default function OrderBox({selectedMarket, tickerMap, onOrderPlaced, cash
                         : { amount: rawAmount })
             };
 
-            const url = isReserve ? '/trade/reserve' : '/trade';
-            const response = await api.post(url, payload);
+            const result = isReserve ? await placeReserveOrder(payload) : await placeOrder(payload);
 
             if (!isReserve) {
                 if (isBuy) {
-                    infoAlert(`${response.data.amount}개 매수 주문이 체결되었습니다.`);
+                    infoAlert(`${result.amount}개 매수 주문이 체결되었습니다.`);
                 } else {
-                    const total = Math.floor(response.data.tradePrice * response.data.amount);
+                    const total = Math.floor(result.tradePrice * result.amount);
                     infoAlert(`${formatNumber(total)} ${currency}에 매도 주문이 체결되었습니다.`);
                 }
             } else {
                 infoAlert('예약 주문이 접수되었습니다.');
             }
 
-            onOrderPlaced?.(response.data);
+            onOrderPlaced?.(result);
             setAmount('');
             setTotalPrice('');
         } catch (err) {

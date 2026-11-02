@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { RiDeleteBinLine } from "react-icons/ri";
-import api from '../../api/axiosConfig';
+import {deleteNotice, fetchNotices as fetchNoticePage} from '../../api/noticeApi.js';
 import { useAuth } from '../../auth/useAuth';
 import { useToast } from '../Toast.jsx';
 import { sanitize } from '../../utils/sanitize.js';
@@ -16,12 +16,10 @@ const Notice = ({keyword}) => {
 
     const fetchNotices = async (pageNum = 0) => {
         try {
-            const res = await api.get('/notices', {
-                params: { page: pageNum, size: 10, keyword: keyword || ''},
-            });
-            setNotices(res.data.content);
-            setTotalPages(res.data.totalPages);
-            setPage(res.data.page);
+            const data = await fetchNoticePage({page: pageNum, size: 10, keyword: keyword || ''});
+            setNotices(data.content);
+            setTotalPages(data.totalPages);
+            setPage(data.page);
             setOpenIds([]); // 페이지 변경 시 열려있는 토글 초기화
         } catch (error) {
             console.error("공지사항 불러오기 실패", error);
@@ -63,7 +61,7 @@ const Notice = ({keyword}) => {
     const handleDelete = async (id) => {
         if (window.confirm("정말 삭제하시겠습니까?")) {
             try {
-                await api.delete(`/notices/${id}`);
+                await deleteNotice(id);
                 infoAlert("삭제되었습니다.");
                 setNotices(prev => prev.filter(notice => notice.id !== id));
             } catch (err) {

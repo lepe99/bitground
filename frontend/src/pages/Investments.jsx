@@ -7,7 +7,7 @@ import TradeHistory from "../components/Investments/TradeHistory.jsx";
 import PendingOrders from "../components/Investments/PendingOrders.jsx";
 import { AuthContext } from "../auth/AuthContext";
 import { TickerContext } from "../ticker/TickerProvider.jsx";
-import api from "../api/axiosConfig.js";
+import {addFavorite, fetchFavorites, fetchOwnedAssets, removeFavorite} from "../api/assetApi.js";
 import '../styles/Investments/Investments.css';
 import "../styles/trade/Trade.css";
 import Loading from "../components/Loading.jsx";
@@ -38,8 +38,7 @@ export default function Investments() {
 
         const fetchAssetsAndFavorites = async () => {
             try {
-                const res = await api.get(`/assets/owned`, { withCredentials: true });
-                const { userAssets = [], cash = 0, availableCash = 0 } = res.data || {};
+                const { userAssets = [], cash = 0, availableCash = 0 } = (await fetchOwnedAssets()) || {};
                 setUserAssets(userAssets);
                 setCash(cash);
                 setAvailableCash(availableCash);
@@ -54,8 +53,7 @@ export default function Investments() {
             }
 
             try {
-                const favRes = await api.get('/favorites');
-                setFavoriteMarkets(favRes.data);
+                setFavoriteMarkets(await fetchFavorites());
             } catch {
                 setFavoriteMarkets([]);
             }
@@ -66,9 +64,7 @@ export default function Investments() {
 
     const toggleFavorite = (symbol) => {
         const isFav = favoriteMarkets.includes(symbol);
-        const req = isFav
-            ? api.delete(`/favorites/${symbol}`)
-            : api.post('/favorites', null, { params: {symbol} });
+        const req = isFav ? removeFavorite(symbol) : addFavorite(symbol);
         req.then(() => {
             setFavoriteMarkets(prev =>
                 isFav ? prev.filter(s => s !== symbol) : [...prev, symbol]
