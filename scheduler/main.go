@@ -2,6 +2,7 @@ package main
 
 import (
 	"Bitground-go/config"
+	"Bitground-go/model"
 	"Bitground-go/service"
 	"Bitground-go/util"
 	"context"
@@ -126,19 +127,20 @@ func run(ctx context.Context, db *sql.DB, cfg config.Config, now time.Time) erro
 		}))
 	}
 
+	// 랭킹은 매시간, 일일 자산 스냅샷은 0시에만 함께 남긴다
 	var coinPrices map[int]float64
+	var coinPriceHistory map[int]model.UpbitCoinPrice
 	rankErr := step("랭킹 업데이트", func() error {
-		err, coinPriceHistory, prices := service.UpdateRank(ctx, db, symbolMap, seasonID, flags.Coin)
-		if err != nil {
-			return err
-		}
-		coinPrices = prices
+		var err error
+		coinPrices, coinPriceHistory, err = service.UpdateRank(ctx, db, symbolMap, seasonID, flags.Coin, now)
+		return err
+	})
+	errs = append(errs, rankErr)
+	if rankErr == nil {
 		errs = append(errs, step("코인 가격 히스토리 업데이트", func() error {
 			return service.UpdateCoinPriceHistory(ctx, db, coinPriceHistory)
 		}))
-		return nil
-	})
-	errs = append(errs, rankErr)
+	}
 
 	if flags.Season {
 		if rankErr != nil {

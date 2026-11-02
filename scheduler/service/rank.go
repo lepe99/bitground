@@ -2,317 +2,149 @@ package service
 
 import (
 	"Bitground-go/model"
-	"Bitground-go/util"
 	"context"
 	"database/sql"
 	"fmt"
-	"golang.org/x/sync/errgroup"
 	"log"
 	"time"
 )
 
-const BATCH_SIZE = 1000 // 배치 크기 설정
-var DailyFlag bool
-var SeasonID int // 전역 변수로 시즌 ID 저장
+// userTotalsCTE 시즌 참여자별 총자산 = 현금 + Σ(보유 수량 × 현재가)
+//
+// 랭킹 대상은 이번 시즌에 체결된 주문이 1건 이상 있는, 탈퇴하지 않은 사용자다.
+// 가입만 하고 거래하지 않은 사용자는 랭킹·티어 산정에서 빠진다(시즌 정산 때 티어 0).
+// 가격 정보가 없는 코인(상장 폐지 등)은 0원으로 계산한다.
+//
+// 파라미터: 코인 가격 JSON(pricesJSON), 시즌 ID
+const userTotalsCTE = `
+	WITH prices AS (
+		SELECT p.coin_id, p.price FROM ` + pricesTable + ` p
+	),
+	participants AS (
+		SELECT DISTINCT user_id FROM orders WHERE season_id = ? AND status = 'COMPLETED'
+	),
+	totals AS (
+		SELECT u.id AS user_id,
+		       u.cash,
+		       FLOOR(u.cash + COALESCE(SUM(ua.amount * p.price), 0)) AS total_value
+		FROM participants pt
+		JOIN users u ON u.id = pt.user_id AND u.is_deleted = 0
+		LEFT JOIN user_assets ua ON ua.user_id = u.id
+		LEFT JOIN prices p ON p.coin_id = ua.symbol_id
+		GROUP BY u.id, u.cash
+	)`
 
-// UpdateRank 랭킹 업데이트 함수, 코인 시세정보 반환과, 일일 유저 자산정보 스냅샷 기능이 이후 추가되었습니다.
-func UpdateRank(ctx context.Context, db *sql.DB, symbolMap map[string]int, currentSeasonID int, insightFlag bool) (error, map[int]model.UpbitCoinPrice, map[int]float64) {
-	DailyFlag = insightFlag    // DailyFlag 설정
-	SeasonID = currentSeasonID // 시즌 ID 설정
-
-	// 1. 총 참여 유저 수 확인
-	totalUsers, err := getParticipatingUserCount(ctx, db)
-	if err != nil {
-		return fmt.Errorf("유저 수 조회 실패: %w", err), nil, nil
-	}
-
-	// 2. 코인 현재가 가져오기
+// UpdateRank 현재 시즌 랭킹을 다시 계산합니다. dailySnapshot이면 일일 자산 스냅샷도 남깁니다.
+// 코인 현재가(시즌 정산의 청산 가격)와 시세(가격 이력 저장용)를 함께 반환합니다.
+//
+// 총자산 계산과 순위·티어 산정을 SQL 집합 연산 한 번(윈도 함수)으로 처리한다.
+// 실행 간 공유하는 임시 테이블·전역 상태가 없어 두 실행이 겹쳐도 서로의 결과를 지우지 않고,
+// 랭킹과 스냅샷이 한 트랜잭션에서 같은 시점의 자산으로 계산된다.
+func UpdateRank(ctx context.Context, db *sql.DB, symbolMap map[string]int, seasonID int, dailySnapshot bool, now time.Time) (map[int]float64, map[int]model.UpbitCoinPrice, error) {
 	coinPrices, coinPriceHistory, err := getAllCoinsCurrentPrice(ctx, symbolMap)
 	if err != nil {
-		return fmt.Errorf("코인 현재가 조회 실패: %w", err), nil, nil
+		return nil, nil, fmt.Errorf("코인 현재가 조회 실패: %w", err)
+	}
+	prices, err := pricesJSON(coinPrices)
+	if err != nil {
+		return nil, nil, err
 	}
 
-	// 3. 배치 처리로 랭킹 업데이트, 코인 가격 히스토리정보 반환
-	return updateRankWithBatching(ctx, db, coinPrices, totalUsers), coinPriceHistory, coinPrices
-}
-
-// 배치 처리 방식 (모든 경우에 사용)
-func updateRankWithBatching(ctx context.Context, db *sql.DB, coinPrices map[int]float64, totalUsers int) error {
-	if totalUsers == 0 {
-		return nil // 참여 유저가 없으면 랭킹 업데이트 필요 없음
-	}
-
-	// 1. 임시 테이블 생성
-	if err := createTempRankingTable(ctx, db); err != nil {
-		return fmt.Errorf("임시 테이블 생성 실패: %w", err)
-	}
-	defer dropTempRankingTable(ctx, db) // 정리
-
-	// 2. 배치 단위로 유저 자산 계산 및 임시 테이블에 저장
-	offset := 0
-	for offset < totalUsers {
-		if err := processBatch(ctx, db, coinPrices, offset, BATCH_SIZE); err != nil {
-			return fmt.Errorf("배치 처리 실패 (offset: %d): %w", offset, err)
-		}
-		offset += BATCH_SIZE
-
-		// 메모리 정리를 위한 가비지 컬렉션 힌트
-		if offset%(BATCH_SIZE*5) == 0 {
-			log.Printf("처리 진행률: %d/%d", offset, totalUsers)
-		}
-	}
-
-	// 3. 임시 테이블에서 랭킹 계산 및 업데이트
-	if err := finalizeRankingFromTemp(ctx, db, totalUsers); err != nil {
-		return fmt.Errorf("임시 테이블에서 랭킹 계산 실패: %w", err)
-	}
-
-	return nil
-}
-
-// 참여 유저 수 조회
-func getParticipatingUserCount(ctx context.Context, db *sql.DB) (int, error) {
-	queryCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	txCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 
-	query := `
-		SELECT COUNT(DISTINCT user_id)
-		FROM orders
-		WHERE season_id = ? AND status = 'COMPLETED'
-	`
-
-	var count int
-	err := db.QueryRowContext(queryCtx, query, SeasonID).Scan(&count)
-	if err != nil {
-		return 0, fmt.Errorf("쿼리 실행 에러: %w", err)
-	}
-
-	return count, nil
-}
-
-// 임시 랭킹 테이블 생성
-func createTempRankingTable(ctx context.Context, db *sql.DB) error {
-	queryCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-
-	// 기존 테이블이 있으면 제거
-	dropQuery := `DROP TABLE IF EXISTS temp_user_rankings`
-	_, err := db.ExecContext(queryCtx, dropQuery)
-	if err != nil {
-		return fmt.Errorf("기존 임시 테이블 제거 실패: %w", err)
-	}
-
-	// 일반 테이블로 생성 (TEMPORARY 키워드 제거)
-	createQuery := `
-        CREATE TABLE temp_user_rankings (
-            user_id INT PRIMARY KEY,
-            total_value BIGINT NOT NULL,
-            INDEX idx_total_value (total_value DESC)
-        )
-    `
-
-	_, err = db.ExecContext(queryCtx, createQuery)
-	return err
-}
-
-// 배치 단위로 유저 자산 계산
-func processBatch(ctx context.Context, db *sql.DB, coinPrices map[int]float64, offset, limit int) error {
-	// 1. 배치 단위로 유저 ID 가져오기
-	userIDs, err := getParticipatingUserIDsBatch(ctx, db, offset, limit)
-	if err != nil {
-		return err
-	}
-
-	if len(userIDs) == 0 {
-		return nil
-	}
-
-	// 2. 해당 유저들의 현금 및 자산 정보 가져오기
-	g, gCtx := errgroup.WithContext(ctx)
-	var userCashMap map[int]int
-	var userAssetsMap map[int][]model.UserAsset
-
-	g.Go(func() error {
-		cash, err := getUserCashMap(gCtx, db, userIDs)
-		userCashMap = cash
-		return err
-	})
-
-	g.Go(func() error {
-		assets, err := getUserAssetsMap(gCtx, db, userIDs)
-		userAssetsMap = assets
-		return err
-	})
-
-	if err := g.Wait(); err != nil {
-		return err
-	}
-
-	// 3. 총 자산 계산 후 임시 테이블에 저장
-	return insertBatchToTemp(ctx, db, userIDs, userCashMap, userAssetsMap, coinPrices)
-}
-
-// 배치 단위로 유저 ID 조회
-func getParticipatingUserIDsBatch(ctx context.Context, db *sql.DB, offset, limit int) ([]int, error) {
-	queryCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-
-	query := `
-		SELECT DISTINCT user_id
-		FROM orders
-		WHERE season_id = ? AND status = 'COMPLETED'
-		ORDER BY user_id
-		LIMIT ? OFFSET ?
-	`
-
-	rows, err := db.QueryContext(queryCtx, query, SeasonID, limit, offset)
-	if err != nil {
-		return nil, fmt.Errorf("쿼리 실행 에러: %w", err)
-	}
-	defer func(rows *sql.Rows) {
-		if err := rows.Close(); err != nil {
-			log.Printf("행 닫기 에러: %v\n", err)
+	err = withTx(txCtx, db, func(tx *sql.Tx) error {
+		n, err := upsertRankings(txCtx, tx, seasonID, prices)
+		if err != nil {
+			return err
 		}
-	}(rows)
+		log.Printf("랭킹 - 시즌 %d 랭킹 갱신 (영향 행 %d)\n", seasonID, n)
 
-	var userIDs []int
-	for rows.Next() {
-		var userID int
-		if err := rows.Scan(&userID); err != nil {
-			return nil, fmt.Errorf("행 스캔 에러: %w", err)
-		}
-		userIDs = append(userIDs, userID)
-	}
-
-	return userIDs, rows.Err()
-}
-
-// 배치를 임시 테이블에 저장, dailyFlag가 true인 경우 DailyBalance 업데이트
-func insertBatchToTemp(ctx context.Context, db *sql.DB, userIDs []int, userCashMap map[int]int,
-	userAssetsMap map[int][]model.UserAsset, coinPrices map[int]float64) error {
-	queryCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-
-	tx, err := db.BeginTx(queryCtx, nil)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if p := recover(); p != nil {
-			_ = tx.Rollback()
-			panic(p)
-		} else if err != nil {
-			_ = tx.Rollback()
-		}
-	}()
-
-	query := `INSERT INTO temp_user_rankings (user_id, total_value) VALUES (?, ?)`
-	stmt, err := tx.PrepareContext(queryCtx, query)
-	if err != nil {
-		return fmt.Errorf("쿼리 준비 에러: %w", err)
-	}
-	defer func(stmt *sql.Stmt) {
-		if err := stmt.Close(); err != nil {
-			log.Printf("쿼리 종료 에러: %v\n", err)
-		}
-	}(stmt)
-
-	// DailyBalance 업데이트 쿼리
-	dailyBalanceQuery := `INSERT INTO user_daily_balances (user_id, cash_balance, coin_holdings_value, total_value, season_id, snapshot_date)
-    VALUES (?, ?, ?, ?, ?, ?)
-    	ON DUPLICATE KEY UPDATE
-    	                    		cash_balance = VALUES(cash_balance),
-    	                    		coin_holdings_value = VALUES(coin_holdings_value),
-    	                    		total_value = VALUES(total_value)`
-	dStmt, err := tx.PrepareContext(queryCtx, dailyBalanceQuery)
-	if err != nil {
-		return fmt.Errorf("일일 잔액 쿼리 준비 에러: %w", err)
-	}
-	defer func(dStmt *sql.Stmt) {
-		if err := dStmt.Close(); err != nil {
-			log.Printf("일일 잔액 쿼리 종료 에러: %v\n", err)
-		}
-	}(dStmt)
-
-	for _, userID := range userIDs {
-		totalValue, cash := calculateUserTotalValue(userID, userCashMap, userAssetsMap, coinPrices)
-		if _, err := stmt.ExecContext(queryCtx, userID, totalValue); err != nil {
-			return fmt.Errorf("임시 테이블에 데이터 삽입 실패 (user_id: %d): %w", userID, err)
-		}
-
-		// DailyFlag가 true인 경우, DailyBalance 업데이트
-		if DailyFlag {
-			// 현재 날짜를 YYYY-MM-DD 형식으로 가져오기
-			snapshotDate := time.Now().Format("2006-01-02")
-
-			// 코인 보유 가치 계산 (총 자산에서 현금 제외)
-			coinHoldingsValue := totalValue - cash
-
-			// 개별 필드를 매개변수로 전달
-			if _, err := dStmt.ExecContext(queryCtx,
-				userID,
-				cash,
-				coinHoldingsValue,
-				totalValue,
-				SeasonID,
-				snapshotDate); err != nil {
-				return fmt.Errorf("일일 잔액 업데이트 실패 (user_id: %d): %w", userID, err)
+		if dailySnapshot {
+			n, err := upsertDailyBalances(txCtx, tx, seasonID, prices, now)
+			if err != nil {
+				return err
 			}
+			log.Printf("랭킹 - 일일 자산 스냅샷 저장 (영향 행 %d)\n", n)
 		}
-	}
-
-	return tx.Commit()
-}
-
-// 임시 테이블에서 최종 랭킹 계산 및 업데이트
-func finalizeRankingFromTemp(ctx context.Context, db *sql.DB, totalUsers int) error {
-	queryCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
-	defer cancel()
-
-	// CTE로 rank를 한 번만 계산하고 tier를 결정
-	query := `
-		INSERT INTO user_rankings (season_id, user_id, total_value, ranks, tier)
-		SELECT 
-		   ? as season_id,
-		   user_id,
-		   total_value,
-		   ranks,
-		   CASE 
-			  WHEN ranks = 1 THEN 7
-			  WHEN ranks <= 3 THEN 6
-			  WHEN (ranks - 3) / GREATEST(? - 3, 1.0) <= 0.10 THEN 5
-			  WHEN (ranks - 3) / GREATEST(? - 3, 1.0) <= 0.25 THEN 4
-			  WHEN (ranks - 3) / GREATEST(? - 3, 1.0) <= 0.45 THEN 3
-			  WHEN (ranks - 3) / GREATEST(? - 3, 1.0) <= 0.70 THEN 2
-			  ELSE 1
-		   END as tier
-		FROM (
-		   SELECT 
-			  user_id,
-			  total_value,
-			  ROW_NUMBER() OVER (ORDER BY total_value DESC) as ranks
-		   FROM temp_user_rankings
-		) AS ranked_users
-		ORDER BY ranks
-		ON DUPLICATE KEY UPDATE
-		   total_value = VALUES(total_value),
-		   ranks = VALUES(ranks),
-		   tier = VALUES(tier)
-	`
-
-	_, err := db.ExecContext(queryCtx, query, SeasonID, totalUsers, totalUsers, totalUsers, totalUsers)
-	return err
-}
-
-// 임시 테이블 정리
-func dropTempRankingTable(ctx context.Context, db *sql.DB) {
-	queryCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-
-	_, err := db.ExecContext(queryCtx, "DROP TABLE IF EXISTS temp_user_rankings")
+		return nil
+	})
 	if err != nil {
-		log.Printf("임시 테이블 삭제 실패: %v", err)
+		return nil, nil, err
 	}
+
+	return coinPrices, coinPriceHistory, nil
+}
+
+// upsertRankings 총자산 내림차순으로 순위를 매기고 순위 구간에 따라 티어를 정합니다.
+//   - 1위: 7, 2~3위: 6
+//   - 나머지는 4위 이하 인원 중 상위 비율로 10%: 5, 25%: 4, 45%: 3, 70%: 2, 그 외: 1
+func upsertRankings(ctx context.Context, tx *sql.Tx, seasonID int, prices string) (int64, error) {
+	// 시즌 중 탈퇴한 사용자는 랭킹에서 지운다
+	_, err := tx.ExecContext(ctx, `
+		DELETE ur FROM user_rankings ur
+		JOIN users u ON u.id = ur.user_id
+		WHERE ur.season_id = ? AND u.is_deleted = 1`, seasonID)
+	if err != nil {
+		return 0, fmt.Errorf("탈퇴 사용자 랭킹 삭제 실패: %w", err)
+	}
+
+	query := `
+		INSERT INTO user_rankings (season_id, user_id, total_value, ranks, tier)` + userTotalsCTE + `
+		SELECT ?, user_id, total_value, ranks,
+		       CASE
+		           WHEN ranks = 1 THEN 7
+		           WHEN ranks <= 3 THEN 6
+		           WHEN (ranks - 3) / GREATEST(participants - 3, 1.0) <= 0.10 THEN 5
+		           WHEN (ranks - 3) / GREATEST(participants - 3, 1.0) <= 0.25 THEN 4
+		           WHEN (ranks - 3) / GREATEST(participants - 3, 1.0) <= 0.45 THEN 3
+		           WHEN (ranks - 3) / GREATEST(participants - 3, 1.0) <= 0.70 THEN 2
+		           ELSE 1
+		       END
+		FROM (
+		    SELECT user_id,
+		           total_value,
+		           ROW_NUMBER() OVER (ORDER BY total_value DESC, user_id) AS ranks,
+		           COUNT(*) OVER () AS participants
+		    FROM totals
+		) AS ranked
+		ON DUPLICATE KEY UPDATE
+		    total_value = VALUES(total_value),
+		    ranks = VALUES(ranks),
+		    tier = VALUES(tier)`
+
+	res, err := tx.ExecContext(ctx, query, prices, seasonID, seasonID)
+	if err != nil {
+		return 0, fmt.Errorf("랭킹 계산 실패: %w", err)
+	}
+	return rowsAffected(res), nil
+}
+
+// upsertDailyBalances 참여자별 현금·코인 평가액·총자산을 오늘 날짜로 남깁니다. (투자 내역 그래프용)
+func upsertDailyBalances(ctx context.Context, tx *sql.Tx, seasonID int, prices string, now time.Time) (int64, error) {
+	query := `
+		INSERT INTO user_daily_balances (user_id, cash_balance, coin_holdings_value, total_value, season_id, snapshot_date)` + userTotalsCTE + `
+		SELECT user_id, cash, total_value - cash, total_value, ?, ?
+		FROM totals
+		ON DUPLICATE KEY UPDATE
+		    cash_balance = VALUES(cash_balance),
+		    coin_holdings_value = VALUES(coin_holdings_value),
+		    total_value = VALUES(total_value)`
+
+	res, err := tx.ExecContext(ctx, query, prices, seasonID, seasonID, now.Format(time.DateOnly))
+	if err != nil {
+		return 0, fmt.Errorf("일일 자산 스냅샷 저장 실패: %w", err)
+	}
+	return rowsAffected(res), nil
+}
+
+// rowsAffected 로그용 영향 행 수. ON DUPLICATE KEY UPDATE는 새 행 1, 갱신 2, 변화 없음 0으로 센다.
+func rowsAffected(res sql.Result) int64 {
+	n, err := res.RowsAffected()
+	if err != nil {
+		return -1
+	}
+	return n
 }
 
 func getAllCoinsCurrentPrice(ctx context.Context, symbolMap map[string]int) (map[int]float64, map[int]model.UpbitCoinPrice, error) {
@@ -335,86 +167,6 @@ func getAllCoinsCurrentPrice(ctx context.Context, symbolMap map[string]int) (map
 	}
 
 	return coinPrices, coinPriceHistory, nil
-}
-
-func getUserCashMap(ctx context.Context, db *sql.DB, userIDs []int) (map[int]int, error) {
-	queryCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-
-	placeholders := make([]interface{}, len(userIDs))
-	for i, id := range userIDs {
-		placeholders[i] = id
-	}
-
-	query := fmt.Sprintf("SELECT id, cash FROM users WHERE id IN (%s)", util.GeneratePlaceholders(len(userIDs)))
-	rows, err := db.QueryContext(queryCtx, query, placeholders...)
-	if err != nil {
-		return nil, fmt.Errorf("쿼리 실행 에러: %w", err)
-	}
-	defer func(rows *sql.Rows) {
-		if err := rows.Close(); err != nil {
-			log.Printf("행 닫기 에러: %v\n", err)
-		}
-	}(rows)
-
-	userCashMap := make(map[int]int)
-	for rows.Next() {
-		var userCash model.UserCash
-		err := rows.Scan(&userCash.UserID, &userCash.Cash)
-		if err != nil {
-			return nil, fmt.Errorf("행 스캔 에러: %w", err)
-		}
-		userCashMap[userCash.UserID] = userCash.Cash
-	}
-
-	return userCashMap, nil
-}
-
-func getUserAssetsMap(ctx context.Context, db *sql.DB, userIDs []int) (map[int][]model.UserAsset, error) {
-	queryCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-
-	placeholders := make([]interface{}, len(userIDs))
-	for i, id := range userIDs {
-		placeholders[i] = id
-	}
-
-	query := fmt.Sprintf("SELECT user_id, symbol_id, amount FROM user_assets WHERE user_id IN (%s)", util.GeneratePlaceholders(len(userIDs)))
-	rows, err := db.QueryContext(queryCtx, query, placeholders...)
-	if err != nil {
-		return nil, fmt.Errorf("쿼리 실행 에러: %w", err)
-	}
-	defer func(rows *sql.Rows) {
-		if err := rows.Close(); err != nil {
-			log.Printf("행 닫기 에러: %v\n", err)
-		}
-	}(rows)
-
-	userAssetsMap := make(map[int][]model.UserAsset)
-	for rows.Next() {
-		var asset model.UserAsset
-		err := rows.Scan(&asset.UserID, &asset.SymbolID, &asset.Amount)
-		if err != nil {
-			return nil, fmt.Errorf("행 스캔 에러: %w", err)
-		}
-		userAssetsMap[asset.UserID] = append(userAssetsMap[asset.UserID], asset)
-	}
-
-	return userAssetsMap, nil
-}
-
-func calculateUserTotalValue(userID int, userCashMap map[int]int, userAssetsMap map[int][]model.UserAsset, priceMap map[int]float64) (int, int) {
-	cash := userCashMap[userID]
-	totalValue := float64(cash)
-
-	assets := userAssetsMap[userID]
-	for _, asset := range assets {
-		if price, exists := priceMap[asset.SymbolID]; exists {
-			totalValue += asset.Amount * price
-		}
-	}
-
-	return int(totalValue), cash
 }
 
 // GetCurrentSeasonID 진행중인 시즌 ID 가져오기
