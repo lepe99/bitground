@@ -5,13 +5,11 @@ import bit.bitgroundspring.dto.TradeSummaryDto;
 import bit.bitgroundspring.dto.UserDto;
 import bit.bitgroundspring.entity.Season;
 import bit.bitgroundspring.entity.User;
-import bit.bitgroundspring.naver.NcpObjectStorageService;
 import bit.bitgroundspring.security.oauth2.AuthService;
 import bit.bitgroundspring.service.OrderService;
 import bit.bitgroundspring.service.SeasonService;
 import bit.bitgroundspring.service.UserService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -67,18 +65,6 @@ public class UserController {
                 "user", userDto
         );
         return ResponseEntity.ok(userInfo);
-    }
-
-    //사용자 프로필 이미지 수정
-    private final NcpObjectStorageService objectStorageService;
-
-    @Value("${ncp.bucket}")
-    private String bucketName;
-
-    @PostMapping("/upload-profile")
-    public ResponseEntity<String> uploadProfileImage(@RequestParam MultipartFile image) {
-        String imageUrl = objectStorageService.uploadFile(bucketName, "profile", image);
-        return ResponseEntity.ok(imageUrl);
     }
 
     //사용자 정보 수정

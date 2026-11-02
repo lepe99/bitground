@@ -70,6 +70,12 @@ spring:
     redis:
       time-to-live: 600000ms # 10분
 
+  # 업로드 크기 제한 (이미지 5MB)
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
+
   # 트랜잭션 설정
   transaction:
     default-timeout: 30  # 트랜잭션 타임아웃 30초
@@ -136,13 +142,16 @@ refresh_expired_time: 86400000 # 1일
 # react 서버 주소 (CORS, 로그인 후 리다이렉트)
 react.host: ${REACT_HOST:http://localhost:5173}
 
-# object storage 설정
-ncp:
-  accessKey: ${NCP_ACCESS_KEY:}
-  secretKey: ${NCP_SECRET_KEY:}
-  regionName: kr-standard
-  endPoint: https://kr.object.ncloudstorage.com
-  bucket: ${NCP_BUCKET:bitground}
+# 이미지 업로드용 S3 호환 스토리지
+# 운영: endpoint·키를 비우면 EC2 IAM 역할로 AWS S3에 접근
+# 로컬: docker-compose의 S3Mock (http://localhost:9090)
+storage:
+  bucket: ${STORAGE_BUCKET:bitground}
+  region: ${STORAGE_REGION:ap-northeast-2}
+  endpoint: ${STORAGE_ENDPOINT:}
+  public-url: ${STORAGE_PUBLIC_URL:}
+  access-key: ${STORAGE_ACCESS_KEY:}
+  secret-key: ${STORAGE_SECRET_KEY:}
 
 # 네이버 뉴스 검색 API
 naver:

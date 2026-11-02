@@ -30,7 +30,7 @@ const PostWrite = () => {
                 const formData = new FormData();
                 formData.append('file', file);
                 try {
-                    const res = await api.post('/posts/upload-image', formData, {
+                    const res = await api.post('/uploads/images', formData, {
                         headers: { 'Content-Type': 'multipart/form-data' },
                     });
 

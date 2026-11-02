@@ -4,14 +4,13 @@ import bit.bitgroundspring.dto.TierDto;
 import bit.bitgroundspring.entity.Season;
 import bit.bitgroundspring.entity.User;
 import bit.bitgroundspring.entity.UserRanking;
-import bit.bitgroundspring.naver.NcpObjectStorageService;
+import bit.bitgroundspring.storage.StorageService;
 import bit.bitgroundspring.repository.RankRepository;
 import bit.bitgroundspring.repository.SeasonRepository;
 import bit.bitgroundspring.repository.UserRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -33,10 +32,7 @@ public class UserService {
     }
     
     private final UserRepository userRepository;
-    private final NcpObjectStorageService objectStorageService;
-
-    @Value("${ncp.bucket}")
-    private String bucketName;
+    private final StorageService storageService;
     
     // 소셜 로그인 ID로 사용자 조회
     public Optional<User> getUserBySocialId(String provider, String providerId) {
@@ -54,13 +50,8 @@ public class UserService {
         user.setEmail(email);
 
         if (imageUrl != null && !imageUrl.equals(user.getProfileImage())) {
-            // 이전 이미지 삭제
-            String oldImage = user.getProfileImage();
-            if (oldImage != null && !oldImage.isEmpty()) {
-                // 파일명 추출 (예: https://kr.object.ncloudstorage.com/bucket/profile/abc.png → abc.png)
-                String oldFileName = oldImage.substring(oldImage.lastIndexOf("/") + 1);
-                objectStorageService.deleteFile(bucketName, "profile", oldFileName);
-            }
+            // 이전 이미지 삭제 (직접 업로드한 이미지만, 소셜 프로필 URL은 그대로 둠)
+            storageService.deleteByUrl(user.getProfileImage());
 
             // 새 이미지 저장
             user.setProfileImage(imageUrl);
@@ -71,16 +62,7 @@ public class UserService {
 
     //이미지업로드
     public String uploadProfileImage(MultipartFile file) {
-        if (file.isEmpty()) {
-            throw new IllegalArgumentException("파일이 선택되지 않았습니다.");
-        }
-        try {
-            String uploadedFilename = objectStorageService.uploadFile(bucketName, "profile", file);
-
-            return "https://kr.object.ncloudstorage.com/" + bucketName + "/profile/" + uploadedFilename;
-        } catch (Exception e) {
-            throw new RuntimeException("파일 업로드 실패", e);
-        }
+        return storageService.uploadImage("profile", file);
     }
 
     //isDeleted -> 1

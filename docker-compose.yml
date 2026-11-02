@@ -34,5 +34,19 @@ services:
       interval: 5s
       retries: 10
 
+  # S3 호환 로컬 스토리지 (이미지 업로드). 인증 없이 읽기 가능
+  s3:
+    image: adobe/s3mock:3.12.0
+    container_name: bitground-s3
+    environment:
+      initialBuckets: bitground
+      retainFilesOnExit: "true"
+      root: /data
+    ports:
+      - "9090:9090"
+    volumes:
+      - s3-data:/data
+
 volumes:
   mysql-data:
+  s3-data:
