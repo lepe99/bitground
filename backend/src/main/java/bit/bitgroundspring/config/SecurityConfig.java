@@ -23,6 +23,7 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.Arrays;
+import java.util.List;
 
 @Configuration
 @EnableWebSecurity
@@ -35,8 +36,8 @@ public class SecurityConfig {
     private final AccessTokenBlocklist accessTokenBlocklist;
     private final ProblemDetailSecurityHandler problemDetailSecurityHandler;
 
-    @Value("${react.host}")
-    private String reactHost;
+    @Value("${cors.allowed-origins}")
+    private List<String> allowedOrigins;
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -48,9 +49,11 @@ public class SecurityConfig {
                         .authenticationEntryPoint(problemDetailSecurityHandler)
                         .accessDeniedHandler(problemDetailSecurityHandler))
                 .authorizeHttpRequests(authorizeRequests -> authorizeRequests
-                        .requestMatchers("/auth/refresh", "/oauth2/**", "/error", "/favicon.ico", "/ws/**", "/actuator/*", // 인증, 테스트
+                        .requestMatchers("/auth/refresh", "/oauth2/**", "/error", "/favicon.ico", "/ws/**", // 인증, WebSocket
                                 "/coins/**", "/coins", "/news", "/market-index/**", "/ai-insights/**", "/public/**", // 공개 API
                                 "/auth/logout", "/seasons/update").permitAll()
+                        // 관리 포트(8091)에서만 열리는 엔드포인트. 외부 노출은 네트워크(보안그룹)로 막는다
+                        .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/prometheus").permitAll()
                         .requestMatchers("/api/docs/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.POST, "/notices").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/notices/*").hasRole("ADMIN")
@@ -75,7 +78,8 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(Arrays.asList(reactHost, "http://localhost:5173"));
+        // 허용 주소는 설정(cors.allowed-origins)으로만 정한다 (기존: localhost:5173을 운영에서도 항상 허용)
+        configuration.setAllowedOrigins(allowedOrigins);
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         configuration.setAllowedHeaders(Arrays.asList("*"));
         configuration.setAllowCredentials(true);

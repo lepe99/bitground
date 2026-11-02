@@ -12,8 +12,9 @@ spring:
     username: ${DB_USERNAME:bitground}
     password: ${DB_PASSWORD:bitground}
     hikari:
-      maximum-pool-size: 24
-      minimum-idle: 3
+      # RDS 프리티어(db.t4g.micro)·1GB EC2 기준. 요청 스레드보다 커넥션이 적어도 대부분 짧은 쿼리라 충분
+      maximum-pool-size: ${DB_POOL_SIZE:10}
+      minimum-idle: 2
       idle-timeout: 300000   # 5분
       connection-timeout: 30000  # 30초
       max-lifetime: 1200000  # 20분
@@ -147,8 +148,12 @@ jwt:
 # refresh token 만료시간
 refresh_expired_time: 86400000 # 1일
 
-# react 서버 주소 (CORS, 로그인 후 리다이렉트)
+# react 서버 주소 (로그인 후 리다이렉트)
 react.host: ${REACT_HOST:http://localhost:5173}
+
+# 브라우저 요청을 허용할 프론트 주소 (CORS, WebSocket 공통). 쉼표로 여러 개
+# 운영 예: https://bitground.kr,https://www.bitground.kr
+cors.allowed-origins: ${CORS_ALLOWED_ORIGINS:${react.host}}
 
 # 이미지 업로드용 S3 호환 스토리지
 # 운영: endpoint·키를 비우면 EC2 IAM 역할로 AWS S3에 접근
@@ -167,14 +172,20 @@ naver:
     client-id: ${NAVER_NEWS_CLIENT_ID:}
     client-secret: ${NAVER_NEWS_CLIENT_SECRET:}
 
-# prometheus 엔드포인트 설정
+# Actuator: 서비스 포트(8090)와 분리된 관리 포트에서만 제공
+# 운영에서는 관리 포트를 외부에 열지 않는다 (보안그룹에서 8091 차단, 같은 호스트의 수집기만 접근)
 management:
   server:
-    port: 8091 # Actuator 전용 포트
+    port: ${MANAGEMENT_PORT:8091}
   endpoints:
     web:
       exposure:
-        include: health,info,prometheus
+        include: health,prometheus
+  endpoint:
+    health:
+      show-details: never # DB·Redis 상태 등 내부 정보는 응답에 넣지 않음
+      probes:
+        enabled: true     # /actuator/health/liveness, /readiness (컨테이너 헬스체크용)
   prometheus:
     metrics:
       export:
