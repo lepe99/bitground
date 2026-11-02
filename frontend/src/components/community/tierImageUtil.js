@@ -1,10 +1,10 @@
-import bronzeLine from "../../assets/images/bronze_line.png";
-import silverLine from "../../assets/images/silver_line.png";
-import goldLine from "../../assets/images/gold_line.png";
-import platinumLine from "../../assets/images/platinum_line.png";
-import diamondLine from "../../assets/images/diamond_line.png";
-import masterLine from "../../assets/images/master_line.png";
-import grandmasterLine from "../../assets/images/grandmaster_line.png";
+import bronzeLine from "../../assets/images/bronze_line.webp";
+import silverLine from "../../assets/images/silver_line.webp";
+import goldLine from "../../assets/images/gold_line.webp";
+import platinumLine from "../../assets/images/platinum_line.webp";
+import diamondLine from "../../assets/images/diamond_line.webp";
+import masterLine from "../../assets/images/master_line.webp";
+import grandmasterLine from "../../assets/images/grandmaster_line.webp";
 
 export const tierImageMap = {
     1: bronzeLine,

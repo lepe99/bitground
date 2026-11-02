@@ -5,13 +5,13 @@ import { fetchTradeSummary } from "../../api/fetchTradeSummary.js";
 import { fetchTradeDetails } from "../../api/fetchTradeDetails.js";
 import api from "../../api/axiosConfig.js";
 import Loading from "../Loading.jsx";
-import bronze from '../../assets/images/bronze.png';
-import silver from '../../assets/images/silver.png';
-import gold from '../../assets/images/gold.png';
-import platinum from '../../assets/images/platinum.png';
-import diamond from '../../assets/images/diamond.png';
-import master from '../../assets/images/master.png';
-import grandmaster from '../../assets/images/grandmaster.png';
+import bronze from '../../assets/images/bronze.webp';
+import silver from '../../assets/images/silver.webp';
+import gold from '../../assets/images/gold.webp';
+import platinum from '../../assets/images/platinum.webp';
+import diamond from '../../assets/images/diamond.webp';
+import master from '../../assets/images/master.webp';
+import grandmaster from '../../assets/images/grandmaster.webp';
 
 // 티어 이름 매핑
 const tierNameMap = {
