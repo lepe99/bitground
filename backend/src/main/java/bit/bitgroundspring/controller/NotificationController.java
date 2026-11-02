@@ -1,7 +1,6 @@
 package bit.bitgroundspring.controller;
 
 import bit.bitgroundspring.dto.projection.NotificationProjection;
-import bit.bitgroundspring.dto.response.NotificationResponse;
 import bit.bitgroundspring.security.oauth2.AuthService;
 import bit.bitgroundspring.service.NotificationService;
 import bit.bitgroundspring.util.UserSseEmitters;
@@ -13,7 +12,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
-import java.util.Map;
 
 @RestController
 @RequiredArgsConstructor
@@ -36,14 +34,6 @@ public class NotificationController {
         userSseEmitters.addUser(userId, emitter);
         
         return emitter;
-    }
-    
-    // 여러 유저에게 알림 전송
-    @PostMapping("/send")
-    public ResponseEntity<Map<String, Integer>> sendToMultipleUsers(
-            @RequestBody NotificationResponse request) {
-        Map<String, Integer> results = userSseEmitters.sendToAll(request); // 모든 사용자에게 알림 전송
-        return ResponseEntity.ok(results);
     }
     
     // 나한테 온 알림, 전체 알림, 안읽은 알림 개수 조회

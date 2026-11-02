@@ -48,7 +48,7 @@ public class SecurityConfig {
                             response.getWriter().write("{\"error\":\"Unauthorized\",\"message\":\"Authentication required\"}");
                         }))
                 .authorizeHttpRequests(authorizeRequests -> authorizeRequests
-                        .requestMatchers("/auth/refresh", "/oauth2/**", "/error", "/favicon.ico", "/test", "/ws/**", "/actuator/*", // 인증, 테스트
+                        .requestMatchers("/auth/refresh", "/oauth2/**", "/error", "/favicon.ico", "/ws/**", "/actuator/*", // 인증, 테스트
                                 "/coins/**", "/coins", "/news", "/market-index/**", "/ai-insights/**", "/public/**", // 공개 API
                                 "/auth/logout", "/seasons/update").permitAll()
                         .requestMatchers("/api/docs/**").hasRole("ADMIN")

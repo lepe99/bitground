@@ -2,8 +2,8 @@ package bit.bitgroundspring.controller;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.json.JSONArray;
-import org.json.JSONObject;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.RequestEntity;
 import org.springframework.http.ResponseEntity;
@@ -28,6 +28,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class NewsController {
     private final RestTemplate restTemplate;
+    private final ObjectMapper objectMapper;
 
     @Value("${naver.news.client-id}")
     private String naverClientId;
@@ -66,20 +67,18 @@ public class NewsController {
 
             ResponseEntity<String> result = restTemplate.exchange(req, String.class);
 
-            JSONObject json = new JSONObject(result.getBody());
-            JSONArray items = json.getJSONArray("items");
+            JsonNode items = objectMapper.readTree(result.getBody()).path("items");
 
             List<Map<String, Object>> list = new ArrayList<>();
 
-            for (int i = 0; i < items.length(); i++) {
-                JSONObject item = items.getJSONObject(i);
+            for (JsonNode item : items) {
                 Map<String, Object> news = new HashMap<>();
 
-                news.put("title", cleanHTMLExceptBold(item.getString("title")));
-                news.put("originallink", item.getString("originallink"));
-                news.put("link", item.getString("link"));
-                news.put("description", cleanHTMLExceptBold(item.getString("description"))); // 또는 stripAllHTML
-                news.put("pubDate", item.getString("pubDate"));
+                news.put("title", cleanHTMLExceptBold(item.path("title").asText()));
+                news.put("originallink", item.path("originallink").asText());
+                news.put("link", item.path("link").asText());
+                news.put("description", cleanHTMLExceptBold(item.path("description").asText()));
+                news.put("pubDate", item.path("pubDate").asText());
 
                 list.add(news);
             }

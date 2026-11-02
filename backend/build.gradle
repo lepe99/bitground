@@ -41,13 +41,6 @@ dependencies {
     testImplementation 'org.springframework.security:spring-security-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 
-    // Spring WebFlux (WebClient 사용을 위해 필수)
-    implementation 'org.springframework.boot:spring-boot-starter-webflux'
-    runtimeOnly 'io.netty:netty-resolver-dns-native-macos:4.1.108.Final:osx-aarch_64' // macOS 개발 환경에서의 DNS 문제 해결
-
-    // ✨ Google Gemini API (정확한 최신 SDK)
-    implementation 'com.google.genai:google-genai:1.1.0'
-
     // object storage (AWS S3, 로컬은 S3Mock)
     implementation platform('software.amazon.awssdk:bom:2.29.0')
     implementation 'software.amazon.awssdk:s3'
@@ -56,12 +49,8 @@ dependencies {
     implementation 'io.jsonwebtoken:jjwt-api:0.11.5'
     runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.11.5'
     runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.11.5'
-    implementation 'com.auth0:java-jwt:4.4.0'
 
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.3.0'
-    // json
-    implementation 'org.json:json:20230227'
-
     // logging
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
     runtimeOnly 'io.micrometer:micrometer-registry-prometheus'

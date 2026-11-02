@@ -17,8 +17,6 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -28,14 +26,13 @@ public class GeminiService {
 
     private static final Logger log = LoggerFactory.getLogger(GeminiService.class);
 
-    // 이 필드는 이제 사용되지 않을 수 있지만, 기존 구조 유지를 위해 둡니다.
     private final String modelName;
     private final String apiKey;
     private final ObjectMapper objectMapper;
 
     // HttpClient는 한 번만 생성하여 재사용하는 것이 효율적입니다.
     private final HttpClient httpClient = HttpClient.newHttpClient();
-    private final String GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=";
+    private static final String GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent";
 
     public GeminiService(@Value("${gemini.model-name}") String modelName,
                          @Value("${gemini.api-key}") String apiKey,
@@ -82,8 +79,9 @@ public class GeminiService {
         String jsonRequestBody = objectMapper.writeValueAsString(requestBody);
 
         HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(GEMINI_API_URL + apiKey))
+                .uri(URI.create(GEMINI_API_URL.formatted(modelName)))
                 .header("Content-Type", "application/json")
+                .header("x-goog-api-key", apiKey) // 키를 URL 쿼리에 노출하지 않음
                 .POST(HttpRequest.BodyPublishers.ofString(jsonRequestBody))
                 .build();
 
