@@ -1,5 +1,5 @@
--- Bitground 스키마 (JPA 엔티티 기준, Hibernate DDL로 생성 후 mysqldump --no-data)
--- 엔티티를 바꾸면 이 파일도 함께 갱신해야 한다.
+-- Bitground 초기 스키마 (JPA 엔티티 기준, Hibernate DDL로 생성 후 mysqldump --no-data)
+-- 이미 적용된 마이그레이션 파일은 고치지 않는다. 스키마를 바꿀 때는 다음 버전 파일(V{n}__설명.sql)을 추가한다.
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0; -- 테이블이 알파벳순이라 FK 대상보다 먼저 생성될 수 있음
 
@@ -180,16 +180,6 @@ CREATE TABLE `reactions` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `UK7xdg8xikkaiqtsbmt95en8kbd` (`user_id`,`target_type`,`target_id`,`liked`),
   CONSTRAINT `FKqmewaibcp5bxtlqxc2cawhuln` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- 스케줄러(Go) 정산 실행 기록: 같은 기간의 시즌 정산·스플릿이 두 번 실행되지 않도록 막는다
--- (Lambda 재시도·중복 호출 대비). notified_at은 백엔드 알림까지 끝났는지 표시
-CREATE TABLE `scheduler_runs` (
-  `kind` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `period` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `created_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
-  `notified_at` datetime(6) DEFAULT NULL,
-  PRIMARY KEY (`kind`,`period`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE `seasons` (

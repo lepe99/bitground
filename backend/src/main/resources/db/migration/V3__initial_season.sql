@@ -1,4 +1,4 @@
--- 로컬 개발용 초기 데이터
+-- 첫 시즌 생성 (진행 중인 시즌이 없을 때만)
 SET NAMES utf8mb4; -- 클라이언트 문자셋을 맞추지 않으면 한글이 깨져서 저장됨
 -- 스케줄러와 백엔드는 status = 'PENDING' 인 시즌을 현재 시즌으로 사용한다.
 INSERT INTO seasons (name, start_at, end_at, status)

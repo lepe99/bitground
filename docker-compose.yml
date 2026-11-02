@@ -22,7 +22,7 @@ services:
       - "3307:3306" # 호스트에 설치된 MySQL(3306)과 충돌하지 않도록 3307 사용
     volumes:
       - mysql-data:/var/lib/mysql
-      - ./db/init:/docker-entrypoint-initdb.d:ro
+      # 테이블은 백엔드 기동 시 Flyway가 만든다 (backend/src/main/resources/db/migration)
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 5s
