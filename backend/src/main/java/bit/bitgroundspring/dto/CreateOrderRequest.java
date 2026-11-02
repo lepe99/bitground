@@ -13,8 +13,6 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @Builder
 public class CreateOrderRequest {
-    private Integer userId;
-    
     @NotNull
     private String symbol;
 

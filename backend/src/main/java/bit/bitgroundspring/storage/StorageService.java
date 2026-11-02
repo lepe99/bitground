@@ -1,11 +1,11 @@
 package bit.bitgroundspring.storage;
 
+import bit.bitgroundspring.common.error.BusinessException;
+import bit.bitgroundspring.common.error.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.web.server.ResponseStatusException;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
@@ -40,14 +40,14 @@ public class StorageService {
      */
     public String uploadImage(String directory, MultipartFile file) {
         if (file == null || file.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "파일이 비어 있습니다.");
+            throw new BusinessException(ErrorCode.FILE_EMPTY);
         }
         if (file.getSize() > MAX_IMAGE_SIZE) {
-            throw new ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE, "이미지는 5MB 이하만 업로드할 수 있습니다.");
+            throw new BusinessException(ErrorCode.FILE_TOO_LARGE, "이미지는 5MB 이하만 업로드할 수 있습니다.");
         }
         String extension = IMAGE_EXTENSIONS.get(file.getContentType());
         if (extension == null) {
-            throw new ResponseStatusException(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "jpg, png, gif, webp 이미지만 업로드할 수 있습니다.");
+            throw new BusinessException(ErrorCode.UNSUPPORTED_FILE_TYPE);
         }
 
         String key = directory + "/" + LocalDate.now().format(DATE_PATH) + "/" + UUID.randomUUID() + "." + extension;
@@ -59,7 +59,7 @@ public class StorageService {
                             .build(),
                     RequestBody.fromInputStream(file.getInputStream(), file.getSize()));
         } catch (IOException e) {
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "이미지 업로드에 실패했습니다.", e);
+            throw new BusinessException(ErrorCode.FILE_UPLOAD_FAILED, e);
         }
         log.info("[storage] uploaded {}", key);
         return props.resolvedPublicUrl() + "/" + key;

@@ -23,11 +23,11 @@ export const AuthProvider = ({children}) => {
             // 백엔드에 현재 사용자 정보를 요청하는 API (쿠키에 유효한 AT가 있다면 성공)
             const response = await api.get('/users/me');
             if (response.data) {
-                setUser(response.data.user);
+                setUser(response.data);
                 setIsLoggedIn(true);
             }
         } catch (error) {
-            console.warn('Not authenticated or error fetching user info:', error.response?.data?.message || error.message);
+            console.warn('Not authenticated or error fetching user info:', error.response?.data?.detail || error.message);
             setUser(null);
             setIsLoggedIn(false);
             // 401이 아닌 다른 네트워크 오류일 수도 있으므로, 무조건 로그아웃 시키기보다는 상태만 업데이트

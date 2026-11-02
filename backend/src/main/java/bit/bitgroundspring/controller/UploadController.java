@@ -1,5 +1,6 @@
 package bit.bitgroundspring.controller;
 
+import org.springframework.http.HttpStatus;
 import bit.bitgroundspring.storage.StorageService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -24,6 +25,6 @@ public class UploadController {
     @PostMapping("/images")
     public ResponseEntity<Map<String, String>> uploadImage(@RequestParam("file") MultipartFile file) {
         String url = storageService.uploadImage("images", file);
-        return ResponseEntity.ok(Map.of("url", url));
+        return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("url", url));
     }
 }

@@ -7,6 +7,7 @@ import api from '../../api/axiosConfig.js';
 import { useAuth } from '../../auth/useAuth.js';
 import { tierImageMap } from './tierImageUtil';
 import {useToast} from "../Toast.jsx";
+import {getErrorMessage} from '../../api/apiError.js';
 
 const PostWrite = () => {
     const navigate = useNavigate();
@@ -93,8 +94,8 @@ const PostWrite = () => {
             });
             infoAlert('게시글이 등록되었습니다!');
             navigate('/community');
-        } catch {
-            errorAlert('등록 실패');
+        } catch (err) {
+            errorAlert(getErrorMessage(err, '등록 실패'));
         }
     };
 

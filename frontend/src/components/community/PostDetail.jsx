@@ -8,6 +8,7 @@ import { tierImageMap } from "./tierImageUtil.js";
 import PostProfile   from "./PostProfile.jsx";
 import {useToast} from "../Toast.jsx";
 import { sanitize } from '../../utils/sanitize.js';
+import {getErrorMessage} from '../../api/apiError.js';
 
 const formatDate = (dateString) => {
     const date = new Date(dateString);
@@ -178,7 +179,7 @@ const PostDetail = () => {
                 await api.delete(`/comments/${commentId}`);
                 commentHandlers.reloadComments();
             } catch (err) {
-                errorAlert("댓글 삭제 실패");
+                errorAlert(getErrorMessage(err, '댓글 삭제 실패'));
                 console.error(err);
             }
         },
@@ -197,8 +198,8 @@ const PostDetail = () => {
                 if (forceViewCount) {
                     window.history.replaceState({}, '', `/community/${id}`);
                 }
-            } catch {
-                errorAlert('게시글을 불러오는 데 실패했습니다.');
+            } catch (err) {
+                errorAlert(getErrorMessage(err, '게시글을 불러오는 데 실패했습니다.'));
                 navigate('/community');
             }
         };
@@ -239,7 +240,7 @@ const PostDetail = () => {
             navigate("/community"); // 글 목록 페이지로 이동
         } catch (error) {
             console.error("삭제 실패", error);
-            errorAlert("게시글 삭제에 실패했습니다.");
+            errorAlert(getErrorMessage(error, '게시글 삭제에 실패했습니다.'));
         }
     };
 

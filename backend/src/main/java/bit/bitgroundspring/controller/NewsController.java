@@ -1,5 +1,7 @@
 package bit.bitgroundspring.controller;
 
+import bit.bitgroundspring.common.error.BusinessException;
+import bit.bitgroundspring.common.error.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -86,7 +88,7 @@ public class NewsController {
             return ResponseEntity.ok(list);
 
         } catch (Exception e) {
-            return ResponseEntity.status(500).build();
+            throw new BusinessException(ErrorCode.EXTERNAL_API_ERROR, e);
         }
     }
 }

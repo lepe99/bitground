@@ -1,5 +1,9 @@
 package bit.bitgroundspring.controller;
 
+import bit.bitgroundspring.common.error.BusinessException;
+import bit.bitgroundspring.common.error.ErrorCode;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import bit.bitgroundspring.dto.projection.SeasonProjection;
 import bit.bitgroundspring.service.OrderService;
 import bit.bitgroundspring.service.SeasonService;
@@ -38,17 +42,14 @@ public class SeasonController {
     }
     
     @PostMapping("/update")
-    public ResponseEntity<?> updateSeasons(@RequestParam String secretKey,
-                                           @RequestParam String seasonFlag) {
-        // 비밀 키 검증
-        if (!secretKey.equals(seasonUpdateKey)) {
-            return ResponseEntity.status(403).body("Forbidden: Invalid secret key");
+    public ResponseEntity<Void> updateSeasons(@RequestParam String secretKey,
+                                              @RequestParam String seasonFlag) {
+        // 스케줄러(Go)만 호출하는 내부 API. 공유 키는 시간 비교 공격을 피하도록 상수 시간 비교
+        if (!MessageDigest.isEqual(secretKey.getBytes(StandardCharsets.UTF_8), seasonUpdateKey.getBytes(StandardCharsets.UTF_8))) {
+            throw new BusinessException(ErrorCode.INVALID_SECRET_KEY);
         }
-        
-        // 시즌 업데이트
         orderService.seasonUpdate(seasonFlag);
-        
-        return ResponseEntity.ok().build();
+        return ResponseEntity.noContent().build();
     }
     
 }

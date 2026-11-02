@@ -1,5 +1,7 @@
 package bit.bitgroundspring.controller;
 
+import bit.bitgroundspring.security.token.AuthUser;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import bit.bitgroundspring.dto.OrderDto;
 import bit.bitgroundspring.dto.projection.OrderProjection;
 import bit.bitgroundspring.repository.SeasonRepository;
@@ -8,35 +10,32 @@ import bit.bitgroundspring.service.OrderService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import bit.bitgroundspring.security.oauth2.AuthService;
 
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/orders")
 @RequiredArgsConstructor
 public class OrderController {
     private final OrderService orderService;
-    private final AuthService authService;
     private final JwtTokenProvider jwtTokenProvider;
     private final SeasonRepository seasonRepository;
 
     @GetMapping("/{seasonId}")
     public List<OrderProjection> getOrders(
             @PathVariable Integer seasonId,
-            @CookieValue("jwt_token") String jwtToken) {
+            @AuthenticationPrincipal AuthUser authUser) {
 
-        Integer userId = authService.getUserIdFromToken(jwtToken); // ✅ 로그인한 사용자만
+        Integer userId = authUser.id();
         return orderService.getOrdersBySeason(seasonId, userId);
     }
     
     @GetMapping("/reserve")
     public ResponseEntity<List<OrderDto>> getReserveOrders(
-            @CookieValue("jwt_token") String jwtToken) {
+            @AuthenticationPrincipal AuthUser authUser) {
 
         // 1. 로그인 유저 ID 추출
-        Integer userId = authService.getUserIdFromToken(jwtToken);
+        Integer userId = authUser.id();
 
         // 2. 현재 시즌 ID 조회
         Integer currentSeasonId = orderService.getCurrentSeasonId(); // 또는 SeasonService 사용
@@ -49,13 +48,13 @@ public class OrderController {
 
     //삭제
     @DeleteMapping("/{orderId}")
-    public ResponseEntity<?> cancelReserveOrder(
+    public ResponseEntity<Void> cancelReserveOrder(
             @PathVariable Integer orderId,
-            @CookieValue("jwt_token") String jwtToken) {
+            @AuthenticationPrincipal AuthUser authUser) {
 
-        Integer userId = authService.getUserIdFromToken(jwtToken);
+        Integer userId = authUser.id();
         orderService.cancelOrder(orderId, userId);
-        return ResponseEntity.ok().build();
+        return ResponseEntity.noContent().build();
     }
 
 

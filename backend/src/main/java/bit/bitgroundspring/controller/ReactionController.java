@@ -1,5 +1,6 @@
 package bit.bitgroundspring.controller;
 
+import jakarta.validation.Valid;
 import bit.bitgroundspring.dto.ReactionDto;
 import bit.bitgroundspring.service.ReactionService;
 import bit.bitgroundspring.security.token.AuthUser;
@@ -16,14 +17,14 @@ public class ReactionController {
     private final ReactionService reactionService;
 
     @PostMapping
-    public ResponseEntity<?> toggleReaction(@AuthenticationPrincipal AuthUser authUser,
-                                            @RequestBody ReactionDto dto) {
+    public ResponseEntity<Void> toggleReaction(@AuthenticationPrincipal AuthUser authUser,
+                                            @Valid @RequestBody ReactionDto dto) {
         reactionService.toggleReaction(
                 authUser.id().longValue(),
                 dto.getTargetType(),
                 dto.getTargetId(),
                 dto.getLiked()
         );
-        return ResponseEntity.ok().build();
+        return ResponseEntity.noContent().build();
     }
 }

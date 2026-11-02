@@ -1,5 +1,7 @@
 package bit.bitgroundspring.service;
 
+import bit.bitgroundspring.common.error.BusinessException;
+import bit.bitgroundspring.common.error.ErrorCode;
 import bit.bitgroundspring.dto.NoticeRequestDto;
 import bit.bitgroundspring.dto.NoticeResponseDto;
 import bit.bitgroundspring.dto.response.Message;
@@ -25,7 +27,7 @@ public class NoticeService {
 
     public Notice createNotice(Integer userId, NoticeRequestDto dto) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("유저 없음"));
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         Notice notice = Notice.builder()
                 .user(user)
@@ -74,7 +76,7 @@ public Page<NoticeResponseDto> searchNotices(String keyword, Pageable pageable) 
 
     public void deleteNotice(Integer id) {
         if (!noticeRepository.existsById(id)) {
-            throw new IllegalArgumentException("해당 공지사항이 존재하지 않습니다");
+            throw new BusinessException(ErrorCode.NOTICE_NOT_FOUND);
         }
 
         noticeRepository.deleteById(id);

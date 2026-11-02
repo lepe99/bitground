@@ -2,6 +2,8 @@
 
 package bit.bitgroundspring.service;
 
+import bit.bitgroundspring.common.error.BusinessException;
+import bit.bitgroundspring.common.error.ErrorCode;
 import bit.bitgroundspring.dto.AiAdviceDto;
 import bit.bitgroundspring.dto.InvestmentSummaryDto;
 import bit.bitgroundspring.entity.AiAdvice;
@@ -44,19 +46,19 @@ public class AiAdviceService {
         try {
             // userId를 기반으로 User 엔티티 조회
             User user = userRepository.findById(userId)
-                    .orElseThrow(() -> new IllegalArgumentException("User not found with ID: " + userId));
+                    .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
             log.debug("[AiAdviceService] 사용자 엔티티 조회 완료. User ID={}", userId);
 
             // Season 엔티티 조회 및 상태 확인
             Season season = seasonRepository.findById(seasonId)
-                    .orElseThrow(() -> new IllegalArgumentException("Season not found with ID: " + seasonId));
+                    .orElseThrow(() -> new BusinessException(ErrorCode.SEASON_NOT_FOUND));
             log.debug("[AiAdviceService] 시즌 엔티티 조회 완료. Season ID={}, Status={}", seasonId, season.getStatus());
 
             // 시즌의 상태가 COMPLETED인지 확인
             if (season.getStatus() != Status.COMPLETED) {
                 log.warn("[AiAdviceService] AI 조언은 COMPLETED 상태의 시즌에 대해서만 생성 또는 조회할 수 있습니다. 현재 시즌 상태: {}. User ID={}, Season ID={}",
                         season.getStatus(), userId, seasonId);
-                throw new IllegalStateException("AI 조언은 'COMPLETED' 상태의 시즌에 대해서만 요청할 수 있습니다.");
+                throw new BusinessException(ErrorCode.SEASON_NOT_COMPLETED);
             }
 
             // 기존 조언이 있는지 확인 (이미 존재하면 업데이트하지 않고 반환)
@@ -73,7 +75,7 @@ public class AiAdviceService {
             InvestmentSummaryDto summaryDto = investmentAnalysisService.getUserInvestmentSummaryForSeason(userId, seasonId);
             if (summaryDto == null) {
                 log.error("[AiAdviceService] 투자 요약 데이터 생성 실패. getUserInvestmentSummaryForSeason()가 null을 반환했습니다. User ID={}, Season ID={}", userId, seasonId);
-                throw new RuntimeException("투자 요약 데이터를 생성할 수 없습니다.");
+                throw new BusinessException(ErrorCode.AI_ADVICE_UNAVAILABLE, "투자 요약 데이터를 생성할 수 없습니다.");
             }
             log.debug("[AiAdviceService] 투자 요약 데이터 생성 완료: {}", summaryDto);
 
@@ -81,11 +83,11 @@ public class AiAdviceService {
             AiAdviceDto generatedAdviceDto = geminiService.generateInvestmentAdvice(summaryDto);
             if (generatedAdviceDto == null) {
                 log.error("[AiAdviceService] Gemini API로부터 AI 조언 생성 실패. generateInvestmentAdvice()가 null을 반환했습니다. User ID={}, Season ID={}", userId, seasonId);
-                throw new RuntimeException("AI 조언 생성에 실패했습니다 (Gemini API 호출 오류 또는 빈 응답).");
+                throw new BusinessException(ErrorCode.AI_ADVICE_UNAVAILABLE, "AI 조언 생성에 실패했습니다 (Gemini API 호출 오류 또는 빈 응답).");
             }
             if (generatedAdviceDto.getAdvice() == null || generatedAdviceDto.getAdvice().isEmpty()) {
                 log.warn("[AiAdviceService] Gemini API로부터 받은 조언 내용이 비어 있습니다. User ID={}, Season ID={}", userId, seasonId);
-                throw new RuntimeException("AI 조언 내용이 비어 있습니다.");
+                throw new BusinessException(ErrorCode.AI_ADVICE_UNAVAILABLE, "AI 조언 내용이 비어 있습니다.");
             }
             log.info("[AiAdviceService] Gemini API로부터 AI 조언 성공적으로 생성. Score: {}, Advice Length: {}",
                     generatedAdviceDto.getScore(), generatedAdviceDto.getAdvice().length());
@@ -133,7 +135,7 @@ public class AiAdviceService {
             throw e;
         } catch (Exception e) {
             log.error("[AiAdviceService] generateOrGetAiAdviceForUserAndSeason - 예상치 못한 오류 발생: {}", e.getMessage(), e);
-            throw new RuntimeException("AI 조언 생성/저장 중 예상치 못한 오류가 발생했습니다.", e);
+            throw new BusinessException(ErrorCode.AI_ADVICE_UNAVAILABLE, e);
         }
     }
 
@@ -151,11 +153,11 @@ public class AiAdviceService {
         try {
             // userId를 기반으로 User 엔티티 조회
             User user = userRepository.findById(userId)
-                    .orElseThrow(() -> new IllegalArgumentException("User not found with ID: " + userId));
+                    .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
             log.debug("[AiAdviceService] getAiAdviceForUserAndSeason - 사용자 엔티티 조회 완료. User ID={}", userId);
 
             Season season = seasonRepository.findById(seasonId)
-                    .orElseThrow(() -> new IllegalArgumentException("Season not found with ID: " + seasonId));
+                    .orElseThrow(() -> new BusinessException(ErrorCode.SEASON_NOT_FOUND));
             log.debug("[AiAdviceService] getAiAdviceForUserAndSeason - 시즌 엔티티 조회 완료. Season ID={}", seasonId);
 
             Optional<AiAdvice> adviceOptional = aiAdviceRepository.findByUserAndSeason(user, season);

@@ -1,34 +1,28 @@
 package bit.bitgroundspring.controller;
 
-import bit.bitgroundspring.dto.UserDto;
-import bit.bitgroundspring.entity.User;
-import bit.bitgroundspring.security.oauth2.AuthService;
+import bit.bitgroundspring.security.token.AuthUser;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import bit.bitgroundspring.service.FavoriteCoinService;
-import bit.bitgroundspring.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
 import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 
 @RestController
 @RequestMapping("/favorites")
 @RequiredArgsConstructor
 public class FavoriteCoinController {
 
-    private final AuthService authService;
     private final FavoriteCoinService favService;
 
     @PostMapping
     public ResponseEntity<Void> addFav(
-            @CookieValue("jwt_token") String jwtToken,
+            @AuthenticationPrincipal AuthUser authUser,
             @RequestParam String symbol
     ) {
-        Integer userId = authService.getUserIdFromToken(jwtToken);
+        Integer userId = authUser.id();
         favService.addFavorite(userId, symbol);
         URI location = URI.create("/api/favorites/" + symbol);
         return ResponseEntity.created(location).build();
@@ -36,19 +30,19 @@ public class FavoriteCoinController {
 
     @DeleteMapping("/{symbol}")
     public ResponseEntity<Void> removeFav(
-            @CookieValue("jwt_token") String jwtToken,
+            @AuthenticationPrincipal AuthUser authUser,
             @PathVariable String symbol
     ) {
-        Integer userId = authService.getUserIdFromToken(jwtToken);
+        Integer userId = authUser.id();
         favService.removeFavorite(userId, symbol);
         return ResponseEntity.noContent().build();
     }
 
     @GetMapping
     public ResponseEntity<List<String>> listFav(
-            @CookieValue("jwt_token") String jwtToken
+            @AuthenticationPrincipal AuthUser authUser
     ) {
-        Integer userId = authService.getUserIdFromToken(jwtToken);
+        Integer userId = authUser.id();
         List<String> symbols = favService.listFavorites(userId);
         return ResponseEntity.ok(symbols);
     }

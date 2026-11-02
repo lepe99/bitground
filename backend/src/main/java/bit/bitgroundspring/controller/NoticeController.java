@@ -1,20 +1,21 @@
 package bit.bitgroundspring.controller;
 
+import bit.bitgroundspring.common.response.PageResponse;
+import bit.bitgroundspring.dto.response.IdResponse;
+import jakarta.validation.Valid;
+import java.net.URI;
 import bit.bitgroundspring.dto.NoticeRequestDto;
 import bit.bitgroundspring.dto.NoticeResponseDto;
 import bit.bitgroundspring.entity.Notice;
 import bit.bitgroundspring.service.NoticeService;
 import bit.bitgroundspring.security.token.AuthUser;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.HashMap;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/notices")
@@ -23,29 +24,23 @@ public class NoticeController {
     private final NoticeService noticeService;
 
     @PostMapping
-    public ResponseEntity<?> create(@AuthenticationPrincipal AuthUser authUser,
-                                    @RequestBody NoticeRequestDto dto) {
+    public ResponseEntity<IdResponse> create(@AuthenticationPrincipal AuthUser authUser,
+                                             @Valid @RequestBody NoticeRequestDto dto) {
         Notice saved = noticeService.createNotice(authUser.id(), dto);
-        return ResponseEntity.ok(saved);
+        return ResponseEntity.created(URI.create("/notices/" + saved.getId())).body(new IdResponse(saved.getId()));
     }
 
     @GetMapping
-    public ResponseEntity<Map<String, Object>> getNotices(
+    public PageResponse<NoticeResponseDto> getNotices(
             @RequestParam(defaultValue = "") String keyword,
             @PageableDefault(size = 10) Pageable pageable
     ) {
-        Page<NoticeResponseDto> page = noticeService.searchNotices(keyword, pageable);
-
-        Map<String, Object> response = new HashMap<>();
-        response.put("content", page.getContent());
-        response.put("totalPages", page.getTotalPages());
-        response.put("number", page.getNumber());
-        return ResponseEntity.ok(response);
+        return PageResponse.of(noticeService.searchNotices(keyword, pageable));
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteNotice(@PathVariable Integer id) {
         noticeService.deleteNotice(id);
-        return ResponseEntity.ok().build();
+        return ResponseEntity.noContent().build();
     }
 }

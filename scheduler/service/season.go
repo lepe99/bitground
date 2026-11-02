@@ -337,7 +337,8 @@ func NotifySeasonUpdate(ctx context.Context, seasonUpdateKey string, seasonFlag 
 	}(resp.Body)
 
 	// 응답 확인
-	if resp.StatusCode != http.StatusOK {
+	// 백엔드는 처리 완료 시 204 No Content를 반환하므로 2xx 전체를 성공으로 본다
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return fmt.Errorf("서버 응답 에러: 상태 코드 %d", resp.StatusCode)
 	}
 

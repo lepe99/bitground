@@ -1,5 +1,7 @@
 package bit.bitgroundspring.service;
 
+import bit.bitgroundspring.common.error.BusinessException;
+import bit.bitgroundspring.common.error.ErrorCode;
 import bit.bitgroundspring.dto.CommentRequestDto;
 import bit.bitgroundspring.dto.CommentResponseDto;
 import bit.bitgroundspring.entity.Comment;
@@ -10,10 +12,8 @@ import bit.bitgroundspring.repository.CommentRepository;
 import bit.bitgroundspring.repository.UserRepository;
 import bit.bitgroundspring.security.token.AuthUser;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -29,9 +29,9 @@ public class CommentService {
     //댓글 저장
     public void save(Integer userId, CommentRequestDto dto) {
         Post post = boardRepository.findById(dto.getPostId())
-                .orElseThrow(() -> new IllegalArgumentException("게시글이 존재하지 않습니다"));
+                .orElseThrow(() -> new BusinessException(ErrorCode.POST_NOT_FOUND));
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("사용자가 존재하지 않습니다"));
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         Comment comment = Comment.builder()
                 .post(post)
@@ -43,7 +43,7 @@ public class CommentService {
 
         if(dto.getParentId() != null) {
             Comment parent = commentRepository.findById(dto.getParentId())
-                    .orElseThrow(() -> new IllegalArgumentException("부모 댓글이 존재하지 않습니다"));
+                    .orElseThrow(() -> new BusinessException(ErrorCode.COMMENT_NOT_FOUND));
             comment.setParent(parent);
         }
 
@@ -61,11 +61,11 @@ public class CommentService {
     @Transactional
     public void deleteComment(Integer commentId, AuthUser authUser) {
         Comment comment = commentRepository.findById(commentId)
-                .orElseThrow(() -> new RuntimeException("댓글 없음"));
+                .orElseThrow(() -> new BusinessException(ErrorCode.COMMENT_NOT_FOUND));
 
         // 작성자 본인 또는 관리자만 삭제 가능
         if (!comment.getUser().getId().equals(authUser.id()) && !authUser.admin()) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "삭제 권한이 없습니다.");
+            throw new BusinessException(ErrorCode.NOT_AUTHOR);
         }
 
         // 자식 댓글 먼저 삭제

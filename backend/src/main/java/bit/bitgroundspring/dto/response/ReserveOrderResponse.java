@@ -1,0 +1,25 @@
+package bit.bitgroundspring.dto.response;
+
+import bit.bitgroundspring.entity.Order;
+import bit.bitgroundspring.entity.OrderType;
+import bit.bitgroundspring.entity.Status;
+
+import java.time.LocalDateTime;
+
+/**
+ * 예약 주문 접수 응답 (기존: Order 엔티티를 그대로 반환해 사용자 정보까지 직렬화됨)
+ */
+public record ReserveOrderResponse(
+        Integer orderId,
+        String symbol,
+        OrderType orderType,
+        Double amount,
+        Float reservePrice,
+        Status status,
+        LocalDateTime createdAt
+) {
+    public static ReserveOrderResponse from(Order order) {
+        return new ReserveOrderResponse(order.getId(), order.getCoin().getSymbol(), order.getOrderType(),
+                order.getAmount(), order.getReservePrice(), order.getStatus(), order.getCreatedAt());
+    }
+}

@@ -1,5 +1,7 @@
 package bit.bitgroundspring.service;
 
+import bit.bitgroundspring.common.error.BusinessException;
+import bit.bitgroundspring.common.error.ErrorCode;
 import bit.bitgroundspring.dto.response.Message;
 import bit.bitgroundspring.dto.response.MessageType;
 import bit.bitgroundspring.dto.response.NotificationResponse;
@@ -108,7 +110,7 @@ public class OrderExecutionService {
 
             // 체결 시점에 잔액·보유 수량을 다시 확인 (사용자 행 잠금으로 시장가 주문과의 동시 갱신 방지)
             User user = userRepository.findByIdWithPessimisticLock(userId)
-                    .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                    .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
             Optional<UserAsset> userAssetOptional = userAssetRepository.findByUserAndCoinWithLock(user, order.getCoin());
             boolean insufficient = orderType == OrderType.BUY
                     ? user.getCash() < (int) (executionPrice * amount)

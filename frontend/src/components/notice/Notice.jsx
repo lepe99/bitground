@@ -4,6 +4,7 @@ import api from '../../api/axiosConfig';
 import { useAuth } from '../../auth/useAuth';
 import { useToast } from '../Toast.jsx';
 import { sanitize } from '../../utils/sanitize.js';
+import {getErrorMessage} from '../../api/apiError.js';
 
 const Notice = ({keyword}) => {
     const [notices, setNotices] = useState([]);
@@ -20,7 +21,7 @@ const Notice = ({keyword}) => {
             });
             setNotices(res.data.content);
             setTotalPages(res.data.totalPages);
-            setPage(res.data.number);
+            setPage(res.data.page);
             setOpenIds([]); // 페이지 변경 시 열려있는 토글 초기화
         } catch (error) {
             console.error("공지사항 불러오기 실패", error);
@@ -66,7 +67,7 @@ const Notice = ({keyword}) => {
                 infoAlert("삭제되었습니다.");
                 setNotices(prev => prev.filter(notice => notice.id !== id));
             } catch (err) {
-                errorAlert("삭제 실패: " + err.message);
+                errorAlert(getErrorMessage(err, '삭제에 실패했습니다.'));
             }
         }
     };

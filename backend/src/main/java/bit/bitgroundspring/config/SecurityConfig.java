@@ -1,11 +1,11 @@
 package bit.bitgroundspring.config;
 
+import bit.bitgroundspring.common.error.ProblemDetailSecurityHandler;
 import bit.bitgroundspring.security.oauth2.CustomOidcUserService;
 import bit.bitgroundspring.security.oauth2.OidcAuthenticationFailureHandler;
 import bit.bitgroundspring.security.oauth2.OidcAuthenticationSuccessHandler;
 import bit.bitgroundspring.security.token.JwtAuthenticationFilter;
 import bit.bitgroundspring.security.token.JwtTokenProvider;
-import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -31,6 +31,7 @@ public class SecurityConfig {
     private final OidcAuthenticationSuccessHandler oidcAuthenticationSuccessHandler;
     private final OidcAuthenticationFailureHandler oidcAuthenticationFailureHandler;
     private final JwtTokenProvider jwtTokenProvider;
+    private final ProblemDetailSecurityHandler problemDetailSecurityHandler;
 
     @Value("${react.host}")
     private String reactHost;
@@ -42,11 +43,8 @@ public class SecurityConfig {
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .exceptionHandling(exceptions -> exceptions
-                        .authenticationEntryPoint((request, response, authException) -> {
-                            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                            response.setContentType("application/json");
-                            response.getWriter().write("{\"error\":\"Unauthorized\",\"message\":\"Authentication required\"}");
-                        }))
+                        .authenticationEntryPoint(problemDetailSecurityHandler)
+                        .accessDeniedHandler(problemDetailSecurityHandler))
                 .authorizeHttpRequests(authorizeRequests -> authorizeRequests
                         .requestMatchers("/auth/refresh", "/oauth2/**", "/error", "/favicon.ico", "/ws/**", "/actuator/*", // 인증, 테스트
                                 "/coins/**", "/coins", "/news", "/market-index/**", "/ai-insights/**", "/public/**", // 공개 API

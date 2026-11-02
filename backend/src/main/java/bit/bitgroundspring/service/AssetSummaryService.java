@@ -2,6 +2,8 @@
 
 package bit.bitgroundspring.service;
 
+import bit.bitgroundspring.common.error.BusinessException;
+import bit.bitgroundspring.common.error.ErrorCode;
 import bit.bitgroundspring.dto.InvestmentSummaryDto;
 import bit.bitgroundspring.entity.Season;
 import bit.bitgroundspring.entity.User;
@@ -36,9 +38,9 @@ public class AssetSummaryService {
      */
     public InvestmentSummaryDto getUserAssetSummaryForSeason(Integer userId, Integer seasonId) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found with ID: " + userId));
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
         Season season = seasonRepository.findById(seasonId)
-                .orElseThrow(() -> new IllegalArgumentException("Season not found with ID: " + seasonId));
+                .orElseThrow(() -> new BusinessException(ErrorCode.SEASON_NOT_FOUND));
 
         LocalDate seasonStartDate = season.getStartAt();
         LocalDate seasonEndDate = season.getEndAt();
@@ -116,9 +118,9 @@ public class AssetSummaryService {
      */
     public List<UserDailyBalance> getDailyBalanceTrend(Integer userId, Integer seasonId) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found with ID: " + userId));
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
         Season season = seasonRepository.findById(seasonId)
-                .orElseThrow(() -> new IllegalArgumentException("Season not found with ID: " + seasonId));
+                .orElseThrow(() -> new BusinessException(ErrorCode.SEASON_NOT_FOUND));
 
         LocalDate seasonStartDate = season.getStartAt();
         LocalDate seasonEndDate = season.getEndAt();

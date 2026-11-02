@@ -1,5 +1,7 @@
 package bit.bitgroundspring.service;
 
+import bit.bitgroundspring.common.error.BusinessException;
+import bit.bitgroundspring.common.error.ErrorCode;
 import bit.bitgroundspring.entity.FavoriteCoin;
 import bit.bitgroundspring.entity.User;
 import bit.bitgroundspring.entity.Coin;
@@ -23,12 +25,12 @@ public class FavoriteCoinService {
     @Transactional
     public void addFavorite(Integer userId, String symbol) {
         User user = userRepo.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자"));
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
         Coin coin = coinRepo.findBySymbol(symbol)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 코인"));
+                .orElseThrow(() -> new BusinessException(ErrorCode.COIN_NOT_FOUND));
         // 중복 방지
         favRepo.findByUserAndCoin(user, coin)
-                .ifPresent(fc -> { throw new IllegalStateException("이미 즐겨찾기 등록됨"); });
+                .ifPresent(fc -> { throw new BusinessException(ErrorCode.FAVORITE_ALREADY_EXISTS); });
 
         FavoriteCoin fc = FavoriteCoin.builder()
                 .user(user)
@@ -41,12 +43,12 @@ public class FavoriteCoinService {
     @Transactional
     public void removeFavorite(Integer userId, String symbol) {
         User user = userRepo.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자"));
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
         Coin coin = coinRepo.findBySymbol(symbol)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 코인"));
+                .orElseThrow(() -> new BusinessException(ErrorCode.COIN_NOT_FOUND));
 
         FavoriteCoin fc = favRepo.findByUserAndCoin(user, coin)
-                .orElseThrow(() -> new IllegalStateException("즐겨찾기에 없음"));
+                .orElseThrow(() -> new BusinessException(ErrorCode.FAVORITE_NOT_FOUND));
         favRepo.delete(fc);
     }
 
@@ -54,7 +56,7 @@ public class FavoriteCoinService {
     @Transactional(readOnly = true)
     public List<String> listFavorites(Integer userId) {
         User user = userRepo.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자"));
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
         return favRepo.findAllByUser(user).stream()
                 .map(fc -> fc.getCoin().getSymbol())
                 .collect(Collectors.toList());

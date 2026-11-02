@@ -32,10 +32,10 @@ export const fetchAiAdvice = async (seasonId) => {
             } else if (error.response.status === 400) {
                 // 예를 들어, 시즌 상태가 COMPLETED가 아닐 때 백엔드에서 400 Bad Request를 반환할 수 있습니다.
                 console.error(`AI 조언 요청 오류 (Season ID: ${seasonId}, Status: ${error.response.status}):`, error.response.data || error.message);
-                throw new Error(`AI 조언 요청 오류: ${error.response.data?.message || error.message}`);
+                throw new Error(`AI 조언 요청 오류: ${error.response.data?.detail || error.message}`);
             } else if (error.response.status === 500) {
                 console.error(`AI 조언 요청 중 서버 내부 오류 (Season ID: ${seasonId}):`, error.response.data || error.message);
-                throw new Error(`서버 오류 발생: ${error.response.data?.message || '알 수 없는 서버 오류'}`);
+                throw new Error(`서버 오류 발생: ${error.response.data?.detail || '알 수 없는 서버 오류'}`);
             }
         }
         console.error(`AI 조언 조회 요청 실패 (Season ID: ${seasonId}):`, error);

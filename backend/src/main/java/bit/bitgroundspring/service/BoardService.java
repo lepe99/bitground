@@ -1,5 +1,7 @@
 package bit.bitgroundspring.service;
 
+import bit.bitgroundspring.common.error.BusinessException;
+import bit.bitgroundspring.common.error.ErrorCode;
 import bit.bitgroundspring.dto.BoardDto;
 import bit.bitgroundspring.entity.Category;
 import bit.bitgroundspring.entity.Post;
@@ -25,7 +27,7 @@ public class BoardService {
      */
     public Post savePost(BoardDto dto) {
         User user = userRepository.findById(dto.getUserId())
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         Post post = Post.builder()
                 .user(user)

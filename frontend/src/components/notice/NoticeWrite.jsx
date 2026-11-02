@@ -5,6 +5,7 @@ import '../../styles/notice/notice.css';
 import api from '../../api/axiosConfig.js';
 import { useAuth } from '../../auth/useAuth.js';
 import {useToast} from "../Toast.jsx";
+import {getErrorMessage} from '../../api/apiError.js';
 
 const NoticeWrite = ({ onDone }) => {
     const quillRef = useRef(null);
@@ -88,8 +89,8 @@ const NoticeWrite = ({ onDone }) => {
             });
             infoAlert('공지사항이 등록되었습니다!');
             onDone();
-        } catch {
-            errorAlert('등록 실패');
+        } catch (err) {
+            errorAlert(getErrorMessage(err, '등록 실패'));
         }
     };
 

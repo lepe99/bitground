@@ -1,11 +1,12 @@
 package bit.bitgroundspring.controller;
 
+import bit.bitgroundspring.common.response.PageResponse;
+import bit.bitgroundspring.security.token.AuthUser;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import bit.bitgroundspring.dto.projection.NotificationProjection;
-import bit.bitgroundspring.security.oauth2.AuthService;
 import bit.bitgroundspring.service.NotificationService;
 import bit.bitgroundspring.util.UserSseEmitters;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -19,16 +20,15 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 public class NotificationController {
     
     private final UserSseEmitters userSseEmitters;
-    private final AuthService authService;
     private final NotificationService notificationService;
     
     private static final Long SSE_TIMEOUT = 30 * 60 * 1000L; // 30분
     
     // 사용자별 SSE 구독 엔드포인트
     @GetMapping(value = "/subscribe", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter subscribe(@CookieValue(name = "jwt_token", required = false) String jwtToken) {
+    public SseEmitter subscribe(@AuthenticationPrincipal AuthUser authUser) {
         // JWT 토큰에서 사용자 ID 추출
-        Integer userId = authService.getUserIdFromToken(jwtToken);
+        Integer userId = authUser.id();
         
         SseEmitter emitter = new SseEmitter(SSE_TIMEOUT);
         userSseEmitters.addUser(userId, emitter);
@@ -38,25 +38,24 @@ public class NotificationController {
     
     // 나한테 온 알림, 전체 알림, 안읽은 알림 개수 조회
     @GetMapping
-    public ResponseEntity<Page<NotificationProjection>> getNotifications(
-            @CookieValue(name = "jwt_token", required = false) String jwtToken, Pageable pageable) {
-        Integer userId = authService.getUserIdFromToken(jwtToken);
-        return ResponseEntity.ok(notificationService.findNotifications(userId, pageable));
+    public PageResponse<NotificationProjection> getNotifications(
+            @AuthenticationPrincipal AuthUser authUser, Pageable pageable) {
+        Integer userId = authUser.id();
+        return PageResponse.of(notificationService.findNotifications(userId, pageable));
     }
     
     @PatchMapping
     public ResponseEntity<Void> markAsRead(
-            @CookieValue(name = "jwt_token", required = false) String jwtToken) {
-        Integer userId = authService.getUserIdFromToken(jwtToken);
+            @AuthenticationPrincipal AuthUser authUser) {
+        Integer userId = authUser.id();
         notificationService.markAllAsRead(userId);
-        return ResponseEntity.ok().build();
+        return ResponseEntity.noContent().build();
     }
     
     @GetMapping("/count")
     public ResponseEntity<Integer> countUnreadNotifications(
-            @CookieValue(name = "jwt_token", required = false) String jwtToken) {
-        Integer userId = authService.getUserIdFromToken(jwtToken);
-        System.out.println("asdf" + notificationService.countUnreadNotifications(userId));
+            @AuthenticationPrincipal AuthUser authUser) {
+        Integer userId = authUser.id();
         return ResponseEntity.ok(notificationService.countUnreadNotifications(userId));
     }
 }

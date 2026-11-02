@@ -2,6 +2,7 @@ import React, {useEffect, useRef, useState} from 'react';
 import '../../styles/trade/OrderBox.css';
 import api from '../../api/axiosConfig.js';
 import {useToast} from "../Toast.jsx";
+import {getErrorMessage} from '../../api/apiError.js';
 
 export default function OrderBox({selectedMarket, tickerMap, onOrderPlaced, cash, holdings,onTradeTabChange}) {
     const [tradeTab, setTradeTab] = useState('BUY');
@@ -244,7 +245,9 @@ export default function OrderBox({selectedMarket, tickerMap, onOrderPlaced, cash
             onOrderPlaced?.(response.data);
             setAmount('');
             setTotalPrice('');
-        }  finally {
+        } catch (err) {
+            errorAlert(getErrorMessage(err, '주문 처리 중 오류가 발생했습니다.'));
+        } finally {
             setLoading(false);
         }
     };

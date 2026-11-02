@@ -1,5 +1,7 @@
 package bit.bitgroundspring.service;
 
+import bit.bitgroundspring.common.error.BusinessException;
+import bit.bitgroundspring.common.error.ErrorCode;
 import bit.bitgroundspring.dto.OrderRequestDto;
 import bit.bitgroundspring.dto.response.OrderResponseDto;
 import bit.bitgroundspring.entity.*;
@@ -43,13 +45,13 @@ public class TradeService {
         double qty;
         // 1) 사용자 & 코인 엔티티 로드 (락 모드로 동시성 방어)
         User user = userRepository.findByIdWithPessimisticLock(userId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         Coin coin = coinRepository.findBySymbol(req.getSymbol())
-                .orElseThrow(() -> new IllegalArgumentException("Coin not found"));
+                .orElseThrow(() -> new BusinessException(ErrorCode.COIN_NOT_FOUND));
 
         Season season = seasonRepository.findByStatus(Status.PENDING)
-                .orElseThrow(() -> new IllegalStateException("진행 중인 시즌이 없습니다."));
+                .orElseThrow(() -> new BusinessException(ErrorCode.NO_ACTIVE_SEASON));
         
         // 2) 현재 시장가 조회
         String url = tickerUrl.replace("{symbol}", req.getSymbol());
@@ -68,7 +70,7 @@ public class TradeService {
             double limitPrice = req.getReservePrice();
             double diffRatio = Math.abs(limitPrice - marketPrice) / marketPrice;
             if (diffRatio > SLIPPAGE_TOLERANCE) {
-                throw new IllegalArgumentException("지정가가 시장가에서 너무 벗어났습니다.");
+                throw new BusinessException(ErrorCode.PRICE_OUT_OF_RANGE);
             }
             execPrice = limitPrice;
         }
@@ -89,7 +91,7 @@ public class TradeService {
             int reservedCash = Optional.ofNullable(
                     orderRepository.calculateTotalReservePriceForBuyOrdersByUserId(userId)).orElse(0);
             if (user.getCash() - reservedCash < rawTotalPrice) {
-                throw new IllegalArgumentException("잔액이 부족합니다.");
+                throw new BusinessException(ErrorCode.INSUFFICIENT_CASH);
             }
             user.setCash(user.getCash() - rawTotalPrice);
             execPrice = isLimitOrder ? req.getReservePrice() : marketPrice;
@@ -116,7 +118,7 @@ public class TradeService {
             // 예약 매도에 묶인 수량을 제외한 가용 수량 기준으로 확인
             double reservedAmt = asset.getId() == null ? 0d
                     : orderRepository.sumPendingSellAmount(userId, coin.getId());
-            if (currentAmt - reservedAmt + EPS < qty) throw new IllegalArgumentException("보유 수량이 부족합니다.");
+            if (currentAmt - reservedAmt + EPS < qty) throw new BusinessException(ErrorCode.INSUFFICIENT_ASSET);
 
             user.setCash(user.getCash() + cost);
 
@@ -158,17 +160,17 @@ public class TradeService {
     // 클라이언트 입력값 검증 (음수 금액으로 현금이 늘어나는 등의 조작 방지)
     private void validateRequest(OrderRequestDto req) {
         if (req.getSymbol() == null || req.getOrderType() == null) {
-            throw new IllegalArgumentException("종목과 주문 종류는 필수입니다.");
+            throw new BusinessException(ErrorCode.INVALID_ORDER, "종목과 주문 종류는 필수입니다.");
         }
         if (req.getReservePrice() != null && !(req.getReservePrice() > 0)) {
-            throw new IllegalArgumentException("지정가는 0보다 커야 합니다.");
+            throw new BusinessException(ErrorCode.INVALID_ORDER, "지정가는 0보다 커야 합니다.");
         }
         if (req.getOrderType() == OrderType.BUY) {
             if (req.getTotalPrice() == null || req.getTotalPrice() <= 0) {
-                throw new IllegalArgumentException("주문 금액은 0보다 커야 합니다.");
+                throw new BusinessException(ErrorCode.INVALID_ORDER, "주문 금액은 0보다 커야 합니다.");
             }
         } else if (req.getAmount() == null || !(req.getAmount() > 0)) {
-            throw new IllegalArgumentException("주문 수량은 0보다 커야 합니다.");
+            throw new BusinessException(ErrorCode.INVALID_ORDER, "주문 수량은 0보다 커야 합니다.");
         }
     }
 }

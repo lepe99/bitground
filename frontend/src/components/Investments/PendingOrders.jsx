@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useContext } from 'react';
 import { useToast } from "../Toast.jsx"; // 알림 토스트 훅
 import api from '../../api/axiosConfig'; // Axios 인스턴스
 import { TickerContext } from "../../ticker/TickerProvider"; // 실시간 시세 컨텍스트
+import {getErrorMessage} from '../../api/apiError.js';
 
 export default function PendingOrders() {
     const { infoAlert, errorAlert } = useToast();
@@ -20,7 +21,7 @@ export default function PendingOrders() {
                 setSelectedIds([]);
             })
             .catch(err => {
-                errorAlert('주문 목록 불러오기 실패');
+                errorAlert(getErrorMessage(err, '주문 목록 불러오기 실패'));
                 setPendingOrders([]);
             });
     };
@@ -76,8 +77,8 @@ export default function PendingOrders() {
                 infoAlert('주문이 취소되었습니다.');
                 fetchOrders();
             })
-            .catch(() => {
-                errorAlert('주문 취소 실패');
+            .catch(err => {
+                errorAlert(getErrorMessage(err, '주문 취소 실패'));
             });
     };
 

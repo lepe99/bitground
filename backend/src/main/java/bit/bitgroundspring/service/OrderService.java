@@ -1,5 +1,7 @@
 package bit.bitgroundspring.service;
 
+import bit.bitgroundspring.common.error.BusinessException;
+import bit.bitgroundspring.common.error.ErrorCode;
 import bit.bitgroundspring.dto.*;
 import bit.bitgroundspring.dto.projection.OrderProjection;
 import bit.bitgroundspring.dto.response.Message;
@@ -133,21 +135,21 @@ public class OrderService {
     
     // 예약 주문 생성 메서드
     @Transactional
-    public Order createReserveOrder(CreateOrderRequest request) {
+    public Order createReserveOrder(Integer userId, CreateOrderRequest request) {
         validateOrderRequest(request);
 
         // 동시에 들어온 예약 주문이 같은 잔액을 중복 사용하지 않도록 사용자 행을 잠금
-        User user = userRepository.findByIdWithPessimisticLock(request.getUserId())
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        User user = userRepository.findByIdWithPessimisticLock(userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         Coin coin = coinRepository.findBySymbol(request.getSymbol())
-                .orElseThrow(() -> new IllegalArgumentException("Invalid symbol ID"));
+                .orElseThrow(() -> new BusinessException(ErrorCode.COIN_NOT_FOUND));
         
         Season season = seasonRepository.findByStatus(Status.PENDING)
-                .orElseThrow(() -> new IllegalStateException("진행 중인 시즌이 없습니다."));
+                .orElseThrow(() -> new BusinessException(ErrorCode.NO_ACTIVE_SEASON));
         
         if (Boolean.TRUE.equals(coin.getIsDeleted())) {
-            throw new IllegalArgumentException("Cannot trade deleted symbol");
+            throw new BusinessException(ErrorCode.COIN_DELISTED);
         }
         
         Order order = Order.builder()
@@ -166,17 +168,17 @@ public class OrderService {
             int totalReservePrice = Optional.ofNullable(
                     orderRepository.calculateTotalReservePriceForBuyOrdersByUserId(user.getId())).orElse(0);
             if (totalReservePrice + request.getAmount() * request.getReservePrice() > user.getCash()) {
-                throw new IllegalArgumentException("예약 주문 금액이 잔액을 초과합니다.");
+                throw new BusinessException(ErrorCode.INSUFFICIENT_CASH);
             }
         } else if (request.getOrderType() == OrderType.SELL) {
             Optional<UserAsset> userAsset = userAssetRepository.findByUserAndCoinWithLock(user, coin);
             if (userAsset.isEmpty()) {
-                throw new IllegalArgumentException("매도 가능한 자산이 없습니다.");
+                throw new BusinessException(ErrorCode.INSUFFICIENT_ASSET);
             }
             // 이미 걸어 둔 예약 매도 수량을 제외하고 확인 (같은 코인 중복 매도 예약 방지)
             double reservedAmount = orderRepository.sumPendingSellAmount(user.getId(), coin.getId());
             if (userAsset.get().getAmount() - reservedAmount < request.getAmount()) {
-                throw new IllegalArgumentException("매도 가능한 자산이 부족합니다.");
+                throw new BusinessException(ErrorCode.INSUFFICIENT_ASSET);
             }
         }
         
@@ -189,19 +191,16 @@ public class OrderService {
     
     private void validateOrderRequest(CreateOrderRequest request) {
         if (request.getAmount() == null || request.getAmount() <= 0) {
-            throw new IllegalArgumentException("Amount must be positive");
+            throw new BusinessException(ErrorCode.INVALID_ORDER, "주문 수량은 0보다 커야 합니다.");
         }
         if (request.getReservePrice() == null || request.getReservePrice() <= 0) {
-            throw new IllegalArgumentException("Reserve price must be positive");
-        }
-        if (request.getUserId() == null) {
-            throw new IllegalArgumentException("User ID is required");
+            throw new BusinessException(ErrorCode.INVALID_ORDER, "예약 가격은 0보다 커야 합니다.");
         }
         if (request.getSymbol() == null) {
-            throw new IllegalArgumentException("Symbol is required");
+            throw new BusinessException(ErrorCode.INVALID_ORDER, "종목은 필수입니다.");
         }
         if (request.getOrderType() == null) {
-            throw new IllegalArgumentException("Order type is required");
+            throw new BusinessException(ErrorCode.INVALID_ORDER, "주문 종류는 필수입니다.");
         }
     }
     
@@ -244,14 +243,14 @@ public class OrderService {
     
     public void cancelOrder(Integer orderId, Integer userId) {
         Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new IllegalArgumentException("Order not found"));
+                .orElseThrow(() -> new BusinessException(ErrorCode.ORDER_NOT_FOUND));
         
         if (!order.getUser().getId().equals(userId)) {
-            throw new SecurityException("Unauthorized to cancel this order");
+            throw new BusinessException(ErrorCode.FORBIDDEN);
         }
         
         if (order.getStatus() != Status.PENDING) {
-            throw new IllegalStateException("Cannot cancel non-pending order");
+            throw new BusinessException(ErrorCode.ORDER_NOT_PENDING);
         }
         
         orderRepository.delete(order);
@@ -267,7 +266,7 @@ public class OrderService {
             Integer symbolId = order.getCoin().getId();
             String symbol = coinRepository.findById(symbolId)
                     .map(Coin::getSymbol)
-                    .orElseThrow(() -> new IllegalArgumentException("Symbol not found: " + symbolId));
+                    .orElseThrow(() -> new BusinessException(ErrorCode.COIN_NOT_FOUND));
             String orderTypeKey = order.getOrderType() == OrderType.BUY ?
                     "buy_orders:" + symbol : "sell_orders:" + symbol;
             
@@ -307,7 +306,7 @@ public class OrderService {
 
         // 사용자에게 시즌 종료 / 스플릿 업데이트 알림 전송
         Season currentSeason = seasonRepository.findByStatus(Status.PENDING)
-                .orElseThrow(() -> new IllegalStateException("진행 중인 시즌이 없습니다."));
+                .orElseThrow(() -> new BusinessException(ErrorCode.NO_ACTIVE_SEASON));
         String seasonName = currentSeason.getName();
 
         Map<String, Object> data = Map.of(
@@ -343,7 +342,7 @@ public class OrderService {
     // 현재 시즌 ID 반환
     public Integer getCurrentSeasonId() {
         return seasonRepository.findByStatus(Status.PENDING)
-                .orElseThrow(() -> new IllegalStateException("진행 중인 시즌이 없습니다."))
+                .orElseThrow(() -> new BusinessException(ErrorCode.NO_ACTIVE_SEASON))
                 .getId();
     }
 

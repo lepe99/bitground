@@ -1,5 +1,7 @@
 package bit.bitgroundspring.service;
 
+import bit.bitgroundspring.common.error.BusinessException;
+import bit.bitgroundspring.common.error.ErrorCode;
 import bit.bitgroundspring.dto.projection.SeasonProjection;
 import bit.bitgroundspring.entity.Status;
 import bit.bitgroundspring.entity.Season;
@@ -26,13 +28,13 @@ public class SeasonService {
     public Integer getCurrentSeasonId() {
         return seasonRepository.findTopByStatusOrderByStartAtDesc(Status.PENDING)
                 .map(season -> season.getId())
-                .orElseThrow(() -> new IllegalStateException("현재 진행 중인 시즌이 없습니다."));
+                .orElseThrow(() -> new BusinessException(ErrorCode.NO_ACTIVE_SEASON));
     }
 
     /*마이페이지용*/
     public Season getSeasonById(Integer seasonId) {
         return seasonRepository.findById(seasonId)
-                .orElseThrow(() -> new RuntimeException("해당 시즌이 존재하지 않습니다."));
+                .orElseThrow(() -> new BusinessException(ErrorCode.SEASON_NOT_FOUND));
     }
 
 }

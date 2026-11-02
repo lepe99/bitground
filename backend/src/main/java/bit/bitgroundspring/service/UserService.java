@@ -1,5 +1,7 @@
 package bit.bitgroundspring.service;
 
+import bit.bitgroundspring.common.error.BusinessException;
+import bit.bitgroundspring.common.error.ErrorCode;
 import bit.bitgroundspring.dto.TierDto;
 import bit.bitgroundspring.entity.Season;
 import bit.bitgroundspring.entity.User;
@@ -28,7 +30,7 @@ public class UserService {
         String provider = (String) authentication.getDetails();
 
         return getUserBySocialId(provider, providerId)
-                .orElseThrow(() -> new RuntimeException("해당 유저를 찾을 수 없습니다."));
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
     }
     
     private final UserRepository userRepository;
@@ -40,11 +42,18 @@ public class UserService {
                 .filter(user -> !user.getIsDeleted());
     }
 
+    // 탈퇴하지 않은 사용자 조회 (없으면 USER_NOT_FOUND)
+    public User getActiveUser(Integer userId) {
+        return userRepository.findById(userId)
+                .filter(user -> !user.getIsDeleted())
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+    }
+
     // 유저 업데이트
     @Transactional
     public User updateUser(Integer userId, String name, String email, String imageUrl) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("해당 사용자 없음"));
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         user.setName(name);
         user.setEmail(email);
@@ -68,7 +77,7 @@ public class UserService {
     //isDeleted -> 1
     public void softDeleteUser(Integer userId) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("해당 사용자 없음"));
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
         user.setIsDeleted(true);
         user.setTier(0);
         user.setEmail(null);
@@ -85,7 +94,7 @@ public class UserService {
 
     public Integer getTierForUserAndSeason(User user, Integer seasonId) {
         Season season = seasonRepository.findById(seasonId)
-                .orElseThrow(() -> new RuntimeException("시즌을 찾을 수 없습니다."));
+                .orElseThrow(() -> new BusinessException(ErrorCode.SEASON_NOT_FOUND));
 
         return rankRepository.findByUserAndSeason(user, season)
                 .map(UserRanking::getTier)
@@ -94,7 +103,7 @@ public class UserService {
 
     public TierDto getTierDtoForUserAndSeason(User user, Integer seasonId) {
         Season season = seasonRepository.findById(seasonId)
-                .orElseThrow(() -> new RuntimeException("시즌을 찾을 수 없습니다."));
+                .orElseThrow(() -> new BusinessException(ErrorCode.SEASON_NOT_FOUND));
 
         return rankRepository.findByUserAndSeason(user, season)
                 .map(userRanking -> {

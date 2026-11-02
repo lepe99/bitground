@@ -1,5 +1,7 @@
 package bit.bitgroundspring.service;
 
+import bit.bitgroundspring.common.error.BusinessException;
+import bit.bitgroundspring.common.error.ErrorCode;
 import bit.bitgroundspring.entity.*;
 import bit.bitgroundspring.repository.BoardRepository;
 import bit.bitgroundspring.repository.CommentRepository;
@@ -42,12 +44,14 @@ public class ReactionService {
 
     private void updateCount(ReactionTargetType type, Long targetId, boolean liked, int delta) {
         if (type == ReactionTargetType.POST) {
-            Post post = boardRepository.findById(targetId.intValue()).orElseThrow();
+            Post post = boardRepository.findById(targetId.intValue())
+                    .orElseThrow(() -> new BusinessException(ErrorCode.POST_NOT_FOUND));
             if (liked) post.setLikes(post.getLikes() + delta);
             else post.setDislikes(post.getDislikes() + delta);
             boardRepository.save(post);
         } else {
-            Comment comment = commentRepository.findById(targetId.intValue()).orElseThrow();
+            Comment comment = commentRepository.findById(targetId.intValue())
+                    .orElseThrow(() -> new BusinessException(ErrorCode.COMMENT_NOT_FOUND));
             if (liked) comment.setLikes(comment.getLikes() + delta);
             else comment.setDislikes(comment.getDislikes() + delta);
             commentRepository.save(comment);

@@ -1,5 +1,7 @@
 package bit.bitgroundspring.service;
 
+import bit.bitgroundspring.common.error.BusinessException;
+import bit.bitgroundspring.common.error.ErrorCode;
 import bit.bitgroundspring.dto.projection.UserAssetProjection;
 import bit.bitgroundspring.dto.response.UserAssetResponse;
 import bit.bitgroundspring.entity.User;
@@ -45,7 +47,7 @@ public class UserAssetService {
         // 사용자 현금 조회
         int cash = userRepository.findById(userId)
                 .map(User::getCash)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         Integer reservedCash = orderRepository.calculateTotalReservePriceForBuyOrdersByUserId(userId);
         // 현금에서 예약된 금액 차감
@@ -54,11 +56,8 @@ public class UserAssetService {
         }
         cash -= reservedCash;
 
-        // 만약 현금이 음수라면 예외 처리
-        if (cash < 0) {
-            throw new RuntimeException("Insufficient cash after reserving for buy orders");
-        }
-        return cash;
+        // 예약 금액이 현금보다 크면(데이터 불일치) 화면이 깨지지 않도록 0으로 보정
+        return Math.max(cash, 0);
     }
 
 

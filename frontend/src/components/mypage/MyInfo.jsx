@@ -4,6 +4,7 @@ import {useAuth} from "../../auth/useAuth.js";
 import {softDeleteUser, updateUserInfo} from "../../api/userApi.js";
 import {FiUpload} from "react-icons/fi";
 import {useToast} from "../Toast.jsx";
+import {getErrorMessage} from '../../api/apiError.js';
 
 export default function MyInfo() {
     const {user, loading} = useAuth();
@@ -50,7 +51,7 @@ export default function MyInfo() {
             window.location.reload();
         } catch (error) {
             console.error('업데이트 실패:', error);
-            errorAlert('수정 중 오류가 발생했습니다.');
+            errorAlert(getErrorMessage(error, '수정 중 오류가 발생했습니다.'));
         }
     };
 
@@ -65,7 +66,7 @@ export default function MyInfo() {
             window.dispatchEvent(new Event('forceLogout'));
         } catch (error) {
             console.error('탈퇴실패:', error);
-            errorAlert('탈퇴 중 문제가 발생했습니다.');
+            errorAlert(getErrorMessage(error, '탈퇴 중 문제가 발생했습니다.'));
         }
     }
 
