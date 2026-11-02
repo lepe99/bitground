@@ -9,7 +9,7 @@ import bit.bitgroundspring.security.token.JwtTokenProvider;
 import jakarta.servlet.http.Cookie;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.test.context.TestComponent;
-import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.time.LocalDate;
@@ -30,7 +30,7 @@ public class TestFixtures {
             "coin_price_history", "market_indices", "coins", "seasons", "users");
 
     private final JdbcTemplate jdbc;
-    private final RedisTemplate<String, Object> redisTemplate;
+    private final StringRedisTemplate redisTemplate;
     private final UserRepository userRepository;
     private final CoinRepository coinRepository;
     private final SeasonRepository seasonRepository;

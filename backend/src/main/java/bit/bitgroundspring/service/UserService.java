@@ -6,46 +6,29 @@ import bit.bitgroundspring.common.error.ErrorCode;
 import bit.bitgroundspring.dto.TierDto;
 import bit.bitgroundspring.entity.Season;
 import bit.bitgroundspring.entity.User;
-import bit.bitgroundspring.entity.UserRanking;
 import bit.bitgroundspring.security.token.AuthTokenService;
 import bit.bitgroundspring.storage.StorageService;
 import bit.bitgroundspring.repository.RankRepository;
 import bit.bitgroundspring.repository.SeasonRepository;
 import bit.bitgroundspring.repository.UserRepository;
-import jakarta.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
 public class UserService {
 
-    public User getCurrentUser() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        String providerId = authentication.getName();
-        String provider = (String) authentication.getDetails();
-
-        return getUserBySocialId(provider, providerId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
-    }
-    
     private final UserRepository userRepository;
     private final StorageService storageService;
     private final AuthTokenService authTokenService;
-    
-    // 소셜 로그인 ID로 사용자 조회
-    public Optional<User> getUserBySocialId(String provider, String providerId) {
-        return userRepository.findByProviderAndProviderId(provider, providerId)
-                .filter(user -> !user.getIsDeleted());
-    }
+    private final RankRepository rankRepository;
+    private final SeasonRepository seasonRepository;
 
     // 탈퇴하지 않은 사용자 조회 (없으면 USER_NOT_FOUND)
+    @Transactional(readOnly = true)
     public User getActiveUser(Integer userId) {
         return userRepository.findById(userId)
                 .filter(user -> !user.getIsDeleted())
@@ -92,22 +75,7 @@ public class UserService {
         authTokenService.revokeAll(userId);
     }
 
-    //mypage trade info
-    @Autowired
-    private RankRepository rankRepository;
-
-    @Autowired
-    private SeasonRepository seasonRepository;
-
-    public Integer getTierForUserAndSeason(User user, Integer seasonId) {
-        Season season = seasonRepository.findById(seasonId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.SEASON_NOT_FOUND));
-
-        return rankRepository.findByUserAndSeason(user, season)
-                .map(UserRanking::getTier)
-                .orElse(null);
-    }
-
+    @Transactional(readOnly = true)
     public TierDto getTierDtoForUserAndSeason(User user, Integer seasonId) {
         Season season = seasonRepository.findById(seasonId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.SEASON_NOT_FOUND));

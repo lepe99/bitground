@@ -9,7 +9,7 @@ import bit.bitgroundspring.entity.*;
 import bit.bitgroundspring.dto.TradeDto;
 import bit.bitgroundspring.event.TradeExecutedEvent;
 import bit.bitgroundspring.repository.*;
-import jakarta.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;

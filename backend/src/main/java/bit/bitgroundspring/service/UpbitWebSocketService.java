@@ -9,7 +9,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.event.ContextRefreshedEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.core.task.AsyncTaskExecutor;
-import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.scheduling.TaskScheduler;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
@@ -38,7 +37,6 @@ public class UpbitWebSocketService {
     
     private final CoinService coinService;
     private final PriceUpdateService priceUpdateService;
-    private final RedisTemplate<String, Object> redisTemplate;
     
     // 추가: Config 클래스에서 생성한 TaskExecutor 주입
     @Qualifier("webSocketTaskExecutor")
@@ -71,12 +69,10 @@ public class UpbitWebSocketService {
     public UpbitWebSocketService(
             CoinService coinService,
             PriceUpdateService priceUpdateService,
-            RedisTemplate<String, Object> redisTemplate,
             @Qualifier("webSocketTaskExecutor") Executor webSocketTaskExecutor,
             TaskScheduler taskScheduler) {
         this.coinService = coinService;
         this.priceUpdateService = priceUpdateService;
-        this.redisTemplate = redisTemplate;
         this.webSocketTaskExecutor = webSocketTaskExecutor;
         this.taskScheduler = taskScheduler;
     }
