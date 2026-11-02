@@ -6,9 +6,9 @@ import '../../styles/community/post.css';
 import {createPost} from '../../api/communityApi.js';
 import {uploadImage} from '../../api/uploadApi.js';
 import { useAuth } from '../../auth/useAuth.js';
-import { tierImageMap } from '../../components/community/tierImageUtil';
 import {useToast} from "../../components/Toast.jsx";
 import {getErrorMessage} from '../../api/apiError.js';
+import {TIER_FRAMES} from '../../constants/tiers.js';
 
 const PostWrite = () => {
     const navigate = useNavigate();
@@ -96,7 +96,7 @@ const PostWrite = () => {
                                 {user?.tier !== 0 ? (
                                 <>
                                 <img
-                                    src={tierImageMap[user?.tier]}
+                                    src={TIER_FRAMES[user?.tier]}
                                     alt=""
                                     className="post-tier-image"
                                 />

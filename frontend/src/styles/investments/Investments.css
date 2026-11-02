@@ -226,7 +226,7 @@
 .profit-rate.negative,
 .profit-amount.negative { color: #2979ff; font-weight: 600; }
 
-/* ───── TradeHistory 전용 ───── */
+/* ───── OrderHistory 전용 ───── */
 .trade-history .table-row.row-buy { background-color: #fff5f5; }
 .trade-history .table-row.row-sell { background-color: #f0faff; }
 

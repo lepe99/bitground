@@ -6,11 +6,11 @@ import {
 } from "../../api/communityApi.js";
 import { useAuth } from '../../auth/useAuth.js';
 import {RiDeleteBinLine} from "react-icons/ri";
-import { tierImageMap } from "../../components/community/tierImageUtil.js";
 import PostProfile   from "../../components/community/PostProfile.jsx";
 import {useToast} from "../../components/Toast.jsx";
 import { sanitize } from '../../utils/sanitize.js';
 import {getErrorMessage} from '../../api/apiError.js';
+import {TIER_FRAMES} from '../../constants/tiers.js';
 
 const formatDate = (dateString) => {
     const date = new Date(dateString);
@@ -81,7 +81,7 @@ const PostDetail = () => {
                             {comment.userTier !== 0 ? (
                                 <>
                                     <img
-                                        src={tierImageMap[comment.userTier]}
+                                        src={TIER_FRAMES[comment.userTier]}
                                         alt=""
                                         className="tier-image"
                                     />
@@ -253,7 +253,7 @@ const PostDetail = () => {
                                     {post.tier !== 0 ? (
                                         <>
                                             <img
-                                                src={tierImageMap[post.tier]}
+                                                src={TIER_FRAMES[post.tier]}
                                                 alt=""
                                                 className="post-tier-image"
                                             />

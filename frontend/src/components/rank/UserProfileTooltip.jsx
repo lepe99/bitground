@@ -1,34 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import '../../styles/rank/UserProfileTooltip.css';
-import bronze from '../../assets/images/bronze.webp';
-import silver from '../../assets/images/silver.webp';
-import gold from '../../assets/images/gold.webp';
-import platinum from '../../assets/images/platinum.webp';
-import diamond from '../../assets/images/diamond.webp';
-import master from '../../assets/images/master.webp';
-import grandmaster from '../../assets/images/grandmaster.webp';
+import {TIER_BADGES, TIER_NAMES} from '../../constants/tiers.js';
 
 //티어 번호 (1~7) 이미지
-const tierLogoImageMap = {
-    1: bronze,
-    2: silver,
-    3: gold,
-    4: platinum,
-    5: diamond,
-    6: master,
-    7: grandmaster
-};
-
-const tierNameMap = {
-    1: 'Bronze',
-    2: 'Silver',
-    3: 'Gold',
-    4: 'Platinum',
-    5: 'Diamond',
-    6: 'Master',
-    7: 'Grandmaster'
-};
-
 export default function UserProfileTooltip({ user, position, isCommunity = false}) {
 
     const [isVisible, setIsVisible] = useState(false);
@@ -41,7 +15,7 @@ export default function UserProfileTooltip({ user, position, isCommunity = false
     if (!user) return null;
 
     const highestTier = user.highestTier;
-    const highestTierImg = tierLogoImageMap[highestTier];
+    const highestTierImg = TIER_BADGES[highestTier];
     const tooltipClass = `user-tooltip ${isCommunity ? 'community-tooltip' : ''} ${isVisible ? 'visible' : ''}`;
 
     return (
@@ -68,7 +42,7 @@ export default function UserProfileTooltip({ user, position, isCommunity = false
                                     className="tier-icon"
                                 />
                             )}
-                            &nbsp;{tierNameMap[highestTier]}
+                            &nbsp;{TIER_NAMES[highestTier]}
                         </div>
                     ) : (
                         <p>참여한 기록이 없습니다</p>
@@ -81,12 +55,12 @@ export default function UserProfileTooltip({ user, position, isCommunity = false
                         {user.pastSeasonTiers.map((item, idx) => (
                                 <div key={idx} className="tier-row">
                                     <img
-                                        src={tierLogoImageMap[item.tier]}
+                                        src={TIER_BADGES[item.tier]}
                                         alt={`티어 ${item.tier}`}
                                         className="tier-icon"
                                     />
                                     <span className="season-text">
-                                        {item.name}: {tierNameMap[item.tier]}
+                                        {item.name}: {TIER_NAMES[item.tier]}
                                     </span>
                                 </div>
                             ))}

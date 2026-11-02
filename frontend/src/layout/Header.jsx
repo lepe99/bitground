@@ -1,4 +1,4 @@
-import "./Header.css"
+import "../styles/Header.css"
 import "../style.css"
 import {MdArrowOutward} from "react-icons/md";
 import {useNavigate} from "react-router-dom";
@@ -6,7 +6,7 @@ import {useAuth} from "../auth/useAuth";
 import {useLocation} from "react-router-dom";
 import {FaRegBell} from "react-icons/fa6";
 import {useEffect, useState} from "react";
-import {useToast} from "../components/Toast.jsx";
+import {useNotifications} from "../notifications/useNotifications.js";
 import {fetchNotifications, markAllNotificationsRead} from "../api/notificationApi.js";
 
 export default function Header() {
@@ -16,7 +16,7 @@ export default function Header() {
 
     const location = useLocation();
     const path = location.pathname;
-    const {unreadNotificationsCount, setUnreadNotificationsCount} = useToast();
+    const {unreadNotificationsCount, setUnreadNotificationsCount} = useNotifications();
 
     // 툴팁의 노출 여부를 관리하는 state를 추가 (초기값: false)
     const [isTooltipVisible, setIsTooltipVisible] = useState(false);

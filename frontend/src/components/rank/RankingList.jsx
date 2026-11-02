@@ -1,41 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {fetchUserRankDetail} from '../../api/rankApi.js';
-import bronzeLine from '../../assets/images/bronze_line.webp';
-import silverLine from '../../assets/images/silver_line.webp';
-import goldLine from '../../assets/images/gold_line.webp';
-import platinumLine from '../../assets/images/platinum_line.webp';
-import diamondLine from '../../assets/images/diamond_line.webp';
-import masterLine from '../../assets/images/master_line.webp';
-import grandmasterLine from '../../assets/images/grandmaster_line.webp';
 import '../../styles/rank/RankingList.css';
 import UserProfileTooltip from "./UserProfileTooltip.jsx";
-import bronze from '../../assets/images/bronze.webp';
-import silver from '../../assets/images/silver.webp';
-import gold from '../../assets/images/gold.webp';
-import platinum from '../../assets/images/platinum.webp';
-import diamond from '../../assets/images/diamond.webp';
-import master from '../../assets/images/master.webp';
-import grandmaster from '../../assets/images/grandmaster.webp';
-
-const tierImageMap = {
-    1: bronzeLine,
-    2: silverLine,
-    3: goldLine,
-    4: platinumLine,
-    5: diamondLine,
-    6: masterLine,
-    7: grandmasterLine
-};
-
-const tierLogoImageMap = {
-    1: bronze,
-    2: silver,
-    3: gold,
-    4: platinum,
-    5: diamond,
-    6: master,
-    7: grandmaster,
-};
+import {TIER_BADGES, TIER_FRAMES} from '../../constants/tiers.js';
 
 export default function RankingList({
                                         data,
@@ -102,7 +69,7 @@ export default function RankingList({
                 const totalValue = Number(item?.totalValue ?? 0);
                 const tier = item?.tier ?? 0;
                 const profileImage = item?.profileImage;
-                const tierImg = tierImageMap[tier] || bronzeLine;
+                const tierImg = TIER_FRAMES[tier] || bronzeLine;
                 const rank = item?.ranks ?? index + 1;
 
                 return (
@@ -121,8 +88,8 @@ export default function RankingList({
                         </div>
                         <div className="user-info">
                             {name}
-                            {tierLogoImageMap[tier] && (
-                                <img src={tierLogoImageMap[tier]} alt="티어로고" className="tier-logo-icon" />
+                            {TIER_BADGES[tier] && (
+                                <img src={TIER_BADGES[tier]} alt="티어로고" className="tier-logo-icon" />
                             )}
                         </div>
                         <div className="amount">{totalValue.toLocaleString()}원</div>

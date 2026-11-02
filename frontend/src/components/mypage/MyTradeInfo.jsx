@@ -4,36 +4,10 @@ import MyTradeAI from "./MyTradeAI.jsx";
 import {fetchAiAdvice, fetchMyTier, fetchTradeDetails, fetchTradeSummary} from "../../api/mypageApi.js";
 import {fetchSeasons} from "../../api/seasonApi.js";
 import Loading from "../Loading.jsx";
-import bronze from '../../assets/images/bronze.webp';
-import silver from '../../assets/images/silver.webp';
-import gold from '../../assets/images/gold.webp';
-import platinum from '../../assets/images/platinum.webp';
-import diamond from '../../assets/images/diamond.webp';
-import master from '../../assets/images/master.webp';
-import grandmaster from '../../assets/images/grandmaster.webp';
+import {TIER_BADGES, TIER_NAMES} from '../../constants/tiers.js';
 
 // 티어 이름 매핑
-const tierNameMap = {
-    1: 'Bronze',
-    2: 'Silver',
-    3: 'Gold',
-    4: 'Platinum',
-    5: 'Diamond',
-    6: 'Master',
-    7: 'Grandmaster'
-};
-
 // 티어 이미지 매핑
-const tierImageMap = {
-    1: bronze,
-    2: silver,
-    3: gold,
-    4: platinum,
-    5: diamond,
-    6: master,
-    7: grandmaster
-};
-
 export default function MyTradeInfo() {
     // 탭 상태 ('분석' 또는 '상세')
     const [tab, setTab] = useState('분석');
@@ -238,8 +212,8 @@ export default function MyTradeInfo() {
                             {/* 사용자 티어 정보 표시 */}
                             {myTier ? (
                                 <span className="season-rank-tier">시즌티어 :
-                                    <img src={tierImageMap[myTier.tier]} alt={tierNameMap[myTier.tier]} />
-                                    {tierNameMap[myTier.tier]}
+                                    <img src={TIER_BADGES[myTier.tier]} alt={TIER_NAMES[myTier.tier]} />
+                                    {TIER_NAMES[myTier.tier]}
                                 </span>
                             ) : (
                                 <span>🏅 랭킹 정보가 없습니다.</span>

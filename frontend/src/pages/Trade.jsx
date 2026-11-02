@@ -2,13 +2,13 @@ import React, {useContext, useEffect, useState} from "react";
 import Sidebar from "../components/trade/Sidebar";
 import CoinDetail from "../components/trade/CoinDetail";
 import OrderBox from "../components/trade/OrderBox";
-import TradeHistory from "../components/trade/TradeHistory";
+import RecentTrades from "../components/trade/RecentTrades.jsx";
 import "../styles/trade/Trade.css";
 import TradingViewWidget from "../components/trade/TradingViewWidget";
 import {addFavorite, fetchAvailableAssets, fetchFavorites, fetchOwnedAssets, removeFavorite} from "../api/assetApi.js";
 import {AuthContext} from "../auth/AuthContext.js";
 import {TickerContext} from "../ticker/TickerProvider.jsx";
-import {useToast} from "../components/Toast.jsx";
+import {useNotifications} from "../notifications/useNotifications.js";
 import Loading from "../components/Loading.jsx";
 
 export default function Trade() {
@@ -22,7 +22,7 @@ export default function Trade() {
     const [orderTab, setOrderTab] = useState('BUY'); // BUY or SELL
     const [userAssets, setUserAssets] = useState({});
 
-    const { userCash } = useToast();
+    const { userCash } = useNotifications();
 
     const fetchOwned = async () => {
         try {
@@ -116,7 +116,7 @@ export default function Trade() {
                             />
                         </section>
                         <section className="trade-history">
-                            <TradeHistory
+                            <RecentTrades
                                 symbol={selectedMarket}/>
                         </section>
                     </div>

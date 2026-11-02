@@ -1,23 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { fetchPublicRanking } from '../../api/rankApi.js';
 import '../../styles/main/RankingPreview.css';
-import bronze from '../../assets/images/bronze.webp';
-import silver from '../../assets/images/silver.webp';
-import gold from '../../assets/images/gold.webp';
-import platinum from '../../assets/images/platinum.webp';
-import diamond from '../../assets/images/diamond.webp';
-import master from '../../assets/images/master.webp';
-import grandmaster from '../../assets/images/grandmaster.webp';
-
-const tierImageMap = {
-    1: bronze,
-    2: silver,
-    3: gold,
-    4: platinum,
-    5: diamond,
-    6: master,
-    7: grandmaster,
-};
+import {TIER_BADGES} from '../../constants/tiers.js';
 
 export default function MainRanking() {
     const [rankingData, setRankingData] = useState(null);
@@ -50,7 +34,7 @@ export default function MainRanking() {
                             <span className="ranking-number">{idx + 1}위</span>
                             <img src={user.profileImage} alt={user.name} className="profile-img" />
                             <span className="user-name">{user.name}</span>
-                            <img src={tierImageMap[user.tier]} alt="티어" className="tier-img" />
+                            <img src={TIER_BADGES[user.tier]} alt="티어" className="tier-img" />
                             <span className="total-value">{user.totalValue.toLocaleString()}원</span>
                         </li>
                     ))}

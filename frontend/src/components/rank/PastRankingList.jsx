@@ -1,4 +1,4 @@
-import LoadingSpinner from "../LoadingSpinner.jsx";
+import Loading from "../Loading.jsx";
 import React from 'react';
 import RankingList from "./RankingList.jsx";
 import '../../styles/rank/PastRankingList.css';
@@ -34,7 +34,7 @@ export default function PastRankingList({
             </div>
 
             {pastLoading ? (
-                <LoadingSpinner />
+                <Loading inline />
             ) : (
                 <RankingList
                     data={pastRankingsMap[selectedSeason] || []}

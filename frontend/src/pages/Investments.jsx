@@ -1,14 +1,14 @@
 import React, { useState, useEffect, useContext } from "react";
 import Sidebar from "../components/trade/Sidebar.jsx";
-import PortfolioHeader from "../components/Investments/PortfolioHeader.jsx";
-import AssetSummary from "../components/Investments/AssetSummary.jsx";
-import HoldingsList from "../components/Investments/HoldingsList.jsx";
-import TradeHistory from "../components/Investments/TradeHistory.jsx";
-import PendingOrders from "../components/Investments/PendingOrders.jsx";
+import PortfolioHeader from "../components/investments/PortfolioHeader.jsx";
+import AssetSummary from "../components/investments/AssetSummary.jsx";
+import HoldingsList from "../components/investments/HoldingsList.jsx";
+import OrderHistory from "../components/investments/OrderHistory.jsx";
+import PendingOrders from "../components/investments/PendingOrders.jsx";
 import { AuthContext } from "../auth/AuthContext";
 import { TickerContext } from "../ticker/TickerProvider.jsx";
 import {addFavorite, fetchFavorites, fetchOwnedAssets, removeFavorite} from "../api/assetApi.js";
-import '../styles/Investments/Investments.css';
+import '../styles/investments/Investments.css';
 import "../styles/trade/Trade.css";
 import Loading from "../components/Loading.jsx";
 import { useNavigate } from 'react-router-dom';
@@ -88,7 +88,7 @@ export default function Investments() {
                             <HoldingsList userAssets={userAssets} />
                         </>
                     )}
-                    {activeTab === '거래내역' && <TradeHistory />}
+                    {activeTab === '거래내역' && <OrderHistory />}
                     {activeTab === '미체결' && <PendingOrders />}
                 </div>
             </div>

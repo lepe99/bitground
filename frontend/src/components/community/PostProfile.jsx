@@ -1,33 +1,7 @@
 import React from "react";
 import '../../styles/community/PostProfile.css';
+import {TIER_BADGES, TIER_NAMES} from '../../constants/tiers.js';
 
-import bronze from '../../assets/images/bronze.webp';
-import silver from '../../assets/images/silver.webp';
-import gold from '../../assets/images/gold.webp';
-import platinum from '../../assets/images/platinum.webp';
-import diamond from '../../assets/images/diamond.webp';
-import master from '../../assets/images/master.webp';
-import grandmaster from '../../assets/images/grandmaster.webp';
-
-const tierLogoImageMap = {
-    1: bronze,
-    2: silver,
-    3: gold,
-    4: platinum,
-    5: diamond,
-    6: master,
-    7: grandmaster
-};
-
-const tierNameMap = {
-    1: 'Bronze',
-    2: 'Silver',
-    3: 'Gold',
-    4: 'Platinum',
-    5: 'Diamond',
-    6: 'Master',
-    7: 'Grandmaster'
-};
 
 export default function PostProfile({ profileImage, name, highestTier, pastSeasonTiers }) {
     return (
@@ -41,12 +15,12 @@ export default function PostProfile({ profileImage, name, highestTier, pastSeaso
                             <>
                                 최고 티어:
                                 <img
-                                    src={tierLogoImageMap[highestTier]}
+                                    src={TIER_BADGES[highestTier]}
                                     alt="티어"
                                     className={highestTier === 7 ? "tier-icon grandmaster-icon" : "tier-icon"}
                                 />
                                 <strong className={highestTier === 7 ? "tier-rank grandmaster" : "tier-rank"}>
-                                    {tierNameMap[highestTier]}
+                                    {TIER_NAMES[highestTier]}
                                 </strong>
                             </>
                         ) : (
@@ -63,12 +37,12 @@ export default function PostProfile({ profileImage, name, highestTier, pastSeaso
                             <div className="tier-season">{tier.seasonName}</div>
                             <div className="tier-rank-wrapper">
                                 <img
-                                    src={tierLogoImageMap[tier.tier]}
-                                    alt={tierNameMap[tier.tier]}
+                                    src={TIER_BADGES[tier.tier]}
+                                    alt={TIER_NAMES[tier.tier]}
                                     className={tier.tier === 7 ? "grandmaster-icon" : "tier-icon"}
                                 />
                                 <div className={`tier-rank ${tier.tier === 7 ? "grandmaster" : ""}`}>
-                                    {tierNameMap[tier.tier]}
+                                    {TIER_NAMES[tier.tier]}
                                 </div>
                             </div>
                         </li>

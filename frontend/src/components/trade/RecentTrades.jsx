@@ -1,12 +1,12 @@
 import React, {useEffect, useState} from 'react';
-import "../../styles/trade/TradeHistory.css"
+import "../../styles/trade/RecentTrades.css"
 
 // 화면에 유지하는 최근 체결 건수 (새 체결이 계속 와도 목록이 끝없이 커지지 않도록)
 const MAX_ROWS = 30;
 const RECONNECT_BASE_MS = 1000;
 const RECONNECT_MAX_MS = 30000;
 
-export default function TradeHistory({symbol}) {
+export default function RecentTrades({symbol}) {
     const [history, setHistory] = useState([]);
 
     const currency = symbol.split("-")[0];

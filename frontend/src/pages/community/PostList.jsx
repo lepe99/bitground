@@ -3,7 +3,7 @@ import {useNavigate} from 'react-router-dom';
 import {fetchPosts as fetchPostPage} from "../../api/communityApi.js";
 import {useEffect, useState} from "react";
 import {HiOutlinePhoto} from "react-icons/hi2";
-import {tierImageMap} from "../../components/community/tierImageUtil.js";
+import {TIER_FRAMES} from '../../constants/tiers.js';
 
 /**
  * 게시글 목록 페이지 컴포넌트
@@ -171,7 +171,7 @@ const PostList = () => {
                                         {post.tier !== 0 ? (
                                             <>
                                                 <img
-                                                    src={tierImageMap[post.tier]}
+                                                    src={TIER_FRAMES[post.tier]}
                                                     alt=""
                                                     className="post-tier-image"
                                                 />
@@ -252,9 +252,9 @@ const PostList = () => {
                             <div className={"post-card-usernametag"}>
                                 <div className="post-user-icon-small">
                                     {/* 티어 이미지: tier가 존재할 때만 출력 */}
-                                    {post.tier !== 0 && tierImageMap[post.tier] && (
+                                    {post.tier !== 0 && TIER_FRAMES[post.tier] && (
                                         <img
-                                            src={tierImageMap[post.tier]}
+                                            src={TIER_FRAMES[post.tier]}
                                             alt={`티어 ${post.tier}`}
                                             className="post-tier-image"
                                         />

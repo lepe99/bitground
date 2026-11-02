@@ -16,7 +16,7 @@ function formatNumber(value, digits = undefined, trimZeros = true) {
     });
 }
 
-export default function TradeHistory() {
+export default function OrderHistory() {
     const { user } = useContext(AuthContext); // 로그인된 사용자 정보
 
     // 📦 상태값 정의
