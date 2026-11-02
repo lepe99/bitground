@@ -68,7 +68,7 @@ export default function Investments() {
             }
 
             try {
-                const favRes = await api.get('/favorites', { params: { userId: user.id } });
+                const favRes = await api.get('/favorites');
                 setFavoriteMarkets(favRes.data);
             } catch {
                 setFavoriteMarkets([]);
@@ -81,8 +81,8 @@ export default function Investments() {
     const toggleFavorite = (symbol) => {
         const isFav = favoriteMarkets.includes(symbol);
         const req = isFav
-            ? api.delete(`/favorites/${symbol}`, { params: { userId: user.id } })
-            : api.post('/favorites', null, { params: { userId: user.id, symbol } });
+            ? api.delete(`/favorites/${symbol}`)
+            : api.post('/favorites', null, { params: {symbol} });
         req.then(() => {
             setFavoriteMarkets(prev =>
                 isFav ? prev.filter(s => s !== symbol) : [...prev, symbol]

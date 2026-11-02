@@ -135,8 +135,9 @@ public class OrderService {
     @Transactional
     public Order createReserveOrder(CreateOrderRequest request) {
         validateOrderRequest(request);
-        
-        User user = userRepository.findById(request.getUserId())
+
+        // 동시에 들어온 예약 주문이 같은 잔액을 중복 사용하지 않도록 사용자 행을 잠금
+        User user = userRepository.findByIdWithPessimisticLock(request.getUserId())
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
         Coin coin = coinRepository.findBySymbol(request.getSymbol())
@@ -161,8 +162,10 @@ public class OrderService {
         
         // 주문 유효성 검사
         if (request.getOrderType() == OrderType.BUY) {
-            Integer totalReservePrice = orderRepository.calculateTotalReservePriceForBuyOrdersByUserId(user.getId());
-            if (totalReservePrice != null && totalReservePrice + request.getAmount() * request.getReservePrice() > user.getCash()) {
+            // 기존 예약 매수가 없으면 합계가 null → 0으로 보고 반드시 잔액 확인 (기존: 확인을 건너뜀)
+            int totalReservePrice = Optional.ofNullable(
+                    orderRepository.calculateTotalReservePriceForBuyOrdersByUserId(user.getId())).orElse(0);
+            if (totalReservePrice + request.getAmount() * request.getReservePrice() > user.getCash()) {
                 throw new IllegalArgumentException("예약 주문 금액이 잔액을 초과합니다.");
             }
         } else if (request.getOrderType() == OrderType.SELL) {
@@ -170,7 +173,9 @@ public class OrderService {
             if (userAsset.isEmpty()) {
                 throw new IllegalArgumentException("매도 가능한 자산이 없습니다.");
             }
-            if (userAsset.get().getAmount() < request.getAmount()) {
+            // 이미 걸어 둔 예약 매도 수량을 제외하고 확인 (같은 코인 중복 매도 예약 방지)
+            double reservedAmount = orderRepository.sumPendingSellAmount(user.getId(), coin.getId());
+            if (userAsset.get().getAmount() - reservedAmount < request.getAmount()) {
                 throw new IllegalArgumentException("매도 가능한 자산이 부족합니다.");
             }
         }

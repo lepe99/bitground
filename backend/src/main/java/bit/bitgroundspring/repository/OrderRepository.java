@@ -95,6 +95,22 @@ public interface OrderRepository extends JpaRepository<Order, Integer> {
     """)
     Integer calculateTotalReservePriceForBuyOrdersByUserId(@Param("userId") Integer userId);
 
+    // 현재 시즌에 체결 대기 중인 예약 매도 수량 (해당 코인)
+    @Query("""
+        SELECT COALESCE(SUM(o.amount), 0.0)
+        FROM Order o
+        WHERE o.user.id = :userId
+          AND o.coin.id = :coinId
+          AND o.status = 'PENDING'
+          AND o.orderType = 'SELL'
+          AND o.season = (
+              SELECT s
+              FROM Season s
+              WHERE s.status = 'PENDING'
+          )
+    """)
+    Double sumPendingSellAmount(@Param("userId") Integer userId, @Param("coinId") Integer coinId);
+
     //미체결
     @Query("SELECT o FROM Order o " +
             "JOIN FETCH o.coin " +

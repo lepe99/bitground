@@ -101,6 +101,25 @@ public class OrderExecutionService {
             }
             
             Order order = orderOpt.get();
+            int userId = order.getUser().getId();
+            OrderType orderType = order.getOrderType();
+            double amount = order.getAmount();
+            final double EPS = 0.00000001;
+
+            // 체결 시점에 잔액·보유 수량을 다시 확인 (사용자 행 잠금으로 시장가 주문과의 동시 갱신 방지)
+            User user = userRepository.findByIdWithPessimisticLock(userId)
+                    .orElseThrow(() -> new IllegalArgumentException("User not found"));
+            Optional<UserAsset> userAssetOptional = userAssetRepository.findByUserAndCoinWithLock(user, order.getCoin());
+            boolean insufficient = orderType == OrderType.BUY
+                    ? user.getCash() < (int) (executionPrice * amount)
+                    : userAssetOptional.map(a -> a.getAmount() + EPS < amount).orElse(true);
+            if (insufficient) {
+                orderRepository.delete(order);
+                log.warn("Order {} cancelled at execution: insufficient {} for user {}",
+                        orderId, orderType == OrderType.BUY ? "cash" : "asset", userId);
+                return;
+            }
+
             order.setStatus(Status.COMPLETED);
             order.setTradePrice(executionPrice);
             order.setUpdatedAt(LocalDateTime.now());
@@ -108,16 +127,11 @@ public class OrderExecutionService {
             orderRepository.save(order);
             eventPublisher.publishEvent(new OrderCreatedEvent(this, order));
             
-            int userId = order.getUser().getId();
-            OrderType orderType = order.getOrderType();
             String symbol = coinRepository.findById(order.getCoin().getId())
                     .map(Coin::getSymbol)
                     .orElse("Unknown");
-            double amount = order.getAmount();
-            
+
             // 유저 현재 잔액 업데이트
-            User user = userRepository.findById(userId)
-                    .orElseThrow(() -> new IllegalArgumentException("User not found"));
             if (orderType == OrderType.BUY) {
                 user.setCash(user.getCash() - (int) (executionPrice * amount));
             } else if (orderType == OrderType.SELL) {
@@ -126,7 +140,6 @@ public class OrderExecutionService {
             userRepository.save(user);
             
             // 유저 자산 업데이트
-            Optional<UserAsset> userAssetOptional = userAssetRepository.findByUserAndCoinWithLock(user, order.getCoin());
             if (userAssetOptional.isPresent()) {
                 UserAsset userAsset = userAssetOptional.get();
                 double userAssetAmount = userAsset.getAmount();
@@ -137,7 +150,6 @@ public class OrderExecutionService {
                                     / (userAssetAmount + amount));
                     userAssetRepository.save(userAsset);
                 } else if (orderType == OrderType.SELL) {
-                    final float EPS = 0.00000001f;
                     double remainingAmount = userAssetAmount - amount;
                     if (remainingAmount < EPS) {
                         userAssetRepository.delete(userAsset);

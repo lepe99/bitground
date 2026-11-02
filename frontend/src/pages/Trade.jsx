@@ -61,7 +61,7 @@ export default function Trade() {
 
 
     useEffect(() => {
-        api.get('/favorites', {params: {userId: user.id}})
+        api.get('/favorites')
             .then(res => setFavoriteMarkets(res.data));
         handleOrderPlaced(); // 초기 자산 정보 로딩
     }, [user.id]);
@@ -76,8 +76,8 @@ export default function Trade() {
     const toggleFav = symbol => {
         const isFav = favoriteMarkets.includes(symbol);
         const req = isFav
-            ? api.delete(`/favorites/${symbol}`, {params: {userId: user.id}})
-            : api.post('/favorites', null, {params: {userId: user.id, symbol}});
+            ? api.delete(`/favorites/${symbol}`)
+            : api.post('/favorites', null, {params: {symbol}});
 
         req.then(() => {
             setFavoriteMarkets(prev =>
