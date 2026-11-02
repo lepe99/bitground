@@ -1,0 +1,38 @@
+# 로컬 개발용 인프라 (MySQL, Redis)
+# 사용법: docker compose up -d
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: bitground-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      MYSQL_DATABASE: bitground
+      MYSQL_USER: bitground
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-bitground}
+      TZ: Asia/Seoul
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-time-zone=+09:00
+    ports:
+      - "3307:3306" # 호스트에 설치된 MySQL(3306)과 충돌하지 않도록 3307 사용
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: bitground-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 10
+
+volumes:
+  mysql-data:

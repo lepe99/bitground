@@ -1,5 +1,5 @@
 # 1) Build 단계: Gradle Wrapper 기반
-FROM eclipse-temurin:17-jdk-alpine AS builder
+FROM eclipse-temurin:21-jdk-alpine AS builder
 WORKDIR /app
 
 # gradlew, gradle 설정 복사 (캐시 활용)
@@ -18,7 +18,7 @@ RUN chmod +x gradlew \
  && ./gradlew clean bootJar -x test --no-daemon
 
 # 2) Run 단계: JRE만 포함해 경량화
-FROM eclipse-temurin:17-jre-alpine
+FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
 
 # Pinpoint Agent 파일 복사
