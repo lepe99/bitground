@@ -102,7 +102,9 @@ class ApiResponseContractTest extends IntegrationTest {
 
         @Test
         void 스케줄러_공유_키가_틀리면_403_INVALID_SECRET_KEY() throws Exception {
-            mvc.perform(post("/seasons/update").param("secretKey", "wrong").param("seasonFlag", "season"))
+            mvc.perform(post("/seasons/update").header("X-Scheduler-Key", "wrong").param("seasonFlag", "season"))
+                    .andExpect(problem(ErrorCode.INVALID_SECRET_KEY));
+            mvc.perform(post("/seasons/update").param("seasonFlag", "season"))
                     .andExpect(problem(ErrorCode.INVALID_SECRET_KEY));
         }
 

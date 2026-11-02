@@ -9,6 +9,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strings"
 	"time"
@@ -45,9 +46,9 @@ type Insight struct {
 	Score   int    `json:"score"`
 }
 
-func UpdateInsight(ctx context.Context, db *sql.DB, geminiKey string, symbolMap map[string]int) error {
+func UpdateInsight(ctx context.Context, db *sql.DB, geminiKey, geminiModel string, symbolMap map[string]int) error {
 	// 1. Gemini API를 사용하여 인사이트 데이터를 가져옵니다.
-	insights, err := getInsightData(ctx, geminiKey, symbolMap)
+	insights, err := getInsightData(ctx, geminiKey, geminiModel, symbolMap)
 	if err != nil {
 		return fmt.Errorf("getInsightData 에러: %w", err)
 	}
@@ -66,8 +67,8 @@ func UpdateInsight(ctx context.Context, db *sql.DB, geminiKey string, symbolMap 
 }
 
 // gemini api를 사용하여 인사이트 데이터를 가져오는 함수
-func getInsightData(ctx context.Context, geminiKey string, symbolMap map[string]int) ([]Insight, error) {
-	const apiURL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent"
+func getInsightData(ctx context.Context, geminiKey, geminiModel string, symbolMap map[string]int) ([]Insight, error) {
+	apiURL := "https://generativelanguage.googleapis.com/v1beta/models/" + url.PathEscape(geminiModel) + ":generateContent"
 
 	// 프롬프트 생성
 	prompt := createPrompt()
@@ -93,14 +94,15 @@ func getInsightData(ctx context.Context, geminiKey string, symbolMap map[string]
 	defer cancel()
 
 	// HTTP 요청 생성
-	req, err := http.NewRequestWithContext(reqCtx, "POST", apiURL+"?key="+geminiKey, bytes.NewBuffer(jsonBody))
+	req, err := http.NewRequestWithContext(reqCtx, http.MethodPost, apiURL, bytes.NewReader(jsonBody))
 	if err != nil {
 		return []Insight{}, fmt.Errorf("HTTP 요청 생성 에러: %w", err)
 	}
+	// API 키는 URL 쿼리(?key=)가 아니라 헤더로 보낸다 (프록시·접근 로그에 남지 않도록)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-goog-api-key", geminiKey)
 
-	// http 클라이언트 생성
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return []Insight{}, fmt.Errorf("API 요청 에러: %w", err)
 	}

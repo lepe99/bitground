@@ -2,7 +2,6 @@ package util
 
 import (
 	"Bitground-go/model"
-	"fmt"
 	"time"
 )
 
@@ -19,46 +18,27 @@ func GeneratePlaceholders(count int) string {
 	return placeholders
 }
 
-// TimeCheck 시간 확인하여 수행할 업데이트 플래그를 반환하는 함수
-func TimeCheck(obj map[string]interface{}) (model.UpdateFlags, error) {
-	// 시간 설정
-	var now time.Time
-	var err error
-	if obj["TEST_TIME"] == "0000-00-00 00:00:00" {
-		now = time.Now().Round(time.Hour)
-	} else {
-		now, err = time.Parse("2006-01-02 15:04:05", obj["TEST_TIME"].(string))
-		if err != nil {
-			return model.UpdateFlags{}, fmt.Errorf("시간 파싱 실패: %w", err)
-		}
-		now = now.Round(time.Hour)
-	}
-
-	chkType := obj["TYPE"].(string)
+// TimeCheck 기준 시각(정시)과 실행 모드로 이번에 수행할 작업 플래그를 반환합니다.
+//   - 매일 0시: 코인 정보 갱신, AI 인사이트, 일일 자산 스냅샷
+//   - prod: 매월 1·16일 0시 시즌 정산, 8·23일 0시 스플릿
+//   - dev: 6시간마다 시즌 정산(0·6·12·18시), 그 사이 3시간 지점에 스플릿
+func TimeCheck(now time.Time, mode string) model.UpdateFlags {
 	day := now.Day()
 	hour := now.Hour()
 
-	var coinUpdate, seasonUpdate, splitUpdate, insightUpdate bool
-
-	if chkType == "dev" {
-		seasonUpdate = hour%6 == 0
-		splitUpdate = hour%6 == 3
-	} else {
-		if hour == 0 {
-			seasonUpdate = day == 1 || day == 16
-			splitUpdate = day == 8 || day == 23
-		}
+	var flags model.UpdateFlags
+	if mode == "dev" {
+		flags.Season = hour%6 == 0
+		flags.Split = hour%6 == 3
+	} else if hour == 0 {
+		flags.Season = day == 1 || day == 16
+		flags.Split = day == 8 || day == 23
 	}
 
 	if hour == 0 {
-		insightUpdate = true
-		coinUpdate = true
+		flags.Insight = true
+		flags.Coin = true
 	}
 
-	return model.UpdateFlags{
-		Season:  seasonUpdate,
-		Split:   splitUpdate,
-		Coin:    coinUpdate,
-		Insight: insightUpdate,
-	}, nil
+	return flags
 }

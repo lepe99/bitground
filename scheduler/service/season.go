@@ -1,25 +1,25 @@
 package service
 
 import (
+	"Bitground-go/config"
 	"Bitground-go/model"
 	"context"
 	"database/sql"
 	"errors"
 	"fmt"
 	"golang.org/x/sync/errgroup"
-	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
 )
 
-func UpdateSeason(ctx context.Context, db *sql.DB, seasonID int, coinPrices map[int]float64, obj map[string]interface{}) error {
-	seasonName := obj["SEASON_NAME"].(string)
-	chkType := obj["TYPE"].(string)
-	seasonUpdateKey := obj["SEASON_UPDATE_KEY"].(string)
+func UpdateSeason(ctx context.Context, db *sql.DB, cfg config.Config, seasonID int, coinPrices map[int]float64) error {
+	seasonName := cfg.SeasonName
+	chkType := cfg.Mode
 
 	// errgroup.WithContext는 컨텍스트와 함께 새로운 Group을 생성합니다.
 	// Group 내의 고루틴 중 하나라도 에러를 반환하면, Group의 Context는 취소되고
@@ -53,7 +53,7 @@ func UpdateSeason(ctx context.Context, db *sql.DB, seasonID int, coinPrices map[
 	}
 
 	// NotifySeasonUpdate 함수를 호출하여 스프링 서버에 시즌 업데이트 요청
-	if err := NotifySeasonUpdate(ctx, seasonUpdateKey, "season"); err != nil {
+	if err := NotifySeasonUpdate(ctx, cfg.BackendURL, cfg.SchedulerKey, "season"); err != nil {
 		return fmt.Errorf("NotifySeasonUpdate 에러: %w", err)
 	}
 
@@ -304,39 +304,26 @@ func updateSeasonRewardCalculated(ctx context.Context, db *sql.DB, seasonID int)
 	return nil
 }
 
-// NotifySeasonUpdate 내 스프링 서버에 시즌/스플릿 업데이트 요청을 보냅니다.
-func NotifySeasonUpdate(ctx context.Context, seasonUpdateKey string, seasonFlag string) error {
-	apiURL := "https://api.bitground.kr/seasons/update"
-
-	// Context를 활용한 HTTP 요청 (타임아웃: 10초)
+// NotifySeasonUpdate 백엔드에 시즌/스플릿 완료를 알립니다. (예약 주문 정리, 사용자 알림)
+// 공유 키는 본문이 아니라 헤더로 보낸다.
+func NotifySeasonUpdate(ctx context.Context, backendURL, schedulerKey, seasonFlag string) error {
 	reqCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	// POST 요청을 위한 폼 데이터 생성
-	formData := fmt.Sprintf("secretKey=%s&seasonFlag=%s", seasonUpdateKey, seasonFlag)
-
-	req, err := http.NewRequestWithContext(reqCtx, "POST", apiURL, strings.NewReader(formData))
+	form := url.Values{"seasonFlag": {seasonFlag}}
+	req, err := http.NewRequestWithContext(reqCtx, http.MethodPost, backendURL+"/seasons/update", strings.NewReader(form.Encode()))
 	if err != nil {
 		return fmt.Errorf("HTTP 요청 생성 에러: %w", err)
 	}
-
-	// Content-Type 헤더 설정
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("X-Scheduler-Key", schedulerKey)
 
-	// 요청 보내기
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("API 요청 에러: %w", err)
 	}
-	defer func(Body io.ReadCloser) {
-		// 응답 본문을 닫아 리소스 누수 방지
-		if err := Body.Close(); err != nil {
-			log.Printf("응답 본문 닫기 에러: %v\n", err)
-		}
-	}(resp.Body)
+	defer resp.Body.Close()
 
-	// 응답 확인
 	// 백엔드는 처리 완료 시 204 No Content를 반환하므로 2xx 전체를 성공으로 본다
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return fmt.Errorf("서버 응답 에러: 상태 코드 %d", resp.StatusCode)

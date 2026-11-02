@@ -3,11 +3,7 @@ package service
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
-	"io"
-	"log"
-	"net/http"
 	"time"
 )
 
@@ -66,33 +62,9 @@ func getMarketCap(ctx context.Context) ([]GeckoCoin, error) {
 		"cro",
 	}
 
-	// Context를 활용한 HTTP 요청 (타임아웃: 30초)
-	reqCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-
-	req, err := http.NewRequestWithContext(reqCtx, "GET", apiURL, nil)
-	if err != nil {
-		return nil, fmt.Errorf("HTTP 요청 생성 에러: %w", err)
-	}
-
-	// API 요청 보내기
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("API 요청 에러: %w", err)
-	}
-	defer func(Body io.ReadCloser) {
-		// 응답 본문을 닫아 리소스 누수 방지
-		if err := Body.Close(); err != nil {
-			log.Printf("응답 본문 닫기 에러: %v\n", err)
-		}
-	}(resp.Body)
-
-	// JSON 응답을 Coin 슬라이스로 디코딩
 	var coins []GeckoCoin
-	err = json.NewDecoder(resp.Body).Decode(&coins)
-	if err != nil {
-		return nil, fmt.Errorf("JSON 디코딩 에러: %w", err)
+	if err := getJSON(ctx, apiURL, 30*time.Second, &coins); err != nil {
+		return nil, err
 	}
 
 	// 제외할 종목 필터링

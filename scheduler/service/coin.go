@@ -5,12 +5,9 @@ import (
 	"Bitground-go/util"
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"golang.org/x/sync/errgroup"
-	"io"
 	"log"
-	"net/http"
 	"time"
 )
 
@@ -65,33 +62,9 @@ func UpdateCoins(ctx context.Context, db *sql.DB) error {
 func getSymbolList(ctx context.Context) ([]model.UpbitCoinList, error) {
 	apiURL := "https://api.upbit.com/v1/market/all?is_details=true"
 
-	// Context를 활용한 HTTP 요청 (타임아웃: 10초)
-	reqCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-
-	req, err := http.NewRequestWithContext(reqCtx, "GET", apiURL, nil)
-	if err != nil {
-		return nil, fmt.Errorf("HTTP 요청 생성 에러: %w", err)
-	}
-
-	// API 요청 보내기
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("API 요청 에러: %w", err)
-	}
-	defer func(Body io.ReadCloser) {
-		// 응답 본문을 닫아 리소스 누수 방지
-		if err := Body.Close(); err != nil {
-			log.Printf("응답 본문 닫기 에러: %v\n", err)
-		}
-	}(resp.Body)
-
-	// JSON 응답을 Coin 슬라이스로 디코딩
 	var coins []model.UpbitCoinList
-	err = json.NewDecoder(resp.Body).Decode(&coins)
-	if err != nil {
-		return nil, fmt.Errorf("JSON 디코딩 에러: %w", err)
+	if err := getJSON(ctx, apiURL, 10*time.Second, &coins); err != nil {
+		return nil, err
 	}
 
 	// "KRW-"로 시작하는 코인 심볼 필터링
@@ -110,32 +83,9 @@ func getSymbolList(ctx context.Context) ([]model.UpbitCoinList, error) {
 func getCoinDetails(ctx context.Context) (map[string]model.UpbitCoinPrice, error) {
 	apiURL := "https://api.upbit.com/v1/ticker/all?quote_currencies=KRW"
 
-	// Context를 활용한 HTTP 요청 (타임아웃: 10초)
-	reqCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-
-	req, err := http.NewRequestWithContext(reqCtx, "GET", apiURL, nil)
-	if err != nil {
-		return nil, fmt.Errorf("HTTP 요청 생성 에러: %w", err)
-	}
-
-	// API 요청 보내기
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("API 요청 에러: %w", err)
-	}
-	defer func(Body io.ReadCloser) {
-		if err := Body.Close(); err != nil {
-			log.Printf("응답 본문 닫기 에러: %v\n", err)
-		}
-	}(resp.Body)
-
-	// 응답 본문 읽기
 	var coinDetails []model.UpbitCoinPrice
-	err = json.NewDecoder(resp.Body).Decode(&coinDetails)
-	if err != nil {
-		return nil, fmt.Errorf("JSON 디코딩 에러: %w", err)
+	if err := getJSON(ctx, apiURL, 10*time.Second, &coinDetails); err != nil {
+		return nil, err
 	}
 
 	// 코인 심볼을 키로 하는 맵 생성

@@ -5,12 +5,9 @@ import (
 	"Bitground-go/util"
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"golang.org/x/sync/errgroup"
-	"io"
 	"log"
-	"net/http"
 	"time"
 )
 
@@ -321,29 +318,9 @@ func dropTempRankingTable(ctx context.Context, db *sql.DB) {
 func getAllCoinsCurrentPrice(ctx context.Context, symbolMap map[string]int) (map[int]float64, map[int]model.UpbitCoinPrice, error) {
 	apiURL := "https://api.upbit.com/v1/ticker/all?quote_currencies=KRW"
 
-	reqCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-
-	req, err := http.NewRequestWithContext(reqCtx, "GET", apiURL, nil)
-	if err != nil {
-		return nil, nil, fmt.Errorf("HTTP 요청 생성 에러: %w", err)
-	}
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, nil, fmt.Errorf("API 요청 에러: %w", err)
-	}
-	defer func(Body io.ReadCloser) {
-		if err := Body.Close(); err != nil {
-			log.Printf("응답 본문 닫기 에러: %v\n", err)
-		}
-	}(resp.Body)
-
 	var upbitPrices []model.UpbitCoinPrice
-	err = json.NewDecoder(resp.Body).Decode(&upbitPrices)
-	if err != nil {
-		return nil, nil, fmt.Errorf("JSON 디코딩 에러: %w", err)
+	if err := getJSON(ctx, apiURL, 10*time.Second, &upbitPrices); err != nil {
+		return nil, nil, err
 	}
 
 	coinPrices := make(map[int]float64)

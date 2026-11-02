@@ -1,14 +1,14 @@
 package service
 
 import (
+	"Bitground-go/config"
 	"context"
 	"database/sql"
 	"fmt"
 	"time"
 )
 
-func UpdateSplit(ctx context.Context, db *sql.DB, obj map[string]interface{}) error {
-	seasonUpdateKey := obj["SEASON_UPDATE_KEY"].(string)
+func UpdateSplit(ctx context.Context, db *sql.DB, cfg config.Config) error {
 	// db에서 모든 탈퇴하지 않은 유저의 자산을 천만 씩 추가
 
 	// 쿼리 타임아웃 설정 (10초)
@@ -27,7 +27,7 @@ func UpdateSplit(ctx context.Context, db *sql.DB, obj map[string]interface{}) er
 	}
 
 	// NotifySeasonUpdate 함수를 호출하여 스프링 서버에 시즌 업데이트 요청
-	if err := NotifySeasonUpdate(ctx, seasonUpdateKey, "split"); err != nil {
+	if err := NotifySeasonUpdate(ctx, cfg.BackendURL, cfg.SchedulerKey, "split"); err != nil {
 		return fmt.Errorf("NotifySeasonUpdate 에러: %w", err)
 	}
 

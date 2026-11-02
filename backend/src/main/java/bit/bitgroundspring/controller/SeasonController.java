@@ -41,12 +41,20 @@ public class SeasonController {
         return ResponseEntity.ok(currentId);
     }
     
+    /**
+     * 스케줄러(Go)가 시즌 정산·스플릿 완료를 알리는 내부 API
+     * 공유 키는 X-Scheduler-Key 헤더로 받는다 (쿼리·본문에 두면 접근 로그에 남을 수 있음)
+     */
     @PostMapping("/update")
-    public ResponseEntity<Void> updateSeasons(@RequestParam String secretKey,
+    public ResponseEntity<Void> updateSeasons(@RequestHeader(name = "X-Scheduler-Key", required = false) String schedulerKey,
                                               @RequestParam String seasonFlag) {
-        // 스케줄러(Go)만 호출하는 내부 API. 공유 키는 시간 비교 공격을 피하도록 상수 시간 비교
-        if (!MessageDigest.isEqual(secretKey.getBytes(StandardCharsets.UTF_8), seasonUpdateKey.getBytes(StandardCharsets.UTF_8))) {
+        // 시간 비교 공격을 피하도록 상수 시간 비교
+        if (schedulerKey == null
+                || !MessageDigest.isEqual(schedulerKey.getBytes(StandardCharsets.UTF_8), seasonUpdateKey.getBytes(StandardCharsets.UTF_8))) {
             throw new BusinessException(ErrorCode.INVALID_SECRET_KEY);
+        }
+        if (!seasonFlag.equals("season") && !seasonFlag.equals("split")) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT, "seasonFlag는 season 또는 split이어야 합니다.");
         }
         orderService.seasonUpdate(seasonFlag);
         return ResponseEntity.noContent().build();
