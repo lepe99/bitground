@@ -5,6 +5,7 @@ import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
@@ -53,14 +54,15 @@ public class Order {
     @Builder.Default
     private Status status = Status.PENDING;
     
-    @Column(name = "reserve_price")
-    private Float reservePrice;
+    // 가격·수량은 DECIMAL/BigDecimal (부동소수점 반올림 오차 방지)
+    @Column(name = "reserve_price", precision = 24, scale = 8)
+    private BigDecimal reservePrice;
     
-    @Column(name = "trade_price", columnDefinition = "DOUBLE")
-    private Double tradePrice;
+    @Column(name = "trade_price", precision = 24, scale = 8)
+    private BigDecimal tradePrice;
     
-    @Column(name = "amount", nullable = false, columnDefinition = "DOUBLE")
-    private Double amount;
+    @Column(name = "amount", nullable = false, precision = 30, scale = 10)
+    private BigDecimal amount;
     
     @UpdateTimestamp
     @Column(name = "updated_at", nullable = false, columnDefinition = "datetime(6) DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6)")

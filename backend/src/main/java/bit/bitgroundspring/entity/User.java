@@ -49,8 +49,9 @@ public class User {
     @Builder.Default
     private Role role = Role.ROLE_USER;
     
-    @Column(name = "cash", nullable = false, columnDefinition = "int")
-    private Integer cash;
+    // 원 단위 현금 (INT는 약 21억 원에서 넘침)
+    @Column(name = "cash", nullable = false)
+    private Long cash;
     
     @JdbcTypeCode(SqlTypes.TINYINT)
     

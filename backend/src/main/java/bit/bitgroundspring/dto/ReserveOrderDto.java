@@ -5,6 +5,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Data
@@ -14,11 +15,11 @@ public class ReserveOrderDto {
     private Integer id;
     private String coinName;
     private String symbol;
-    private Double amount;
-    private Double reservePrice;
-    private Double tradePrice;
+    private BigDecimal amount;
+    private BigDecimal reservePrice;
+    private BigDecimal tradePrice;
     private LocalDateTime orderTime;
-    private Double remainingQuantity;
+    private BigDecimal remainingQuantity;
     private String orderType;
 
     public static ReserveOrderDto from(Order order) {
@@ -27,7 +28,7 @@ public class ReserveOrderDto {
                 .coinName(order.getCoin().getKoreanName())
                 .symbol(order.getCoin().getSymbol())
                 .amount(order.getAmount())
-                .reservePrice(order.getReservePrice() != null ? (double) order.getReservePrice() : null)
+                .reservePrice(order.getReservePrice())
                 .tradePrice(order.getTradePrice())
                 .orderTime(order.getCreatedAt())
                 .remainingQuantity(order.getAmount()) // 체결 수량 없다면 전체 = 남은 수량

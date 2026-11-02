@@ -1,6 +1,11 @@
 # 비밀값과 환경별 값은 환경변수로 주입한다.
 # 로컬에서는 backend/.env 파일을 읽는다 (.env.example 참고, 커밋 금지).
 spring:
+  # BigDecimal 금액·수량을 1E-8 같은 지수 표기 없이 숫자 그대로 응답
+  jackson:
+    generator:
+      write-bigdecimal-as-plain: true
+
   application.name: bitground
   config:
     import: optional:file:.env[.properties]

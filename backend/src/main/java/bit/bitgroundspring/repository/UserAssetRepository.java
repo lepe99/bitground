@@ -29,9 +29,9 @@ public interface UserAssetRepository extends JpaRepository<UserAsset, Integer> {
     SELECT
         ua.coin.symbol as symbol,
         CASE
-            WHEN COALESCE(SUM(o.amount), 0.0) <= ua.amount
-            THEN ua.amount - COALESCE(SUM(o.amount), 0.0)
-            ELSE 0.0
+            WHEN COALESCE(SUM(o.amount), 0) <= ua.amount
+            THEN ua.amount - COALESCE(SUM(o.amount), 0)
+            ELSE 0
         END as amount,
         ua.avgPrice as avgPrice
     FROM UserAsset ua
@@ -45,9 +45,9 @@ public interface UserAssetRepository extends JpaRepository<UserAsset, Integer> {
     WHERE ua.user.id = :userId
     GROUP BY ua.coin.id, ua.coin.symbol, ua.amount, ua.avgPrice
     HAVING CASE
-        WHEN COALESCE(SUM(o.amount), 0.0) <= ua.amount
-        THEN ua.amount - COALESCE(SUM(o.amount), 0.0)
-        ELSE 0.0
+        WHEN COALESCE(SUM(o.amount), 0) <= ua.amount
+        THEN ua.amount - COALESCE(SUM(o.amount), 0)
+        ELSE 0
     END > 0
     """)
     List<UserAssetProjection> findUserAssetsWithAvailableAmount(@Param("userId") Integer userId);

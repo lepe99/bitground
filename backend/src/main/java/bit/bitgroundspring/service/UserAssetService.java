@@ -29,7 +29,7 @@ public class UserAssetService {
      */
     @Transactional(readOnly = true)
     public UserAssetResponse getUserAssets(Integer userId) {
-        Integer cash = getAvailableCash(userId);
+        Long cash = getAvailableCash(userId);
         
         // 사용자 자산 조회 (projection 사용)
         List<UserAssetProjection> userAssets = userAssetRepository
@@ -43,18 +43,12 @@ public class UserAssetService {
         return userAssetRepository.findByUserId(userId);
     }
 
-    public Integer getAvailableCash(Integer userId) {
-        // 사용자 현금 조회
-        int cash = userRepository.findById(userId)
+    public Long getAvailableCash(Integer userId) {
+        // 사용자 현금에서 예약 매수에 묶인 금액을 뺀 주문 가능 금액
+        long cash = userRepository.findById(userId)
                 .map(User::getCash)
-                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
-
-        Integer reservedCash = orderRepository.calculateTotalReservePriceForBuyOrdersByUserId(userId);
-        // 현금에서 예약된 금액 차감
-        if (reservedCash == null) {
-            reservedCash = 0; // 예약된 금액이 없으면 0으로 설정
-        }
-        cash -= reservedCash;
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND))
+                - orderRepository.reservedBuyCash(userId);
 
         // 예약 금액이 현금보다 크면(데이터 불일치) 화면이 깨지지 않도록 0으로 보정
         return Math.max(cash, 0);

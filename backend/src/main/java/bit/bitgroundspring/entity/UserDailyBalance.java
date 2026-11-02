@@ -58,13 +58,13 @@ public class UserDailyBalance {
     private LocalDate snapshotDate; // 스냅샷 기록 시각
 
     @Column(name = "total_value", nullable = false)
-    private Integer totalValue; // 해당 시점의 총 자산 가치
+    private Long totalValue; // 해당 시점의 총 자산 가치
 
     @Column(name = "cash_balance", nullable = false)
-    private Integer cashBalance; // 해당 시점의 현금 잔고
+    private Long cashBalance; // 해당 시점의 현금 잔고
 
     @Column(name = "coin_holdings_value", nullable = false)
-    private Integer coinHoldingsValue; // 해당 시점의 보유 코인 평가액 합계
+    private Long coinHoldingsValue; // 해당 시점의 보유 코인 평가액 합계
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false, columnDefinition = "datetime(6) DEFAULT CURRENT_TIMESTAMP(6)")

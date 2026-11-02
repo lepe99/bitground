@@ -31,12 +31,12 @@ public class OrderNotificationListener {
     @TransactionalEventListener(fallbackExecution = true)
     public void onReserveOrderExecuted(ReserveOrderExecutedEvent event) {
         try {
-            int cash = userRepository.findById(event.userId()).map(User::getCash).orElse(0);
+            long cash = userRepository.findById(event.userId()).map(User::getCash).orElse(0L);
             Map<String, Object> data = Map.of(
                     "orderType", event.orderType().name(),
                     "symbol", event.symbol(),
                     "amount", event.amount(),
-                    "tradePrice", (float) event.tradePrice(),
+                    "tradePrice", event.tradePrice(),
                     "cash", cash
             );
             userSseEmitters.notifyOrderExecution(event.userId(), NotificationResponse.builder()

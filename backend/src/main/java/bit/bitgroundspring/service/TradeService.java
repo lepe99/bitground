@@ -3,6 +3,7 @@ package bit.bitgroundspring.service;
 import bit.bitgroundspring.aop.Loggable;
 import bit.bitgroundspring.common.error.BusinessException;
 import bit.bitgroundspring.common.error.ErrorCode;
+import bit.bitgroundspring.common.money.Money;
 import bit.bitgroundspring.dto.OrderRequestDto;
 import bit.bitgroundspring.dto.response.OrderResponseDto;
 import bit.bitgroundspring.entity.*;
@@ -19,10 +20,11 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -45,7 +47,7 @@ public class TradeService {
     @Loggable("시장가 주문")
     public OrderResponseDto placeOrder(Integer userId, OrderRequestDto req) {
         validateRequest(req);
-        double qty;
+        BigDecimal qty;
         // 1) 사용자 & 코인 엔티티 로드 (락 모드로 동시성 방어)
         User user = userRepository.findByIdWithPessimisticLock(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
@@ -56,23 +58,23 @@ public class TradeService {
         Season season = seasonRepository.findByStatus(Status.PENDING)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NO_ACTIVE_SEASON));
         
-        // 2) 현재 시장가 조회
+        // 2) 현재 시장가 조회 (float로 받으면 큰 가격에서 자릿수가 잘리므로 문자열 그대로 BigDecimal로)
         String url = tickerUrl.replace("{symbol}", req.getSymbol());
         ResponseEntity<List<Map<String,Object>>> resp = restTemplate.exchange(
                 url, HttpMethod.GET, HttpEntity.EMPTY,
                 new org.springframework.core.ParameterizedTypeReference<>() {}
         );
-        float marketPrice = ((Number)resp.getBody().get(0).get("trade_price")).floatValue();
+        BigDecimal marketPrice = new BigDecimal(resp.getBody().get(0).get("trade_price").toString());
 
         // 3) 주문 종류 분기
-        boolean isLimitOrder = req.getReservePrice() != null;
-        double execPrice = marketPrice;
+        BigDecimal execPrice = marketPrice;
         LocalDateTime now = LocalDateTime.now();
 
-        if (isLimitOrder) {
-            double limitPrice = req.getReservePrice();
-            double diffRatio = Math.abs(limitPrice - marketPrice) / marketPrice;
-            if (diffRatio > SLIPPAGE_TOLERANCE) {
+        if (req.getReservePrice() != null) {
+            BigDecimal limitPrice = Money.price(Money.of(req.getReservePrice()));
+            BigDecimal diffRatio = limitPrice.subtract(marketPrice).abs()
+                    .divide(marketPrice, Money.PRICE_SCALE, RoundingMode.HALF_UP);
+            if (diffRatio.compareTo(BigDecimal.valueOf(SLIPPAGE_TOLERANCE)) > 0) {
                 throw new BusinessException(ErrorCode.PRICE_OUT_OF_RANGE);
             }
             execPrice = limitPrice;
@@ -84,55 +86,48 @@ public class TradeService {
                 .orElseGet(() -> UserAsset.builder()
                         .user(user)
                         .coin(coin)
-                        .amount(0d)
-                        .avgPrice(0d)
+                        .amount(BigDecimal.ZERO)
+                        .avgPrice(BigDecimal.ZERO)
                         .build());
 
         if (isBuy) {
-            int rawTotalPrice = req.getTotalPrice();
+            // 주문 금액(원)으로 살 수 있는 수량을 버림으로 계산하고, 평균 매입가에는 실제 낸 금액을 반영
+            long totalPrice = req.getTotalPrice();
             // 예약 매수에 묶인 금액을 제외한 가용 현금 기준으로 확인
-            int reservedCash = Optional.ofNullable(
-                    orderRepository.calculateTotalReservePriceForBuyOrdersByUserId(userId)).orElse(0);
-            if (user.getCash() - reservedCash < rawTotalPrice) {
+            if (user.getCash() - orderRepository.reservedBuyCash(userId) < totalPrice) {
                 throw new BusinessException(ErrorCode.INSUFFICIENT_CASH);
             }
-            user.setCash(user.getCash() - rawTotalPrice);
-            execPrice = isLimitOrder ? req.getReservePrice() : marketPrice;
-            qty = rawTotalPrice / execPrice;
-            qty = Math.floor(qty * 1e10) / 1e10;
+            qty = Money.quantityFor(totalPrice, execPrice);
+            if (qty.signum() == 0) {
+                throw new BusinessException(ErrorCode.INVALID_ORDER, "주문 금액이 너무 적습니다.");
+            }
+            user.setCash(user.getCash() - totalPrice);
 
-            double newQty   = asset.getAmount() + qty;
-            double newTotal = asset.getAmount() * asset.getAvgPrice() + rawTotalPrice;
-            double newAvg   = newTotal / newQty;
-            newAvg = Math.floor(newAvg * 1e10) / 1e10;
-
+            BigDecimal newQty = asset.getAmount().add(qty);
+            BigDecimal newCost = asset.getAmount().multiply(asset.getAvgPrice()).add(BigDecimal.valueOf(totalPrice));
             asset.setAmount(newQty);
-            asset.setAvgPrice(newAvg);
-
+            asset.setAvgPrice(newCost.divide(newQty, Money.PRICE_SCALE, RoundingMode.HALF_UP));
             assetRepository.save(asset);
-            userRepository.save(user);
 
         } else {  // SELL
-            qty = req.getAmount();
-            double rawCost = qty * execPrice;
-            int cost = (int) Math.floor(rawCost);
-            final float EPS = 0.00000001f;
-            double currentAmt = asset.getAmount();
+            qty = Money.quantity(Money.of(req.getAmount()));
+            BigDecimal currentAmt = asset.getAmount();
             // 예약 매도에 묶인 수량을 제외한 가용 수량 기준으로 확인
-            double reservedAmt = asset.getId() == null ? 0d
+            BigDecimal reservedAmt = asset.getId() == null ? BigDecimal.ZERO
                     : orderRepository.sumPendingSellAmount(userId, coin.getId());
-            if (currentAmt - reservedAmt + EPS < qty) throw new BusinessException(ErrorCode.INSUFFICIENT_ASSET);
+            if (qty.signum() == 0 || currentAmt.subtract(reservedAmt).compareTo(qty) < 0) {
+                throw new BusinessException(ErrorCode.INSUFFICIENT_ASSET);
+            }
 
-            user.setCash(user.getCash() + cost);
+            // 받는 돈은 원 단위 내림
+            user.setCash(user.getCash() + Money.krwFloor(execPrice, qty));
 
-            double remaining = currentAmt - qty;
-            if (remaining < EPS) {
+            BigDecimal remaining = currentAmt.subtract(qty);
+            if (remaining.signum() == 0) {
                 assetRepository.delete(asset);
             } else {
                 asset.setAmount(remaining);
-                assetRepository.save(asset);
             }
-            userRepository.save(user);
         }
 
         Order order = Order.builder()
@@ -142,7 +137,7 @@ public class TradeService {
                 .orderType(req.getOrderType())
                 .status(Status.COMPLETED)
                 .tradePrice(execPrice)
-                .amount(Math.abs(qty))
+                .amount(qty)
                 .createdAt(now)
                 .updatedAt(now)
                 .build();

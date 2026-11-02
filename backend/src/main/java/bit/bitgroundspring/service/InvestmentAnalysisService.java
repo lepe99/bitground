@@ -62,7 +62,7 @@ public class InvestmentAnalysisService {
         Optional<UserRanking> userRankingOptional = userRankingRepository.findByUserAndSeason(user, season);
         UserRanking userRanking = userRankingOptional.orElse(null);
 
-        Integer initialCashBalance = initialCashUtil.getInitialCash();
+        Long initialCashBalance = (long) initialCashUtil.getInitialCash();
 
         // 2. 거래 활동 요약 (Order 엔티티 기반)
         // season.getStatus() == Status.COMPLETED 조건 확인
@@ -78,7 +78,7 @@ public class InvestmentAnalysisService {
                 .count();
 
         Float totalTradeValueSum = completedOrders.stream()
-                .map(order -> (float)(order.getTradePrice() * order.getAmount()))
+                .map(order -> order.getTradePrice().multiply(order.getAmount()).floatValue())
                 .reduce(0.0F, Float::sum);
         Float avgTradeAmount = (totalTradeCount > 0)
                 ? totalTradeValueSum / totalTradeCount
@@ -98,7 +98,7 @@ public class InvestmentAnalysisService {
             Float coinSellValue = 0.0F;
 
             for (Order order : coinOrders) {
-                Float tradeValue = (float)(order.getTradePrice() * order.getAmount());
+                Float tradeValue = order.getTradePrice().multiply(order.getAmount()).floatValue();
                 if (order.getOrderType() == OrderType.BUY) {
                     coinBuyValue += tradeValue;
                 } else if (order.getOrderType() == OrderType.SELL) {
@@ -121,7 +121,7 @@ public class InvestmentAnalysisService {
             Map<String, Float> coinVolumes = new HashMap<>();
             for (Order order : completedOrders) {
                 String symbol = order.getCoin().getSymbol();
-                Float tradeVolume = (float)(order.getTradePrice() * order.getAmount());
+                Float tradeVolume = order.getTradePrice().multiply(order.getAmount()).floatValue();
                 coinVolumes.put(symbol, coinVolumes.getOrDefault(symbol, 0.0F) + tradeVolume);
             }
 
@@ -225,8 +225,8 @@ public class InvestmentAnalysisService {
         // ⭐⭐ 수정된 부분: finalTotalValue와 totalProfitLossAmount/Percentage 재계산 ⭐⭐
         // 시즌이 COMPLETED 상태라면, 모든 자산이 매도 처리되어 totalRealizedProfitLoss에 반영되었다고 가정합니다.
         // 따라서 최종 총 자산은 초기 자산 + 총 실현 손익으로 계산합니다.
-        Integer finalTotalValue;
-        Integer totalProfitLossAmountRecalculated; // 기존 totalProfitLossAmount와 구분
+        Long finalTotalValue;
+        Long totalProfitLossAmountRecalculated; // 기존 totalProfitLossAmount와 구분
         Float totalProfitLossPercentageRecalculated; // 기존 totalProfitLossPercentage와 구분
 
         if (season.getStatus() == Status.COMPLETED) {

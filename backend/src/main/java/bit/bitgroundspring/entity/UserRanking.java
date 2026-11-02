@@ -55,7 +55,7 @@ public class UserRanking {
     private Integer ranks;
     
     @Column(name = "total_value", nullable = false)
-    private Integer totalValue;
+    private Long totalValue;
     
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, columnDefinition = "timestamp(6) DEFAULT CURRENT_TIMESTAMP(6)")

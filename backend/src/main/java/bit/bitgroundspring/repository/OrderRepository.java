@@ -13,6 +13,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -84,9 +86,9 @@ public interface OrderRepository extends JpaRepository<Order, Integer> {
     @Query("SELECT o FROM Order o JOIN FETCH o.coin WHERE o.id = :id")
     Optional<Order> findByIdForUpdate(@Param("id") Integer id);
     
-    // 거래 가능 자산 조회 위한 메서드
+    // 현재 시즌 예약 매수에 묶인 금액 합계 (예약가 × 수량)
     @Query("""
-        SELECT CAST(ROUND(SUM(o.reservePrice * o.amount)) AS integer)
+        SELECT SUM(o.reservePrice * o.amount)
         FROM Order o
         WHERE o.user.id = :userId
           AND o.status = 'PENDING'
@@ -97,11 +99,17 @@ public interface OrderRepository extends JpaRepository<Order, Integer> {
               WHERE s.status = 'PENDING'
           )
     """)
-    Integer calculateTotalReservePriceForBuyOrdersByUserId(@Param("userId") Integer userId);
+    BigDecimal sumPendingBuyCost(@Param("userId") Integer userId);
+
+    /** 예약 매수에 묶인 현금 (원 단위 올림, 없으면 0) */
+    default long reservedBuyCash(Integer userId) {
+        BigDecimal sum = sumPendingBuyCost(userId);
+        return sum == null ? 0 : sum.setScale(0, RoundingMode.CEILING).longValueExact();
+    }
 
     // 현재 시즌에 체결 대기 중인 예약 매도 수량 (해당 코인)
     @Query("""
-        SELECT COALESCE(SUM(o.amount), 0.0)
+        SELECT COALESCE(SUM(o.amount), 0)
         FROM Order o
         WHERE o.user.id = :userId
           AND o.coin.id = :coinId
@@ -113,7 +121,7 @@ public interface OrderRepository extends JpaRepository<Order, Integer> {
               WHERE s.status = 'PENDING'
           )
     """)
-    Double sumPendingSellAmount(@Param("userId") Integer userId, @Param("coinId") Integer coinId);
+    BigDecimal sumPendingSellAmount(@Param("userId") Integer userId, @Param("coinId") Integer coinId);
 
     //미체결
     @Query("SELECT o FROM Order o " +

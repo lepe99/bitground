@@ -58,19 +58,19 @@ public class AssetSummaryService {
                     .seasonName(season.getName())
                     .seasonStartAt(season.getStartAt())
                     .seasonEndAt(season.getEndAt())
-                    .initialCashBalance(0) // Integer 기본값으로 수정
-                    .finalTotalValue(0)    // Integer 기본값으로 수정
-                    .totalProfitLossAmount(0) // Integer 기본값으로 수정
+                    .initialCashBalance(0L)
+                    .finalTotalValue(0L)
+                    .totalProfitLossAmount(0L)
                     .totalProfitLossPercentage(0.0f)
                     .build();
         }
 
-        // UserDailyBalance 엔티티의 totalValue가 Integer이므로 Integer로 받습니다.
-        Integer initialTotalValue = dailyBalances.get(0).getTotalValue();
-        Integer finalTotalValue = dailyBalances.get(dailyBalances.size() - 1).getTotalValue();
+        // 총자산은 원 단위 long (21억 원을 넘을 수 있음)
+        Long initialTotalValue = dailyBalances.get(0).getTotalValue();
+        Long finalTotalValue = dailyBalances.get(dailyBalances.size() - 1).getTotalValue();
 
-        // 총 손익 금액 계산 (Integer)
-        Integer totalProfitLossAmount = finalTotalValue - initialTotalValue;
+        // 총 손익 금액 계산
+        Long totalProfitLossAmount = finalTotalValue - initialTotalValue;
 
         // 총 수익률 계산 (Float으로 형변환하여 소수점 계산)
         Float totalProfitLossPercentage = 0.0f;
@@ -85,9 +85,9 @@ public class AssetSummaryService {
                 .seasonName(season.getName())
                 .seasonStartAt(season.getStartAt())
                 .seasonEndAt(season.getEndAt())
-                .initialCashBalance(initialTotalValue) // Integer 값 전달
-                .finalTotalValue(finalTotalValue)    // Integer 값 전달
-                .totalProfitLossAmount(totalProfitLossAmount) // Integer 값 전달
+                .initialCashBalance(initialTotalValue)
+                .finalTotalValue(finalTotalValue)
+                .totalProfitLossAmount(totalProfitLossAmount)
                 .totalProfitLossPercentage(totalProfitLossPercentage) // Float 값 전달
                 .finalRank(null)
                 .totalTradeCount(null)

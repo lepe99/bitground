@@ -5,6 +5,7 @@ import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
@@ -38,11 +39,11 @@ public class UserAsset {
                     foreignKeyDefinition = "FOREIGN KEY (symbol_id) REFERENCES coins(id) ON DELETE CASCADE"))
     private Coin coin;
     
-    @Column(name = "amount", nullable = false, columnDefinition = "DOUBLE")
-    private Double amount;
+    @Column(name = "amount", nullable = false, precision = 30, scale = 10)
+    private BigDecimal amount;
     
-    @Column(name = "avg_price", nullable = false, columnDefinition = "DOUBLE")
-    private Double avgPrice;
+    @Column(name = "avg_price", nullable = false, precision = 24, scale = 8)
+    private BigDecimal avgPrice;
     
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, columnDefinition = "datetime(6) DEFAULT CURRENT_TIMESTAMP(6)")

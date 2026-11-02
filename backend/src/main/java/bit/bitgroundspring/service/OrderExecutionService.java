@@ -3,6 +3,7 @@ package bit.bitgroundspring.service;
 import bit.bitgroundspring.common.error.BusinessException;
 import bit.bitgroundspring.common.error.ErrorCode;
 import bit.bitgroundspring.common.logging.TraceIdFilter;
+import bit.bitgroundspring.common.money.Money;
 import bit.bitgroundspring.dto.TradeDto;
 import bit.bitgroundspring.entity.*;
 import bit.bitgroundspring.event.ReserveOrderExecutedEvent;
@@ -22,6 +23,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -41,10 +43,8 @@ public class OrderExecutionService {
     private static final int MAX_BATCH = 500;
     /** 이보다 오래 큐에 머문 요청은 체결 지연으로 기록 */
     private static final long LAG_WARN_MILLIS = 5_000;
-    private static final double EPS = 0.00000001;
-
-    /** 체결 큐 메시지 */
-    public record ExecutionRequest(int orderId, double price, long requestedAt) {
+    /** 체결 큐 메시지 (가격은 시세 원문 그대로 BigDecimal로 읽음) */
+    public record ExecutionRequest(int orderId, BigDecimal price, long requestedAt) {
     }
 
     private final OrderRepository orderRepository;
@@ -131,7 +131,7 @@ public class OrderExecutionService {
      * 주문 하나를 체결한다. 호출자의 트랜잭션 안에서 실행되며, 예외가 나면 전부 롤백된다.
      * 주문 행 → 사용자 행 순서로 잠가 취소·시장가 주문과 동시에 처리되지 않게 한다.
      */
-    public void executeOrder(int orderId, double executionPrice) {
+    public void executeOrder(int orderId, BigDecimal executionPrice) {
         Optional<Order> orderOpt = orderRepository.findByIdForUpdate(orderId)
                 .filter(order -> order.getStatus() == Status.PENDING);
         if (orderOpt.isEmpty()) {
@@ -142,8 +142,10 @@ public class OrderExecutionService {
         Order order = orderOpt.get();
         int userId = order.getUser().getId();
         OrderType orderType = order.getOrderType();
-        double amount = order.getAmount();
-        int tradeAmount = (int) (executionPrice * amount);
+        BigDecimal amount = order.getAmount();
+        BigDecimal price = Money.price(executionPrice);
+        // 내는 돈은 올림, 받는 돈은 내림 (원 단위)
+        long tradeAmount = orderType == OrderType.BUY ? Money.krwCeil(price, amount) : Money.krwFloor(price, amount);
 
         // 체결 시점에 잔액·보유 수량을 다시 확인
         User user = userRepository.findByIdWithPessimisticLock(userId)
@@ -151,7 +153,7 @@ public class OrderExecutionService {
         Optional<UserAsset> userAssetOptional = userAssetRepository.findByUserAndCoinWithLock(user, order.getCoin());
         boolean insufficient = orderType == OrderType.BUY
                 ? user.getCash() < tradeAmount
-                : userAssetOptional.map(a -> a.getAmount() + EPS < amount).orElse(true);
+                : userAssetOptional.map(a -> a.getAmount().compareTo(amount) < 0).orElse(true);
         if (insufficient) {
             orderRepository.delete(order);
             log.warn("Order {} cancelled at execution: insufficient {} for user {}",
@@ -160,22 +162,19 @@ public class OrderExecutionService {
         }
 
         order.setStatus(Status.COMPLETED);
-        order.setTradePrice(executionPrice);
+        order.setTradePrice(price);
         order.setUpdatedAt(LocalDateTime.now());
 
         user.setCash(orderType == OrderType.BUY ? user.getCash() - tradeAmount : user.getCash() + tradeAmount);
 
         if (userAssetOptional.isPresent()) {
             UserAsset userAsset = userAssetOptional.get();
-            double userAssetAmount = userAsset.getAmount();
             if (orderType == OrderType.BUY) {
-                userAsset.setAmount(userAssetAmount + amount);
-                userAsset.setAvgPrice(
-                        (userAsset.getAvgPrice() * userAssetAmount + executionPrice * amount)
-                                / (userAssetAmount + amount));
+                userAsset.setAvgPrice(Money.averagePrice(userAsset.getAmount(), userAsset.getAvgPrice(), amount, price));
+                userAsset.setAmount(userAsset.getAmount().add(amount));
             } else {
-                double remainingAmount = userAssetAmount - amount;
-                if (remainingAmount < EPS) {
+                BigDecimal remainingAmount = userAsset.getAmount().subtract(amount);
+                if (remainingAmount.signum() == 0) {
                     userAssetRepository.delete(userAsset);
                 } else {
                     userAsset.setAmount(remainingAmount);
@@ -186,17 +185,17 @@ public class OrderExecutionService {
                     .user(user)
                     .coin(order.getCoin())
                     .amount(amount)
-                    .avgPrice(executionPrice)
+                    .avgPrice(price)
                     .build());
         }
 
         // 커밋 후에만 리스너가 실행된다 (체결 내역 방송, 사용자 알림)
         Coin coin = order.getCoin();
         eventPublisher.publishEvent(new TradeExecutedEvent(new TradeDto(coin.getSymbol(), coin.getKoreanName(),
-                orderType, amount, executionPrice, order.getCreatedAt(), order.getUpdatedAt())));
+                orderType, amount, price, order.getCreatedAt(), order.getUpdatedAt())));
         eventPublisher.publishEvent(new ReserveOrderExecutedEvent(orderId, userId, coin.getSymbol(), orderType,
-                amount, executionPrice));
+                amount, price));
 
-        log.info("Order executed: {} at price {} for user {}", orderId, executionPrice, userId);
+        log.info("Order executed: {} at price {} for user {}", orderId, price.toPlainString(), userId);
     }
 }

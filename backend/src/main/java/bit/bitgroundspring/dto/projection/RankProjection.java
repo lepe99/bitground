@@ -8,7 +8,7 @@ public interface RankProjection {
     String getProfileImage();
     Integer getRanks();
     Integer getTier();
-    Integer getTotalValue();
+    Long getTotalValue();
     LocalDateTime getUpdatedAt();
     String getSeasonName();
 

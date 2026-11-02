@@ -1,5 +1,6 @@
 package bit.bitgroundspring.service;
 
+import bit.bitgroundspring.common.money.Money;
 import bit.bitgroundspring.aop.Loggable;
 import bit.bitgroundspring.common.error.BusinessException;
 import bit.bitgroundspring.common.error.ErrorCode;
@@ -17,6 +18,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -66,11 +68,12 @@ public class OrderService {
                     .filter(o -> o.getOrderType().name().equals("SELL"))
                     .toList();
 
-            double buyTotal = buys.stream().mapToDouble(o -> o.getTradePrice() * o.getAmount()).sum();
-            double sellTotal = sells.stream().mapToDouble(o -> o.getTradePrice() * o.getAmount()).sum();
+            // 합계는 BigDecimal로 정확히 구하고, 화면용 평균·수익률만 double로 바꾼다
+            double buyTotal = sumValue(buys).doubleValue();
+            double sellTotal = sumValue(sells).doubleValue();
 
-            double buyQty = buys.stream().mapToDouble(Order::getAmount).sum();
-            double sellQty = sells.stream().mapToDouble(Order::getAmount).sum();
+            double buyQty = sumQuantity(buys).doubleValue();
+            double sellQty = sumQuantity(sells).doubleValue();
 
             double avgBuy = buyQty == 0 ? 0 : buyTotal / buyQty;
             double avgSell = sellQty == 0 ? 0 : sellTotal / sellQty;
@@ -112,11 +115,13 @@ public class OrderService {
             String type = order.getOrderType().name().equals("BUY") ? "매수" : "매도";
 
             String coin = order.getCoin().getSymbol().replace("KRW-", "");
-            String qty = order.getAmount() + " " + coin;
+            String qty = order.getAmount().stripTrailingZeros().toPlainString() + " " + coin;
             String koreanName = order.getCoin().getKoreanName();
 
-            double price = order.getTradePrice();
-            double total = price * order.getAmount();
+            BigDecimal price = order.getTradePrice();
+            long total = order.getOrderType() == OrderType.BUY
+                    ? Money.krwCeil(price, order.getAmount())
+                    : Money.krwFloor(price, order.getAmount());
 
             return TradeDetailDto.builder()
                     .date(date)
@@ -155,27 +160,23 @@ public class OrderService {
                 .season(season)
                 .coin(coin)
                 .orderType(request.getOrderType())
-                .amount(request.getAmount())
-                .reservePrice(request.getReservePrice())
+                .amount(Money.quantity(Money.of(request.getAmount())))
+                .reservePrice(Money.price(Money.of(request.getReservePrice())))
                 .status(Status.PENDING)
                 .build();
         
-        // 주문 유효성 검사
+        // 주문 유효성 검사 (현재 시즌 미체결 예약 주문에 이미 묶인 현금·수량을 빼고 확인)
         if (request.getOrderType() == OrderType.BUY) {
-            // 기존 예약 매수가 없으면 합계가 null → 0으로 보고 반드시 잔액 확인 (기존: 확인을 건너뜀)
-            int totalReservePrice = Optional.ofNullable(
-                    orderRepository.calculateTotalReservePriceForBuyOrdersByUserId(user.getId())).orElse(0);
-            if (totalReservePrice + request.getAmount() * request.getReservePrice() > user.getCash()) {
+            long cost = Money.krwCeil(order.getReservePrice(), order.getAmount());
+            if (orderRepository.reservedBuyCash(user.getId()) + cost > user.getCash()) {
                 throw new BusinessException(ErrorCode.INSUFFICIENT_CASH);
             }
         } else if (request.getOrderType() == OrderType.SELL) {
-            Optional<UserAsset> userAsset = userAssetRepository.findByUserAndCoinWithLock(user, coin);
-            if (userAsset.isEmpty()) {
-                throw new BusinessException(ErrorCode.INSUFFICIENT_ASSET);
-            }
-            // 이미 걸어 둔 예약 매도 수량을 제외하고 확인 (같은 코인 중복 매도 예약 방지)
-            double reservedAmount = orderRepository.sumPendingSellAmount(user.getId(), coin.getId());
-            if (userAsset.get().getAmount() - reservedAmount < request.getAmount()) {
+            UserAsset userAsset = userAssetRepository.findByUserAndCoinWithLock(user, coin)
+                    .orElseThrow(() -> new BusinessException(ErrorCode.INSUFFICIENT_ASSET));
+            // 같은 코인 중복 매도 예약 방지
+            BigDecimal reservedAmount = orderRepository.sumPendingSellAmount(user.getId(), coin.getId());
+            if (userAsset.getAmount().subtract(reservedAmount).compareTo(order.getAmount()) < 0) {
                 throw new BusinessException(ErrorCode.INSUFFICIENT_ASSET);
             }
         }
@@ -189,7 +190,8 @@ public class OrderService {
     }
     
     private void validateOrderRequest(CreateOrderRequest request) {
-        if (request.getAmount() == null || request.getAmount() <= 0) {
+        // 수량은 소수 10자리까지만 저장하므로 그보다 작은 수량은 0으로 본다
+        if (request.getAmount() == null || Money.quantity(Money.of(Math.max(request.getAmount(), 0))).signum() <= 0) {
             throw new BusinessException(ErrorCode.INVALID_ORDER, "주문 수량은 0보다 커야 합니다.");
         }
         if (request.getReservePrice() == null || request.getReservePrice() <= 0) {
@@ -250,6 +252,14 @@ public class OrderService {
                 .data(data)
                 .build();
         userSseEmitters.sendToAll(notificationResponse);
+    }
+
+    private static BigDecimal sumValue(List<Order> orders) {
+        return orders.stream().map(o -> o.getTradePrice().multiply(o.getAmount())).reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private static BigDecimal sumQuantity(List<Order> orders) {
+        return orders.stream().map(Order::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     //미체결

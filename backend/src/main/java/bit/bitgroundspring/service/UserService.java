@@ -102,10 +102,11 @@ public class UserService {
         };
     }
 
-    public Integer getCashByUserId(Integer userId) {
+    @Transactional(readOnly = true)
+    public Long getCashByUserId(Integer userId) {
         return userRepository.findById(userId)
-                .map(user -> user.getCash())
-                .orElse(0);
+                .map(User::getCash)
+                .orElse(0L);
     }
 
 }

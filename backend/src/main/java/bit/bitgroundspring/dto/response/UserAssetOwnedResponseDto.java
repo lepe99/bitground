@@ -13,7 +13,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class UserAssetOwnedResponseDto {
-    private Integer cash;
+    private Long cash;
     private List<UserAssetProjection> userAssets;
-    private Integer availableCash;
+    private Long availableCash;
 }

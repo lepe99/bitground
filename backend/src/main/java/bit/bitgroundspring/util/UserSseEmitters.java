@@ -13,6 +13,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import jakarta.annotation.PreDestroy;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -201,8 +202,8 @@ public class UserSseEmitters {
                 String orderType = dataMap.get("orderType").equals("BUY") ? "매수" : "매도";
                 String symbol = (String) dataMap.get("symbol");
                 String cutSymbol = symbol.split("-")[1];
-                Double amount = (Double) dataMap.get("amount");
-                Float tradePrice = (Float) dataMap.get("tradePrice");
+                BigDecimal amount = (BigDecimal) dataMap.get("amount");
+                BigDecimal tradePrice = (BigDecimal) dataMap.get("tradePrice");
                 String formattedPrice = formatPrice(tradePrice);
                 message = String.format("예약 %s 주문이 체결되었습니다.\n수량 : %.7f %s\n체결 : 개당 %s원",
                         orderType, amount, cutSymbol, formattedPrice);
@@ -307,16 +308,15 @@ public class UserSseEmitters {
     }
     
     // 가격 형식 지정 메소드 - 불필요한 0 제거
-    private String formatPrice(Float price) {
+    private String formatPrice(BigDecimal price) {
         if (price == null) return "0";
-        
-        // 정수인 경우 소수점 표시 안 함
-        if (price == Math.floor(price)) {
-            return String.format("%,d", price.intValue());
+
+        // 정수인 경우 소수점 표시 안 함, 소수점이 있으면 불필요한 0 제거 (천 단위 구분)
+        BigDecimal stripped = price.stripTrailingZeros();
+        if (stripped.scale() <= 0) {
+            return String.format("%,d", stripped.longValueExact());
         }
-        
-        // 소수점이 있는 경우 불필요한 0 제거
-        return String.format("%,.8f", price).replaceAll("0+$", "").replaceAll("\\.$", "");
+        return String.format("%,." + stripped.scale() + "f", stripped);
     }
     
     // 🔄 애플리케이션 종료 시 모든 연결 정리

@@ -31,9 +31,9 @@ public class InvestmentSummaryDto {
     private LocalDate seasonEndAt;
 
     // 2. 시즌 전체 성과 지표
-    private Integer initialCashBalance;       // 시즌 시작 시 초기 현금 잔고
-    private Integer finalTotalValue;          // 시즌 종료 시점 최종 총 자산
-    private Integer totalProfitLossAmount;    // 총 손익 금액
+    private Long initialCashBalance;          // 시즌 시작 시 초기 현금 잔고
+    private Long finalTotalValue;             // 시즌 종료 시점 최종 총 자산
+    private Long totalProfitLossAmount;       // 총 손익 금액
     private Float totalProfitLossPercentage; // 총 수익률 (%)
     private Integer finalRank;             // 시즌 최종 랭크
 

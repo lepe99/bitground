@@ -129,7 +129,7 @@ public class CustomOidcUserService extends OidcUserService {
                     .providerId(providerId)
                     .email(email)
                     .name(name)
-                    .cash(initialCashUtil.getInitialCash()) // 초기 캐시 설정
+                    .cash((long) initialCashUtil.getInitialCash()) // 초기 캐시 설정
                     .profileImage(profileImage)
                     .build();
             

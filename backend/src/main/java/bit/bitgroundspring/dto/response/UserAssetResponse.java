@@ -13,6 +13,6 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class UserAssetResponse {
-    private Integer cash;
+    private Long cash;
     private List<UserAssetProjection> userAssets;
 }

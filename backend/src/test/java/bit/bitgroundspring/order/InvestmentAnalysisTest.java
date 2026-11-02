@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -36,7 +37,7 @@ class InvestmentAnalysisTest extends IntegrationTest {
         Coin btc = fixtures.coin("KRW-BTC");
         User user = fixtures.user(1_000_000);
         orderRepository.save(Order.builder().user(user).coin(btc).season(season)
-                .orderType(OrderType.BUY).amount(0.01).tradePrice(100.0).status(Status.COMPLETED).build());
+                .orderType(OrderType.BUY).amount(new BigDecimal("0.01")).tradePrice(new BigDecimal("100")).status(Status.COMPLETED).build());
 
         LocalDate start = season.getStartAt();
         LocalDate end = season.getEndAt();

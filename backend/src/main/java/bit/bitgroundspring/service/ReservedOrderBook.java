@@ -66,7 +66,7 @@ public class ReservedOrderBook {
 
     public void add(Order order) {
         redis.opsForZSet().add(key(order.getOrderType(), order.getCoin().getSymbol()),
-                String.valueOf(order.getId()), order.getReservePrice());
+                String.valueOf(order.getId()), order.getReservePrice().doubleValue());
     }
 
     public void remove(Order order) {

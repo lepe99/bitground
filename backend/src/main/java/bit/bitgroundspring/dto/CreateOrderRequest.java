@@ -25,5 +25,5 @@ public class CreateOrderRequest {
     
     @NotNull
     @Positive
-    private Float reservePrice;
+    private Double reservePrice;
 }

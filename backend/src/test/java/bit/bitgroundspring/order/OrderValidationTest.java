@@ -21,6 +21,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 
@@ -77,14 +78,14 @@ class OrderValidationTest extends IntegrationTest {
                 .content("{\"symbol\":\"KRW-BTC\",\"orderType\":\"%s\",\"amount\":%s,\"reservePrice\":%s}".formatted(type, amount, price)));
     }
 
-    private int cash() {
+    private long cash() {
         return userRepository.findById(user.getId()).orElseThrow().getCash();
     }
 
     private double btcAmount() {
         return userAssetRepository.findAll().stream()
                 .filter(a -> a.getUser().getId().equals(user.getId()))
-                .mapToDouble(UserAsset::getAmount).sum();
+                .mapToDouble(a -> a.getAmount().doubleValue()).sum();
     }
 
     @Nested
@@ -173,12 +174,12 @@ class OrderValidationTest extends IntegrationTest {
         private Order pendingOrder(OrderType type, double amount) {
             return orderRepository.save(Order.builder()
                     .user(user).coin(btc).season(season)
-                    .orderType(type).amount(amount).reservePrice(1f)
+                    .orderType(type).amount(BigDecimal.valueOf(amount)).reservePrice(BigDecimal.ONE)
                     .status(Status.PENDING).build());
         }
 
         private void execute(Order order) {
-            transactionTemplate.executeWithoutResult(s -> orderExecutionService.executeOrder(order.getId(), PRICE));
+            transactionTemplate.executeWithoutResult(s -> orderExecutionService.executeOrder(order.getId(), BigDecimal.valueOf(PRICE)));
         }
 
         @Test

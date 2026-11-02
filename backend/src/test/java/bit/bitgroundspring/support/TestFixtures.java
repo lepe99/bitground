@@ -12,6 +12,7 @@ import org.springframework.boot.test.context.TestComponent;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.jdbc.core.JdbcTemplate;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -52,7 +53,7 @@ public class TestFixtures {
                 .name("user-" + UUID.randomUUID().toString().substring(0, 8))
                 .provider("google")
                 .providerId(UUID.randomUUID().toString())
-                .cash(cash)
+                .cash((long) cash)
                 .build());
     }
 
@@ -85,7 +86,7 @@ public class TestFixtures {
 
     public UserAsset asset(User user, Coin coin, double amount, double avgPrice) {
         return userAssetRepository.save(UserAsset.builder()
-                .user(user).coin(coin).amount(amount).avgPrice(avgPrice).build());
+                .user(user).coin(coin).amount(BigDecimal.valueOf(amount)).avgPrice(BigDecimal.valueOf(avgPrice)).build());
     }
 
     // 실제 로그인과 같은 형식의 JWT를 jwt_token 쿠키로 발급

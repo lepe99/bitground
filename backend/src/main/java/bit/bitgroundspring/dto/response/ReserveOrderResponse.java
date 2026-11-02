@@ -4,6 +4,7 @@ import bit.bitgroundspring.entity.Order;
 import bit.bitgroundspring.entity.OrderType;
 import bit.bitgroundspring.entity.Status;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
@@ -13,8 +14,8 @@ public record ReserveOrderResponse(
         Integer orderId,
         String symbol,
         OrderType orderType,
-        Double amount,
-        Float reservePrice,
+        BigDecimal amount,
+        BigDecimal reservePrice,
         Status status,
         LocalDateTime createdAt
 ) {

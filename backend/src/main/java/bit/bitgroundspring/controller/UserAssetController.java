@@ -44,8 +44,8 @@ public class UserAssetController {
         Integer userId = authUser.id();
 
         List<UserAssetProjection> assets = assetService.getOnlyUserAssets(userId);
-        Integer cash = userService.getCashByUserId(userId); // 💡 이거 미리 구현해놔야 해
-        Integer availableCash = assetService.getAvailableCash(userId);
+        Long cash = userService.getCashByUserId(userId);
+        Long availableCash = assetService.getAvailableCash(userId);
 
         UserAssetOwnedResponseDto response = new UserAssetOwnedResponseDto(cash, assets, availableCash);
         return ResponseEntity.ok(response);

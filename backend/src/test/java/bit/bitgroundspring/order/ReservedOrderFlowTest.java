@@ -75,7 +75,7 @@ class ReservedOrderFlowTest extends IntegrationTest {
         req.setSymbol("KRW-BTC");
         req.setOrderType(OrderType.BUY);
         req.setAmount(amount);
-        req.setReservePrice(price);
+        req.setReservePrice((double) price);
         return req;
     }
 
@@ -105,7 +105,7 @@ class ReservedOrderFlowTest extends IntegrationTest {
 
         await(() -> orderStatus(order) == Status.COMPLETED);
         assertThat(userRepository.findById(user.getId()).orElseThrow().getCash()).isEqualTo(1_000_000 - 490_000);
-        assertThat(userAssetRepository.findAll()).singleElement().satisfies(a -> assertThat(a.getAmount()).isEqualTo(0.01));
+        assertThat(userAssetRepository.findAll()).singleElement().satisfies(a -> assertThat(a.getAmount()).isEqualByComparingTo("0.01"));
         await(() -> notificationRepository.count() == 1);
     }
 

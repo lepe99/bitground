@@ -9,5 +9,5 @@ public class OrderRequestDto {
     private OrderType orderType;
     private Double amount;        // SELL 또는 reserve 용도
     private Double reservePrice;  // 예약주문일 경우만 사용
-    private Integer totalPrice;    // BUY + market인 경우 사용
+    private Long totalPrice;    // BUY + market인 경우 사용
 }

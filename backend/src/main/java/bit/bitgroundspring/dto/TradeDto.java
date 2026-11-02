@@ -4,6 +4,7 @@ import bit.bitgroundspring.entity.OrderType;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Data
@@ -12,8 +13,8 @@ public class TradeDto {
     private String symbol;
     private String koreanName;
     private OrderType orderType;
-    private Double amount;
-    private Double tradePrice;
+    private BigDecimal amount;
+    private BigDecimal tradePrice;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }
