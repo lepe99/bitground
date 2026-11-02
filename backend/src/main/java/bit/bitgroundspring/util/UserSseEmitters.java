@@ -93,7 +93,7 @@ public class UserSseEmitters {
         cleanupDeadWrappers(userId, deadWrappers);
         
         // 비동기 알림 저장
-        if (hasSuccessfulSend && (data.getMessage() == Message.ORDER_EXECUTION || data.getMessage() == Message.INQUIRY_UPDATE)) {
+        if (hasSuccessfulSend && data.getMessage() == Message.ORDER_EXECUTION) {
             CompletableFuture.runAsync(() -> saveNotification(userId, data, data.getMessage()));
         }
         
@@ -203,9 +203,6 @@ public class UserSseEmitters {
                 String formattedPrice = formatPrice(tradePrice);
                 message = String.format("예약 %s 주문이 체결되었습니다.\n수량 : %.7f %s\n체결 : 개당 %s원",
                         orderType, amount, cutSymbol, formattedPrice);
-            } else if (messageType == Message.INQUIRY_UPDATE) {
-                String title = (String) dataMap.get("title");
-                message = String.format("작성하신 문의사항에 답변이 등록되었습니다.\n지금 바로 확인해보세요.\n📩[%s]", title);
             }
             
             Notification notification = Notification.builder()

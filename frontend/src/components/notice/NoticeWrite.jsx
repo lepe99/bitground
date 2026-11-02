@@ -1,19 +1,19 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import ReactQuill from 'react-quill-new';
 import 'react-quill-new/dist/quill.snow.css';
-import '../../styles/service/service.css';
+import '../../styles/notice/notice.css';
 import api from '../../api/axiosConfig.js';
 import { useAuth } from '../../auth/useAuth.js';
-import { tierImageMap } from '../community/tierImageUtil';
 import {useToast} from "../Toast.jsx";
 
-const AskWrite = ( { setSelectedMenu } ) => {
+const NoticeWrite = ({ onDone }) => {
     const quillRef = useRef(null);
     const [title, setTitle] = useState('');
     const [content, setContent] = useState('');
     const { user } = useAuth();
     const { errorAlert, infoAlert } = useToast();
 
+    // 🔸 이미지 업로드 핸들러
     const imageHandler = useCallback(() => {
         const input = document.createElement('input');
         input.setAttribute('type', 'file');
@@ -26,7 +26,7 @@ const AskWrite = ( { setSelectedMenu } ) => {
                 const formData = new FormData();
                 formData.append('file', file);
                 try {
-                    const res = await api.post('/inquiries/upload-image', formData, {
+                    const res = await api.post('/notices/upload-image', formData, {
                         headers: { 'Content-Type': 'multipart/form-data' },
                     });
 
@@ -40,6 +40,7 @@ const AskWrite = ( { setSelectedMenu } ) => {
                     }
                     editor.insertEmbed(range.index, 'image', imageUrl);
 
+                    // 스타일 조정
                     setTimeout(() => {
                         const editorElem = quillRef.current.editor?.root;
                         const imgs = editorElem?.querySelectorAll(`img[src="${imageUrl}"]`);
@@ -57,6 +58,7 @@ const AskWrite = ( { setSelectedMenu } ) => {
         };
     }, []);
 
+    // 🔸 Quill 모듈 설정
     const quillModules = useMemo(() => ({
         toolbar: {
             container: [
@@ -70,26 +72,22 @@ const AskWrite = ( { setSelectedMenu } ) => {
         }
     }), [imageHandler]);
 
+    // 🔸 등록 버튼 클릭 시
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (!title.trim() || !content.trim()) {
             errorAlert('제목과 내용을 입력해주세요.');
             return;
         }
-        console.log('user', user);
-        const formData = {
-            user: {id :user.id},
-            title,
-            content,
-        };
+
+        const formData = { title, content };
 
         try {
-            await api.post('/inquiries', formData, {
+            await api.post('/notices', formData, {
                 headers: { 'Content-Type': 'application/json' }
             });
-            infoAlert('문의글이 등록되었습니다!');
-            localStorage.setItem("serviceMenu", "ask"); // 다음 진입 시 탭 고정용
-            setSelectedMenu('ask');
+            infoAlert('공지사항이 등록되었습니다!');
+            onDone();
         } catch {
             errorAlert('등록 실패');
         }
@@ -97,66 +95,41 @@ const AskWrite = ( { setSelectedMenu } ) => {
 
     return (
         <div>
-            <div className='ask-write-container'>
-                <div className='ask-writer-info'>
-                    <div className='ask-writer-profile'>
-                        <div className="ask-user-icon-div">
-                            <div className="ask-user-icon">
-                                {user.tier !== 0 ? (
-                                    <>
-                                        <img
-                                            src={tierImageMap[user.tier]}
-                                            alt=""
-                                            className="ask-tier-image"
-                                        />
-                                        {user.profileImage && (
-                                            <img
-                                                src={user.profileImage}
-                                                alt=""
-                                                className="ask-rank-profile-image"
-                                            />
-                                        )}
-                                    </>
-                                ) : (
-                                    user.profileImage && (
-                                        <img
-                                            src={user.profileImage}
-                                            alt=""
-                                            className="ask-rank-profile-image"
-                                        />
-                                    )
-                                )}
-                            </div>
-                        </div>
-                        <div className='ask-writer-details'>
-                            <span className='ask-writer-nickname'>{user.name}</span>
+            <div className='notice-write-container'>
+                <div className='notice-writer-info'>
+                    <div className='notice-writer-profile'>
+                        <img src={user.profileImage} alt="프로필" className='profile-image' />
+                        <div className='notice-writer-details'>
+                            <span className='notice-writer-tier'>[Admin]</span>
+                            <span className='notice-writer-nickname'>{user.name}</span>
                         </div>
                     </div>
                 </div>
 
                 <form onSubmit={handleSubmit}>
-                    <div className='ask-write-header'>
+                    <div className='notice-write-header'>
                         <input
                             type='text'
-                            className='ask-write-title'
+                            className='notice-write-title'
                             placeholder='제목을 입력하세요'
                             value={title}
                             onChange={(e) => setTitle(e.target.value)}
                         />
                     </div>
-                    <div className='ask-write-body'>
+
+                    <div className='notice-write-body'>
                         <ReactQuill
                             ref={quillRef}
                             value={content}
                             onChange={setContent}
                             modules={quillModules}
                             theme='snow'
-                            className='ReactQuill-ask'
-
+                            className='ReactQuill'
                         />
-                    </div>
-                    <div className='ask-write-footer'>
-                        <button type='submit' className='ask-submit-button'>등록하기</button>
+
+                        <div className='notice-write-footer'>
+                            <button type='submit' className='notice-submit-button'>등록하기</button>
+                        </div>
                     </div>
                 </form>
             </div>
@@ -164,4 +137,4 @@ const AskWrite = ( { setSelectedMenu } ) => {
     );
 };
 
-export default AskWrite;
+export default NoticeWrite;

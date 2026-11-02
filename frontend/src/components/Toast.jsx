@@ -132,15 +132,9 @@ export const ToastProvider = ({
                     case 'NOTICE': {
                         const {title} = notificationData.data;
                         displayMessage += `🔔 새로운 공지사항이 등록되었습니다.\n`;
-                        displayMessage += `고객센터 탭에서 확인해보세요.\n`;
+                        displayMessage += `공지사항 탭에서 확인해보세요.\n`;
                         displayMessage += `[${title}]\n`;
                         break;
-                    }
-                    case 'INQUIRY_UPDATE': {
-                        const {title} = notificationData.data;
-                        displayMessage += `작성하신 문의사항에 답변이 등록되었습니다.\n`;
-                        displayMessage += `지금 바로 확인해보세요.\n`;
-                        displayMessage += `📩[${title}]\n`;
                     }
                 }
 

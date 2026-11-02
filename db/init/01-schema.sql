@@ -92,25 +92,6 @@ CREATE TABLE `favorite_coins` (
   CONSTRAINT `favorite_coins_users_id_fk` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE `inquiries` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `is_answered` tinyint(1) NOT NULL DEFAULT '0',
-  `is_deleted` tinyint(1) NOT NULL DEFAULT '0',
-  `user_id` int NOT NULL,
-  `answered_at` datetime(6) DEFAULT NULL,
-  `created_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
-  `updated_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
-  `answer` varchar(2000) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `content` varchar(2000) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `answer_writer` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `title` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
-  PRIMARY KEY (`id`),
-  KEY `idx_inquiries_created_at_desc` (`created_at` DESC),
-  KEY `idx_inquiries_title` (`title`),
-  KEY `inquiries_users_id_fk` (`user_id`),
-  CONSTRAINT `inquiries_users_id_fk` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
 CREATE TABLE `market_indices` (
   `alt_index` int NOT NULL,
   `date` date NOT NULL,
@@ -142,7 +123,7 @@ CREATE TABLE `notifications` (
   `user_id` int NOT NULL,
   `created_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   `message` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `message_type` enum('INQUIRY_UPDATE','NOTICE','ORDER_EXECUTION','SEASON_UPDATE') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `message_type` enum('NOTICE','ORDER_EXECUTION','SEASON_UPDATE') COLLATE utf8mb4_unicode_ci NOT NULL,
   PRIMARY KEY (`id`),
   KEY `idx_notifications_user_created_at_desc` (`user_id`,`created_at` DESC),
   KEY `idx_notifications_user_is_read` (`user_id`,`is_read`),

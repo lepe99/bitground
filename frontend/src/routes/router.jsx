@@ -13,7 +13,7 @@ import CoinTrends from "../components/CoinTrends.jsx";
 import Rank from "../pages/Rank.jsx";
 import Investments from "../pages/Investments.jsx";
 import {TickerProvider} from "../ticker/TickerProvider.jsx";
-import Service from "../pages/Service.jsx";
+import NoticePage from "../pages/NoticePage.jsx";
 
 export const router = createBrowserRouter([
     {
@@ -30,7 +30,7 @@ export const router = createBrowserRouter([
                     // 여기에 보호된 라우트 추가
                     { path: "rank", element: <Rank/> },
                     { path: "mypage", element: <Mypage /> },
-                    { path: "service", element: <Service/> },
+                    { path: "notice", element: <NoticePage/> },
                     // upbit ticker
                     {
                         element: <TickerProvider><Outlet/></TickerProvider>,

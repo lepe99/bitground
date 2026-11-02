@@ -95,10 +95,7 @@ export default function Header() {
     const handleNavigate = (messageType) => () => {
         switch (messageType) {
             case 'NOTICE':
-                navigate('/service');
-                break;
-            case 'INQUIRY_UPDATE':
-                navigate('/service');
+                navigate('/notice');
                 break;
             case 'ORDER_EXECUTION':
                 navigate('/investments');
@@ -160,9 +157,9 @@ export default function Header() {
                                  onClick={() => navigate("/rank")}>
                                 랭킹
                             </div>
-                            <div className={`nav-service ${path === "/service" ? "active" : ""}`}
-                                 onClick={() => navigate("/service")}>
-                                고객센터
+                            <div className={`nav-service ${path === "/notice" ? "active" : ""}`}
+                                 onClick={() => navigate("/notice")}>
+                                공지사항
                             </div>
                         </div>
                     </div>
@@ -217,7 +214,7 @@ export default function Header() {
                             <li onClick={() => {navigate('/trends'); closeMenu();}}>최신동향</li>
                             <li onClick={() => {navigate('/community'); closeMenu();}}>커뮤니티</li>
                             <li onClick={() => {navigate('/rank'); closeMenu();}}>랭킹</li>
-                            <li onClick={() => {navigate('/service'); closeMenu();}}>고객센터</li>
+                            <li onClick={() => {navigate('/notice'); closeMenu();}}>공지사항</li>
                             {isLoggedIn ? (
                                 <>
                                     <li onClick={() => {navigate('/mypage'); closeMenu();}}>마이페이지</li>

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { RiDeleteBinLine } from "react-icons/ri";
 import api from '../../api/axiosConfig';
 import { useAuth } from '../../auth/useAuth';
+import { useToast } from '../Toast.jsx';
 
 const Notice = ({keyword}) => {
     const [notices, setNotices] = useState([]);
@@ -9,7 +10,7 @@ const Notice = ({keyword}) => {
     const [totalPages, setTotalPages] = useState(0);
     const [openIds, setOpenIds] = useState([]); // 토글용 상태
     const { user } = useAuth();
-    const { infoAlert, errorAlert } = useAuth();
+    const { infoAlert, errorAlert } = useToast();
 
     const fetchNotices = async (pageNum = 0) => {
         try {
