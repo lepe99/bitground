@@ -23,10 +23,7 @@ const Callback = () => {
         hasProcessed.current = true;
 
         checkAuthState()
-            .then(() => {
-                localStorage.setItem('authState', 'true');
-                navigate('/');
-            })
+            .then(() => navigate('/'))
             .catch((error) => {
                 console.error('Error processing auth callback:', error);
                 navigate('/login');

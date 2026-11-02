@@ -1,6 +1,11 @@
 import React, {createContext, useContext, useState, useCallback, useEffect, useRef} from 'react';
 import {IoIosCloseCircleOutline, IoIosInformationCircleOutline} from "react-icons/io";
 import api from "../api/axiosConfig.js";
+import {useAuth} from "../auth/useAuth.js";
+
+// 연속 실패 시 재연결을 멈추는 횟수 (지수 백오프, 최대 30초 간격)
+const MAX_RECONNECT_ATTEMPTS = 8;
+const MAX_RECONNECT_DELAY_MS = 30000;
 
 // 토스트 타입 정의
 const TOAST_TYPES = {
@@ -34,6 +39,7 @@ export const ToastProvider = ({
                                   reconnectInterval = 3000, // 재연결 간격 (ms)
                                   enableSSEToasts = true // SSE 메시지를 자동으로 토스트로 표시할지 여부
                               }) => {
+    const {isLoggedIn} = useAuth();
     const [toasts, setToasts] = useState([]);
     const [sseStatus, setSseStatus] = useState(SSE_STATUS.DISCONNECTED);
 
@@ -41,6 +47,8 @@ export const ToastProvider = ({
     const eventSourceRef = useRef(null);
     const reconnectTimeoutRef = useRef(null);
     const reconnectAttemptsRef = useRef(0);
+    const connectRef = useRef(() => {});
+    const sseEnabledRef = useRef(false); // 로그아웃 뒤 진행 중이던 재연결이 다시 붙지 않도록
 
     const [userCash, setUserCash] = useState(0); // 사용자 현금 상태
     const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0); // 읽지 않은 알림 개수
@@ -83,21 +91,20 @@ export const ToastProvider = ({
     }, []);
 
     // 읽지 않은 알림 개수 가져오는 함수
-    const fetchUnreadNotificationsCount = async () => {
+    const fetchUnreadNotificationsCount = useCallback(async () => {
         try {
             const response = await api.get('/notifications/count');
             setUnreadNotificationsCount(response.data);
         } catch (error) {
             console.error('읽지 않은 알림 개수 가져오기 실패:', error);
         }
-    }
+    }, []);
 
     // SSE 메시지 처리 함수
     const handleSSEMessage = useCallback((event) => {
         try {
             // JSON 파싱 시도
             const notificationData = JSON.parse(event.data);
-            console.log('Received SSE Notification:', notificationData);
 
             if (enableSSEToasts && notificationData.message) {
                 // 1. 토스트 메시지 타입 결정
@@ -148,7 +155,7 @@ export const ToastProvider = ({
         } catch (e) {
             console.error('SSE 메시지 파싱 오류:', e);
         }
-    }, [addToast, enableSSEToasts]);
+    }, [addToast, enableSSEToasts, fetchUnreadNotificationsCount]);
 
     // SSE 연결 함수
     const connectSSE = useCallback(() => {
@@ -161,32 +168,37 @@ export const ToastProvider = ({
             eventSourceRef.current = eventSource;
 
             eventSource.onopen = () => {
-                console.log('SSE 연결 성공');
                 setSseStatus(SSE_STATUS.CONNECTED);
                 reconnectAttemptsRef.current = 0;
             };
 
             eventSource.onmessage = handleSSEMessage;
 
-            eventSource.onerror = (error) => {
-                console.error('SSE 연결 오류:', error);
+            eventSource.onerror = () => {
                 setSseStatus(SSE_STATUS.ERROR);
 
-                // 연결 종료
+                // 브라우저 기본 재연결은 401이어도 계속 시도하므로 직접 닫고 다시 연결한다
                 eventSource.close();
                 eventSourceRef.current = null;
 
-                // 자동 재연결
-                if (autoReconnect) {
-                    reconnectAttemptsRef.current++;
-                    const delay = Math.min(reconnectInterval * reconnectAttemptsRef.current, 30000); // 최대 30초
-
-                    console.log(`${delay / 1000}초 후 SSE 재연결 시도 (${reconnectAttemptsRef.current}번째)`);
-
-                    reconnectTimeoutRef.current = setTimeout(() => {
-                        connectSSE();
-                    }, delay);
+                if (!autoReconnect) return;
+                const attempt = ++reconnectAttemptsRef.current;
+                if (attempt > MAX_RECONNECT_ATTEMPTS) {
+                    console.warn('SSE 재연결을 중단합니다.');
+                    return;
                 }
+                const delay = Math.min(reconnectInterval * 2 ** (attempt - 1), MAX_RECONNECT_DELAY_MS);
+                reconnectTimeoutRef.current = setTimeout(async () => {
+                    // EventSource는 응답 상태 코드를 알려주지 않으므로 axios 요청으로 인증을 먼저 확인한다.
+                    // 액세스 토큰이 만료됐으면 인터셉터가 재발급하고, 재발급도 실패하면 로그아웃(forceLogout)되어
+                    // isLoggedIn이 false가 되면서 연결이 정리된다.
+                    try {
+                        await api.get('/notifications/count');
+                        if (sseEnabledRef.current) connectRef.current();
+                    } catch {
+                        // 인증 실패: 로그아웃 처리에 맡기고 재연결하지 않음
+                    }
+                }, delay);
             };
 
         } catch (error) {
@@ -194,6 +206,7 @@ export const ToastProvider = ({
             setSseStatus(SSE_STATUS.ERROR);
         }
     }, [sseUrl, autoReconnect, reconnectInterval, handleSSEMessage]);
+    connectRef.current = connectSSE;
 
     // SSE 연결 해제 함수
     const disconnectSSE = useCallback(() => {
@@ -211,20 +224,22 @@ export const ToastProvider = ({
         reconnectAttemptsRef.current = 0;
     }, []);
 
-    // 컴포넌트 마운트 시 SSE 연결
+    // 로그인한 동안에만 SSE 연결 (비로그인 상태에서 401 재연결이 반복되지 않도록)
     useEffect(() => {
-        if (sseUrl) {
-            connectSSE();
+        if (!isLoggedIn) {
+            setUnreadNotificationsCount(0);
+            return;
         }
 
-        // 읽지 않은 알림 개수 초기화
+        sseEnabledRef.current = true;
+        connectSSE();
         fetchUnreadNotificationsCount();
 
-        // 클린업
         return () => {
+            sseEnabledRef.current = false;
             disconnectSSE();
         };
-    }, [sseUrl, connectSSE, disconnectSSE]);
+    }, [isLoggedIn, connectSSE, disconnectSSE, fetchUnreadNotificationsCount]);
 
     const value = {
         toasts,
