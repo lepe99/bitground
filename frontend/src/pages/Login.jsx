@@ -10,11 +10,12 @@ export default function Main() {
     const {errorAlert} = useToast();
 
     useEffect(() => {
-        // url 파라미터에 에러 메시지가 있다면 표시
-        const errorMessage = new URLSearchParams(window.location.search).get('error');
-        if (errorMessage) {
+        // 로그인 실패 시 서버가 ?error=OAUTH_CANCELLED | OAUTH_FAILED 로 돌려보낸다
+        const errorCode = new URLSearchParams(window.location.search).get('error');
+        if (errorCode === 'OAUTH_CANCELLED') {
+            errorAlert("로그인이 취소되었습니다.");
+        } else if (errorCode) {
             errorAlert("로그인 중 오류가 발생했습니다. 다시 시도해주세요.");
-            console.error('Auth error:', errorMessage);
         }
     }, []);
 
