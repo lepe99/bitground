@@ -1,5 +1,7 @@
 package bit.bitgroundspring.entity;
 
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -28,6 +30,8 @@ public class AiInsight {
     
     @Column(name = "symbol", nullable = false)
     private String symbol; // VARCHAR(255) NOT NULL, 어떤 코인에 대한 분석인지 식별
+    
+    @JdbcTypeCode(SqlTypes.TINYINT)
     
     @Column(name = "score", nullable = false, columnDefinition = "tinyint")
     private Integer score;

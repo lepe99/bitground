@@ -28,10 +28,10 @@ spring:
     baseline-on-migrate: true
     baseline-version: 1
 
-  # jpa 설정 (스키마 변경은 Flyway로만)
+  # jpa 설정 (스키마 변경은 Flyway로만, Hibernate는 엔티티와 스키마가 맞는지 기동 시 검증만)
   jpa:
     hibernate:
-      ddl-auto: ${JPA_DDL_AUTO:none}
+      ddl-auto: ${JPA_DDL_AUTO:validate}
     show-sql: ${JPA_SHOW_SQL:false}
     open-in-view: false # osiv 사용하지 않음
     properties:

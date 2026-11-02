@@ -1,5 +1,7 @@
 package bit.bitgroundspring.entity;
 
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -36,6 +38,8 @@ public class AiAdvice {
             foreignKey = @ForeignKey(name = "ai_advices_seasons_id_fk",
                     foreignKeyDefinition = "FOREIGN KEY (season_id) REFERENCES seasons(id) ON DELETE CASCADE"))
     private Season season;
+    
+    @JdbcTypeCode(SqlTypes.TINYINT)
     
     @Column(name = "score", nullable = false , columnDefinition = "tinyint")
     private Integer score;

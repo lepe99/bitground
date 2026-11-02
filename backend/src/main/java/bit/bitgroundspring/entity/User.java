@@ -1,5 +1,7 @@
 package bit.bitgroundspring.entity;
 
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -49,6 +51,8 @@ public class User {
     
     @Column(name = "cash", nullable = false, columnDefinition = "int")
     private Integer cash;
+    
+    @JdbcTypeCode(SqlTypes.TINYINT)
     
     @Column(name = "tier", nullable = false, columnDefinition = "tinyint default 0")
     @Builder.Default

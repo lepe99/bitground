@@ -1,5 +1,7 @@
 package bit.bitgroundspring.entity;
 
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -27,6 +29,8 @@ public class MarketIndex {
     
     @Column(name = "date", nullable = false)
     private LocalDate date;
+    
+    @JdbcTypeCode(SqlTypes.TINYINT)
     
     @Column(name = "hour", nullable = false, columnDefinition = "tinyint")
     private Integer hour;

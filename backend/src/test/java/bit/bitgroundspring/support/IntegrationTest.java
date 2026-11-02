@@ -27,7 +27,6 @@ import software.amazon.awssdk.services.s3.S3Client;
 @Import(TestFixtures.class)
 @TestPropertySource(properties = {
         "spring.config.import=", // 로컬 backend/.env 를 읽지 않음
-        "spring.jpa.hibernate.ddl-auto=none",
         "jwt.secret=test-secret-key-for-integration-tests-must-be-at-least-64-bytes-long-0123456789",
         "season.update.key=test-season-key",
         "spring.security.oauth2.client.registration.google.client-id=test",

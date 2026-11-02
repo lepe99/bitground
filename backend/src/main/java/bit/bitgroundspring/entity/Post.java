@@ -1,5 +1,7 @@
 package bit.bitgroundspring.entity;
 
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -29,6 +31,8 @@ public class Post {
             foreignKey = @ForeignKey(name = "posts_users_id_fk",
                     foreignKeyDefinition = "FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE"))
     private User user;
+    
+    @JdbcTypeCode(SqlTypes.TINYINT)
     
     @Column(name = "tier", nullable = false, columnDefinition = "tinyint")
     private Integer tier;
