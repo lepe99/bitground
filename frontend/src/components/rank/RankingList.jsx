@@ -69,7 +69,7 @@ export default function RankingList({
                 const totalValue = Number(item?.totalValue ?? 0);
                 const tier = item?.tier ?? 0;
                 const profileImage = item?.profileImage;
-                const tierImg = TIER_FRAMES[tier] || bronzeLine;
+                const tierImg = TIER_FRAMES[tier] || TIER_FRAMES[1];
                 const rank = item?.ranks ?? index + 1;
 
                 return (

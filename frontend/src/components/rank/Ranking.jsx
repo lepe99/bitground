@@ -88,7 +88,8 @@ export default function Ranking() {
     useEffect(() => {
         const loadSeasons = async () => {
             try {
-                const seasonData = (await fetchSeasons())
+                const allSeasons = await fetchSeasons();
+                const seasonData = allSeasons
                     .filter(season => season.status !== 'PENDING')
                     .map(season => ({
                         id: season.id,
@@ -97,13 +98,13 @@ export default function Ranking() {
                         endAt: season.endAt
                     }));
 
-                if (response.data[0].status === 'PENDING') {
-                    setCurrentSeasonName(response.data[0].name);
+                if (allSeasons[0]?.status === 'PENDING') {
+                    setCurrentSeasonName(allSeasons[0].name);
                 }
 
                 setSeasons(seasonData);
-                if (response.data && response.data[0].status === 'PENDING' && response.data[1].status === 'COMPLETED') {
-                    setSelectedSeason(response.data[1]?.id);
+                if (allSeasons[0]?.status === 'PENDING' && allSeasons[1]?.status === 'COMPLETED') {
+                    setSelectedSeason(allSeasons[1].id);
                 } else {
                     console.warn('현재 시즌 정보가 없습니다.');
                 }

@@ -1,5 +1,7 @@
 @import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css");
 
+/* 리디자인 전 전역 스타일. Tailwind 유틸리티보다 우선순위가 낮도록 legacy 레이어에 둔다 (8단계에서 제거) */
+@layer legacy {
 *, body {
     font-family: Pretendard, sans-serif;
     color: #343434;
@@ -129,11 +131,4 @@ body{
     font-weight: 500;
     white-space: pre-wrap;
 }
-
-/*반응형 전체적용*/
-
-@media screen and (max-width: 768px) {
-    html {
-        font-size: 70%; /* 전체 폰트 크기 70%로 줄임 */
-    }
 }

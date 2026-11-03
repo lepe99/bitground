@@ -1,0 +1,123 @@
+/*
+ * 디자인 토큰과 Tailwind 진입점.
+ * 레이어 순서: legacy(리디자인 전 CSS) < utilities. 기존 화면을 다 옮기면(8단계) preflight를 켜고 legacy를 지운다.
+ */
+@layer theme, legacy, base, components, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+
+/* dark: 변형은 OS 설정이 아니라 <html data-theme="dark"> 기준 */
+@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
+
+/* 라이트 */
+:root {
+    --c-bg: #F4F5F7;
+    --c-surface: #FFFFFF;
+    --c-surface-2: #F2F3F5;
+    --c-line: #E5E7EB;
+    --c-fg: #111827;
+    --c-fg-2: #4B5563;
+    --c-fg-3: #6B7280;
+    --c-up: #D92D20;
+    --c-down: #1D5BD8;
+    --c-brand: #F5A524;
+    --c-brand-fg: #B45309;
+    --c-brand-soft: #FEF3DC;
+    --c-logo-bar: #F5A524;
+    color-scheme: light;
+}
+
+/* 다크 */
+[data-theme=dark] {
+    --c-bg: #0B0E14;
+    --c-surface: #131720;
+    --c-surface-2: #1A1F2B;
+    --c-line: #262C3A;
+    --c-fg: #F3F4F6;
+    --c-fg-2: #C2C7D0;
+    --c-fg-3: #8B93A1;
+    --c-up: #F04452;
+    --c-down: #4C8DFF;
+    --c-brand: #F5A524;
+    --c-brand-fg: #F5B547;
+    --c-brand-soft: rgba(245, 165, 36, 0.14);
+    --c-logo-bar: #F5B547;
+    color-scheme: dark;
+}
+
+@theme inline {
+    --font-sans: Pretendard, 'Noto Sans KR', system-ui, sans-serif;
+
+    --color-bg: var(--c-bg);
+    --color-surface: var(--c-surface);
+    --color-surface-2: var(--c-surface-2);
+    --color-line: var(--c-line);
+    --color-fg: var(--c-fg);
+    --color-fg-2: var(--c-fg-2);
+    --color-fg-3: var(--c-fg-3);
+    --color-up: var(--c-up);
+    --color-down: var(--c-down);
+    --color-brand: var(--c-brand);
+    --color-brand-fg: var(--c-brand-fg);
+    --color-brand-soft: var(--c-brand-soft);
+    --color-logo-bar: var(--c-logo-bar);
+
+    /* 티어 색 (프로필 링·티어 이름) */
+    --color-tier-1: #B87333;
+    --color-tier-2: #9AA4B2;
+    --color-tier-3: #D4A017;
+    --color-tier-4: #2BA596;
+    --color-tier-5: #3F7BF0;
+    --color-tier-6: #7C4DEB;
+    --color-tier-7: #B42341;
+}
+
+@layer base {
+    body {
+        background: var(--c-bg);
+        color: var(--c-fg);
+        font-family: var(--font-sans);
+        font-size: 16px;
+        font-weight: 400;
+        -webkit-font-smoothing: antialiased;
+    }
+
+    /*
+     * 새 화면은 루트에 .rd를 붙인다. legacy의 `*` 규칙(색·크기 고정) 대신 부모 값을 물려받고,
+     * preflight를 켜기 전까지 필요한 초기화만 .rd 안에 적용한다.
+     */
+    /* legacy의 `*` 규칙이 html에도 걸려 1rem이 14.4px가 되는 것을 되돌린다 */
+    html { font-size: 16px; }
+
+    .rd {
+        color: var(--c-fg);
+        font-family: var(--font-sans);
+        font-size: 1rem;
+        font-weight: 400;
+    }
+    .rd * {
+        color: inherit;
+        font-size: inherit;
+        font-weight: inherit;
+        font-family: inherit;
+    }
+    .rd :where(h1, h2, h3, h4, h5, h6, p, dl, dd, figure) { margin: 0; }
+    .rd :where(button, input, select, textarea) {
+        font: inherit;
+        color: inherit;
+        background: transparent;
+        border: 0;
+        padding: 0;
+    }
+    .rd :where(button, [role=button]) { cursor: pointer; }
+    .rd :where(ul, ol) { margin: 0; padding: 0; list-style: none; }
+    .rd :where(a) { color: inherit; text-decoration: inherit; }
+    .rd :where(img, video) { display: block; max-width: 100%; }
+    .rd :where(table) { border-collapse: collapse; }
+    .rd :where(:focus-visible) { outline: 2px solid var(--c-brand); outline-offset: 2px; }
+}
+
+/* 숫자 자리 맞춤 */
+@utility num {
+    font-variant-numeric: tabular-nums;
+}

@@ -1,9 +1,10 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react-swc'
+import tailwindcss from '@tailwindcss/vite'
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => ({
-  plugins: [react()],
+  plugins: [react(), tailwindcss()],
   // 운영 빌드에서는 디버그용 console.log/info/debug 호출을 제거한다 (warn·error는 남김)
   esbuild: mode === 'production' ? { pure: ['console.log', 'console.info', 'console.debug'] } : {},
   server: {

@@ -3,17 +3,20 @@ import {AuthProvider} from "./auth/AuthProvider.jsx";
 import router from "./routes/router.jsx";
 import {ToastProvider} from "./components/Toast.jsx";
 import {NotificationProvider} from "./notifications/NotificationProvider.jsx";
+import {ThemeProvider} from "./theme/ThemeProvider.jsx";
 
 
 export default function App() {
     return (
-        <AuthProvider>
-            <ToastProvider>
-                <NotificationProvider>
-                    <RouterProvider router={router}/>
-                </NotificationProvider>
-            </ToastProvider>
-        </AuthProvider>
+        <ThemeProvider>
+            <AuthProvider>
+                <ToastProvider>
+                    <NotificationProvider>
+                        <RouterProvider router={router}/>
+                    </NotificationProvider>
+                </ToastProvider>
+            </AuthProvider>
+        </ThemeProvider>
     );
 }
 
