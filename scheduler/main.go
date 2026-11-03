@@ -105,7 +105,7 @@ func run(ctx context.Context, db *sql.DB, cfg config.Config, now time.Time) erro
 	case !flags.Insight:
 		log.Println("인사이트 업데이트 생략")
 	case cfg.GeminiAPIKey == "":
-		log.Println("인사이트 업데이트 생략: GOOGLE_API_KEY 없음")
+		log.Println("인사이트 업데이트 생략: GEMINI_API_KEY 없음")
 	default:
 		wg.Go(func() {
 			insightErr = step("인사이트 업데이트", func() error {
