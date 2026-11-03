@@ -2,10 +2,12 @@ import api from "./axiosConfig.js";
 
 const BASE_URL = '/news';
 
-export const fetchNews = async (keyword, start = 1, display = 5) => { // display 기본값을 4로 변경
+/** 뉴스 검색. page는 1부터 */
+export const fetchNews = async (keyword, start = 1, display = 5) => {
     try {
+        // 네이버 검색의 start는 '몇 번째 기사부터'라서 쪽 번호를 기사 위치로 바꾼다 (2쪽 → 6번째부터)
         const response = await api.get(BASE_URL, {
-            params: { keyword, start, display },
+            params: { keyword, start: (start - 1) * display + 1, display },
         });
         const data = response.data;
 

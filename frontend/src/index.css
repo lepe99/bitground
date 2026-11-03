@@ -121,3 +121,34 @@
 @utility num {
     font-variant-numeric: tabular-nums;
 }
+
+/* 게시글·공지 본문 (RichContent) */
+@layer components {
+    .rich { font-size: 15px; line-height: 1.75; color: var(--c-fg); overflow-wrap: anywhere; }
+    .rich :where(p, ul, ol, blockquote, pre) { margin: 0 0 0.75em; }
+    .rich :where(h1) { font-size: 1.5em; font-weight: 800; margin: 0.6em 0 0.4em; }
+    .rich :where(h2) { font-size: 1.25em; font-weight: 700; margin: 0.6em 0 0.4em; }
+    .rich :where(strong, b) { font-weight: 700; }
+    .rich :where(a) { color: var(--c-brand-fg); text-decoration: underline; text-underline-offset: 2px; }
+    .rich :where(ul) { list-style: disc; padding-left: 1.4em; }
+    .rich :where(ol) { list-style: decimal; padding-left: 1.4em; }
+    .rich :where(li[data-list=bullet]) { list-style: disc; }
+    .rich :where(blockquote) { border-left: 3px solid var(--c-line); padding-left: 0.9em; color: var(--c-fg-2); }
+    .rich :where(pre, code) { background: var(--c-surface-2); border-radius: 8px; font-size: 0.9em; }
+    .rich :where(pre) { padding: 0.8em 1em; overflow-x: auto; }
+    .rich :where(img) { max-width: 100%; height: auto; border-radius: 12px; margin: 0.4em 0; }
+}
+
+/* Quill 에디터를 테마 색에 맞춘다 (Quill CSS는 레이어 밖이라 여기도 레이어 밖에 둔다) */
+.rich-editor .ql-toolbar.ql-snow { border: 1px solid var(--c-line); border-radius: 12px 12px 0 0; background: var(--c-surface-2); }
+.rich-editor .ql-container.ql-snow { border: 1px solid var(--c-line); border-top: 0; border-radius: 0 0 12px 12px; background: var(--c-surface); font-family: var(--font-sans); font-size: 15px; }
+.rich-editor .ql-editor { min-height: 320px; color: var(--c-fg); line-height: 1.75; }
+.rich-editor .ql-editor.ql-blank::before { color: var(--c-fg-3); font-style: normal; }
+.rich-editor .ql-snow .ql-stroke { stroke: var(--c-fg-2); }
+.rich-editor .ql-snow .ql-fill { fill: var(--c-fg-2); }
+.rich-editor .ql-snow .ql-picker { color: var(--c-fg-2); }
+.rich-editor .ql-snow .ql-picker-options { background: var(--c-surface); border-color: var(--c-line); }
+.rich-editor .ql-snow .ql-tooltip { background: var(--c-surface); border-color: var(--c-line); color: var(--c-fg); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2); }
+.rich-editor .ql-snow .ql-tooltip input[type=text] { background: var(--c-surface-2); border-color: var(--c-line); color: var(--c-fg); }
+.rich-editor .ql-snow button:hover .ql-stroke, .rich-editor .ql-snow .ql-active .ql-stroke { stroke: var(--c-brand-fg); }
+.rich-editor .ql-snow button:hover .ql-fill, .rich-editor .ql-snow .ql-active .ql-fill { fill: var(--c-brand-fg); }

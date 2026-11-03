@@ -1,356 +1,128 @@
-import React, { useEffect, useState } from 'react';
-import "../../styles/community/post.css";
-import { useNavigate, useParams } from 'react-router-dom';
-import {
-    createComment, deleteComment, deletePost, fetchCommentCount, fetchComments, fetchPost, sendReaction as postReaction
-} from "../../api/communityApi.js";
-import { useAuth } from '../../auth/useAuth.js';
-import {RiDeleteBinLine} from "react-icons/ri";
-import PostProfile   from "../../components/community/PostProfile.jsx";
+import {useEffect, useState} from "react";
+import {Link, useNavigate, useParams} from "react-router-dom";
+import {useAuth} from "../../auth/useAuth.js";
 import {useToast} from "../../components/Toast.jsx";
-import { sanitize } from '../../utils/sanitize.js';
-import {getErrorMessage} from '../../api/apiError.js';
-import {TIER_FRAMES} from '../../constants/tiers.js';
+import {deletePost, fetchPost, sendReaction} from "../../api/communityApi.js";
+import {getErrorMessage} from "../../api/apiError.js";
+import Card from "../../components/ui/Card.jsx";
+import Avatar from "../../components/ui/Avatar.jsx";
+import TierBadge from "../../components/ui/TierBadge.jsx";
+import RichContent from "../../components/ui/RichContent.jsx";
+import CommentSection from "../../components/community/CommentSection.jsx";
+import {CATEGORY_LABEL, CATEGORY_STYLE, fullTime} from "../../components/community/post.js";
+import {TIER_NAMES, TIER_TEXT} from "../../constants/tiers.js";
 
-const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
-    return `${year}-${month}-${day} ${hours}:${minutes}`;
-};
-
-const CommentForm = ({ value, onChange, onSubmit, buttonText, isReply = false }) => (
-    <div className={isReply ? "reply-form-container" : "comment-input-area"}>
-        <div className="comment-wrapper">
-              <textarea
-                  value={value}
-                  onChange={(e) => onChange(e.target.value)}
-                  maxLength={255}
-                  placeholder={isReply ? '답글을 입력하세요' : '댓글을 입력하세요'}
-                  className={isReply ? "reply-input" : "comment-textarea"}
-              />
-            <div className="char-count-inside">
-                ({value.length}/255)
-            </div>
-        </div>
-        <div style={{ textAlign: 'right' }}>
-            <button className='writebtn' onClick={onSubmit}>{buttonText}</button>
-        </div>
-    </div>
-);
-
-const PostDetail = () => {
-    const { id } = useParams();
-    const postId = parseInt(id);
+/** 게시글 본문 · 글쓴이 티어 기록 · 좋아요/싫어요 · 댓글 */
+export default function PostDetail() {
+    const {id} = useParams();
+    const postId = Number(id);
     const navigate = useNavigate();
     const {user} = useAuth();
-    const { errorAlert, infoAlert } = useToast();
-
+    const {infoAlert, errorAlert} = useToast();
     const [post, setPost] = useState(null);
-    const [comments, setComments] = useState([]);
-    const [commentContent, setCommentContent] = useState("");
-    const [replyTargetId, setReplyTargetId] = useState(null);
-    const [replyContent, setReplyContent] = useState("");
-    const [openRepliesMap, setOpenRepliesMap] = useState({});
-    const [commentCount, setCommentCount] = useState(0);
 
-    const toggleReplies = (commentId) => {
-        setOpenRepliesMap(prev => ({ ...prev, [commentId]: !prev[commentId] }));
-    };
-
-    const Comment = ({ comment, onReply, onDelete, currentUserId, replyTargetId }) => {
-        const hasReplies = comment.children && comment.children.length > 0;
-        const isReply = comment.parentId !== null;
-
-        const handleReplyClick = () => {
-            if (replyTargetId === comment.id) {
-                onReply(null);
-            } else {
-                onReply(comment.id);
-            }
-        };
-
-        return (
-            <div className="comment-item">
-                <div className="comment-header">
-                    <div className="comment-user-info">
-                        <div className="user-icon" style={{ width: '32px', height: '32px', marginRight: '8px' }}>
-                            {comment.userTier !== 0 ? (
-                                <>
-                                    <img
-                                        src={TIER_FRAMES[comment.userTier]}
-                                        alt=""
-                                        className="tier-image"
-                                    />
-                                    {comment.profileImage && (
-                                        <img
-                                            src={comment.profileImage}
-                                            alt="프로필"
-                                            className="rank-profile-image"
-                                        />
-                                    )}
-                                </>
-                            ) : (
-                                comment.profileImage && (
-                                    <img
-                                        src={comment.profileImage}
-                                        alt="프로필"
-                                        className="rank-profile-image"
-                                    />
-                                )
-                            )}
-                        </div>
-                        <span className="comment-username">{comment.userName}</span>
-                        <span className="comment-date">({formatDate(comment.createdAt)})</span>
-                    </div>
-                </div>
-                <div className="comment-content">{comment.content}</div>
-                <div className="comment-actions">
-                    <button className="comment-action-btn" onClick={() => sendReaction({
-                        targetType: 'COMMENT',
-                        targetId: comment.id,
-                        liked: true
-                    })}>👍 {comment.likes}</button>
-                    <button className="comment-action-btn" onClick={() => sendReaction({
-                        targetType: 'COMMENT',
-                        targetId: comment.id,
-                        liked: false
-                    })}>👎{comment.dislikes}</button>
-                    {!isReply && <button className="comment-action-btn" onClick={handleReplyClick}>💬 답글달기</button>}
-                    {comment.userId === currentUserId && <button className="comment-action-btn danger" onClick={() => onDelete(comment.id)}>🗑️ 삭제</button>}
-                </div>
-                {hasReplies && !isReply && (
-                    <div className="reply-toggle" onClick={() => toggleReplies(comment.id)}>
-                        {openRepliesMap[comment.id] ? '답글 숨기기 ▼' : `${comment.children.length}개의 답글 보기 ▶`}
-                    </div>
-                )}
-                {openRepliesMap[comment.id] && hasReplies && (
-                    <div className="comment-replies">
-                        {comment.children.map(reply => (
-                            <Comment
-                                key={reply.id}
-                                comment={reply}
-                                onReply={onReply}
-                                onDelete={onDelete}
-                                currentUserId={currentUserId}
-                                user={user}
-                                replyTargetId={replyTargetId}
-                            />
-                        ))}
-                    </div>
-                )}
-            </div>
-        );
-    };
-
-    const commentHandlers = {
-        reloadComments: () => {
-            fetchComments(id).then(setComments);
-        },
-        submitComment: () => {
-            if (!commentContent.trim()) return;
-            createComment({postId: id, content: commentContent}).then(() => {
-                setCommentContent("");
-                commentHandlers.reloadComments();
-            });
-        },
-        submitReply: (parentId) => {
-            if (!replyContent.trim()) return;
-            createComment({postId: id, content: replyContent, parentId}).then(() => {
-                setReplyContent("");
-                setReplyTargetId(null);
-                commentHandlers.reloadComments();
-            });
-        },
-        deleteComment: async (commentId) => {
-            const confirmed = window.confirm("댓글을 삭제하시겠습니까?");
-            if (!confirmed) return;
-            try {
-                await deleteComment(commentId);
-                commentHandlers.reloadComments();
-            } catch (err) {
-                errorAlert(getErrorMessage(err, '댓글 삭제 실패'));
-                console.error(err);
-            }
-        },
-    };
-
+    // 조회수는 서버가 사용자 기준으로 중복을 걸러 올린다
     useEffect(() => {
-        // 조회수는 서버가 사용자 기준으로 중복을 걸러 올린다
-        const fetchPost = async () => {
-            try {
-                setPost(await fetchPost(id));
-            } catch (err) {
-                errorAlert(getErrorMessage(err, '게시글을 불러오는 데 실패했습니다.'));
-                navigate('/community');
-            }
+        let alive = true;
+        fetchPost(postId)
+            .then((p) => alive && setPost(p))
+            .catch((err) => {
+                if (!alive) return;
+                errorAlert(getErrorMessage(err, "게시글을 불러오지 못했습니다."));
+                navigate("/community", {replace: true});
+            });
+        return () => {
+            alive = false;
         };
-        fetchPost();
-    }, [id, navigate]);
+    }, [postId, navigate, errorAlert]);
 
-    useEffect(() => {
-        commentHandlers.reloadComments();
-        fetchCommentCount(postId).then(setCommentCount);
-    }, [id]);
-
-    const sendReaction = async ({ targetType, targetId, liked }) => {
+    const react = async (liked) => {
         try {
-            await postReaction({targetType, targetId, liked});
-
-            if (targetType === 'POST') {
-                setPost(await fetchPost(targetId)); // 게시글 갱신
-            } else {
-                commentHandlers.reloadComments();
-            }
+            await sendReaction({targetType: "POST", targetId: postId, liked});
+            setPost(await fetchPost(postId));
         } catch (err) {
-            console.error("리액션 실패", err);
+            errorAlert(getErrorMessage(err, "반응을 남기지 못했습니다."));
         }
     };
 
-    const handleDelete = async () => {
-        if (!window.confirm("정말 이 게시글을 삭제하시겠습니까?")) return;
-
+    const remove = async () => {
+        if (!window.confirm("이 글을 삭제할까요?")) return;
         try {
             await deletePost(postId);
-            infoAlert("게시글이 삭제되었습니다.");
-            navigate("/community"); // 글 목록 페이지로 이동
-        } catch (error) {
-            console.error("삭제 실패", error);
-            errorAlert(getErrorMessage(error, '게시글 삭제에 실패했습니다.'));
+            infoAlert("글을 삭제했어요.");
+            navigate("/community");
+        } catch (err) {
+            errorAlert(getErrorMessage(err, "글을 삭제하지 못했습니다."));
         }
     };
 
-    if (!post) {
-        return (
-            <div className={"post-container"}>
-
-                <div className='postlist'>
-                    <p style={{ textAlign: 'center', padding: '20px' }}>게시글을 찾을 수 없습니다. !</p>
-                </div>
-                <div className='postheader'>
-                    <button type='button' className='listbtn' onClick={() => navigate('/community')}>&lt; 목록</button>
-                </div>
-            </div>
-        );
-    }
+    if (!post) return <p className="rd py-20 text-center text-sm text-fg-3">불러오는 중…</p>;
 
     return (
-        <div className={"post-container"}>
+        <div className="rd mx-auto flex max-w-[800px] flex-col gap-4 px-5 pt-3 pb-12 md:gap-5 md:pt-8">
+            <Link to="/community" className="flex w-fit items-center gap-1 text-sm font-semibold text-fg-2 hover:text-fg">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>
+                커뮤니티
+            </Link>
 
-            <div className='post-detail'>
-                <div className='post-detail-content'>
-                    <div className='post-detail-header'>
-                        <h2 className='post-detail-title'>[{post.category}] {post.title}
-                            {user?.id === post.userId && (
-                                <RiDeleteBinLine className='deletebtn' onClick={handleDelete}/>
-                            )}</h2>
-                        <div className='post-detail-info'>
-                            <div style={{ display: 'flex', alignItems: 'center' }}>
-                                <div className="post-user-icon">
-                                    {post.tier !== 0 ? (
-                                        <>
-                                            <img
-                                                src={TIER_FRAMES[post.tier]}
-                                                alt=""
-                                                className="post-tier-image"
-                                            />
-                                            {post.profileImage && (
-                                                <img
-                                                    src={post.profileImage}
-                                                    alt=""
-                                                    className="post-rank-profile-image"
-                                                />
-                                            )}
-                                        </>
-                                    ) : (
-                                        post.profileImage && (
-                                            <img
-                                                src={post.profileImage}
-                                                alt=""
-                                                className="post-rank-profile-image"
-                                            />
-                                        )
-                                    )}
-                                </div>
-                                <span style={{ fontWeight: 'bold' }}>{post.name}</span>
-                                <span className='post-createdAt' style={{ marginLeft: '10px' }}>
-                                    ({formatDate(post.createdAt)})
-                                </span>
-                            </div>
-                            <div style={{ display: 'flex', alignItems: 'center' }}>
-                                <span style={{ marginRight: '20px' }}>조회 {post.views}</span>
-                                <span>좋아요 {post.likes}</span>
-                            </div>
-                        </div>
+            <Card as="article" className="flex flex-col gap-5 p-5 md:p-8">
+                <header className="flex flex-col gap-3 border-b border-line pb-5">
+                    <span className={`w-fit rounded-md px-1.5 py-0.5 text-xs font-bold ${CATEGORY_STYLE[post.category] ?? "bg-surface-2 text-fg-2"}`}>
+                        {CATEGORY_LABEL[post.category] ?? post.category}
+                    </span>
+                    <h1 className="text-xl leading-snug font-extrabold tracking-[-0.01em] md:text-2xl">{post.title}</h1>
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                        <Avatar src={post.profileImage} name={post.name} tier={post.tier} size="sm"/>
+                        <span className="flex flex-col">
+                            <span className="text-sm font-semibold">{post.name}</span>
+                            <span className="num text-xs text-fg-3">{fullTime(post.createdAt)} · 조회 {post.views}</span>
+                        </span>
+                        {user?.id === post.userId && (
+                            <button type="button" onClick={remove} className="ml-auto rounded-lg px-2.5 py-1.5 text-[13px] font-semibold text-fg-3 hover:bg-surface-2 hover:text-up">
+                                삭제
+                            </button>
+                        )}
                     </div>
-                    <div className='post-detail-body' dangerouslySetInnerHTML={{ __html: sanitize(post.content) }}></div>
-                    <PostProfile
-                        profileImage={post.profileImage}
-                        name={post.name}
-                        highestTier={post.highestTier}
-                        pastSeasonTiers={post.pastSeasonTiers}
-                    />
-                    <div className='post-detail-footer'>
-                        <button className='likebtn' style={{ marginRight: '10px' }} onClick={() => sendReaction({
-                            targetType: 'POST',
-                            targetId: postId,
-                            liked: true
-                        })}>👍 좋아요({post.likes})</button>
+                </header>
 
-                        <button className='dislikebtn' onClick={() => sendReaction({
-                            targetType: 'POST',
-                            targetId: postId,
-                            liked: false
-                        })}>👎 싫어요({post.dislikes})</button>
-                    </div>
+                <RichContent html={post.content}/>
+
+                <div className="flex justify-center gap-2 pt-2">
+                    <button type="button" onClick={() => react(true)} className="num flex h-11 items-center gap-1.5 rounded-full border border-line px-5 text-sm font-semibold hover:border-up hover:text-up">
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M7 10v11H3V10zM7 10l4-8a3 3 0 0 1 3 3v4h6a2 2 0 0 1 2 2.3l-1.4 8A2 2 0 0 1 18.6 21H7"/></svg>
+                        좋아요 {post.likes}
+                    </button>
+                    <button type="button" onClick={() => react(false)} className="num flex h-11 items-center gap-1.5 rounded-full border border-line px-5 text-sm font-semibold hover:border-down hover:text-down">
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="rotate-180" aria-hidden="true"><path d="M7 10v11H3V10zM7 10l4-8a3 3 0 0 1 3 3v4h6a2 2 0 0 1 2 2.3l-1.4 8A2 2 0 0 1 18.6 21H7"/></svg>
+                        싫어요 {post.dislikes}
+                    </button>
                 </div>
 
-                <div className='post-comments'>
-                    <div className="comment-count">댓글 ({commentCount})</div>
-                    <br />
-                    <CommentForm
-                        value={commentContent}
-                        onChange={setCommentContent}
-                        onSubmit={commentHandlers.submitComment}
-                        buttonText="댓글 작성"
-                    />
-                    <div className='comment-list'>
-                        {comments.map(comment => (
-                            <React.Fragment key={comment.id}>
-                                <Comment
-                                    comment={comment}
-                                    onReply={setReplyTargetId}
-                                    onDelete={commentHandlers.deleteComment}
-                                    currentUserId={user?.id}
-                                    user={user}
-                                    replyTargetId={replyTargetId}
-                                />
-                                {replyTargetId === comment.id && (
-                                    <CommentForm
-                                        value={replyContent}
-                                        onChange={setReplyContent}
-                                        onSubmit={() => {
-                                            commentHandlers.submitReply(comment.id);
-                                            setReplyTargetId(null);
-                                        }}
-                                        buttonText="답글 등록"
-                                        isReply={true}
-                                    />
-                                )}
-                            </React.Fragment>
-                        ))}
-                    </div>
+                {/* 글쓴이 티어 기록 */}
+                <div className="flex flex-wrap items-center gap-3 rounded-2xl bg-surface-2 p-4">
+                    <Avatar src={post.profileImage} name={post.name} tier={post.tier} size="md" outline="text-surface-2"/>
+                    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                        <span className="text-sm font-semibold">{post.name}</span>
+                        <span className="text-xs text-fg-3">
+                            최고 티어{" "}
+                            {post.highestTier ? <strong className={TIER_TEXT[post.highestTier]}>{TIER_NAMES[post.highestTier]}</strong> : "기록 없음"}
+                        </span>
+                    </span>
+                    {post.pastSeasonTiers?.length > 0 && (
+                        <ul className="flex gap-1.5" aria-label="지난 시즌 티어">
+                            {post.pastSeasonTiers.slice(0, 5).map((s) => (
+                                <li key={s.name} title={`${s.name} ${TIER_NAMES[s.tier] ?? ""}`}>
+                                    <TierBadge tier={s.tier} size={24}/>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
                 </div>
-            </div>
-            <div className='postheader'>
-                <button type='button' className='listbtn' onClick={() => navigate('/community')}>&lt; 목록</button>&nbsp;&nbsp;
-                <button type='button' className='writebtn' onClick={() => navigate('/community/write')}>📝 글쓰기</button>
-            </div>
+            </Card>
+
+            <Card className="p-5 md:p-8">
+                <CommentSection postId={postId}/>
+            </Card>
         </div>
     );
-};
-
-export default PostDetail;
+}

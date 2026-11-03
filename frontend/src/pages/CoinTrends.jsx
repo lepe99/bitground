@@ -1,428 +1,219 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { fetchNews } from '../api/newsApi.js';
-import '../styles/CoinTrends.css'; // 새로운 CSS 파일 임포트
+import {useEffect, useState} from "react";
+import {Link} from "react-router-dom";
+import {fetchNews} from "../api/newsApi.js";
+import {fetchAlertCoins, fetchCoinInsight, fetchTodayInsightSymbols, fetchWarningCoins} from "../api/coinApi.js";
+import Card from "../components/ui/Card.jsx";
+import SegmentedTabs from "../components/ui/SegmentedTabs.jsx";
+import TopCoins from "../components/main/TopCoins.jsx";
 
-import {
-  fetchTop5HighTradePriceCoins,
-  fetchTop5PriceIncreaseCoins,
-  fetchTop5PriceDecreaseCoins,
-  fetchWarningCoins,
-  fetchAlertCoins,
-  fetchTodayInsightSymbols, // 오늘자 AI 인사이트 심볼 목록
-  fetchCoinInsight
-} from '../api/coinApi.js';
+// AI 분석 목록 맨 앞에 둘 종목 (나머지는 그날 AI가 고른 종목을 이름순으로 최대 5개)
+const PINNED = ["MARKET_OVERALL", "KRW-BTC", "KRW-ETH", "KRW-SOL", "KRW-XRP"];
+const NEWS_KEYWORDS = ["비트코인", "이더리움", "리플", "솔라나", "가상자산"];
+const NEWS_PAGE_SIZE = 5;
 
-// 뉴스 검색 드롭다운에 사용되는 인기 코인 목록입니다.
-const POPULAR_COINS = ['KRW-BTC', 'KRW-ETH', 'KRW-XRP', 'KRW-SOL'];
-const POPULAR_COIN_KEYWORDS = POPULAR_COINS.map(coin => coin.split('-')[1]);
+// 네이버 뉴스 제목의 <b> 태그와 &quot; 같은 문자를 글자로 바꾼다
+const plain = (html) => new DOMParser().parseFromString(html ?? "", "text/html").body.textContent ?? "";
 
-export default function CoinTrends() {
-  const [marketData, setMarketData] = useState({
-    highTradePrice: [],
-    priceIncrease: [],
-    priceDecrease: [],
-    warningCoins: [],
-    alertCoins: [],
-  });
-  const [newsData, setNewsData] = useState([]);
-  const [keyword, setKeyword] = useState('BTC');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalNewsPages, setTotalNewsPages] = useState(1);
+function AiInsightCard() {
+    const [options, setOptions] = useState(null);
+    const [symbol, setSymbol] = useState(null);
+    const [insight, setInsight] = useState(undefined); // undefined: 불러오는 중, null: 없음
 
-  // AI 분석 관련 상태 (드롭다운 선택 및 결과 표시용)
-  const [aiInsightSymbols, setAiInsightSymbols] = useState([]); // 드롭다운에 표시될 AI 분석 가능 코인 심볼 목록
-  const [selectedCoinSymbol, setSelectedCoinSymbol] = useState(''); // 드롭다운에서 현재 선택된 코인 심볼
-  const [selectedCoinAnalysis, setSelectedCoinAnalysis] = useState(null); // 선택된 코인의 AI 분석 결과
-
-  const [loadingMarket, setLoadingMarket] = useState(true);
-  const [loadingNews, setLoadingNews] = useState(false);
-  const [loadingAnalysis, setLoadingAnalysis] = useState(false); // AI 분석 데이터 (드롭다운 목록 및 선택된 코인) 로딩
-
-  const newsCardRef = useRef(null);
-
-  // AI 분석 드롭다운 목록 구성 (고객님 요청에 따라 특정 코인만 포함)
-  // 이 useEffect는 컴포넌트 마운트 시 한 번만 실행되어 드롭다운 목록을 구성하고 기본값을 설정합니다.
-  useEffect(() => {
-    const fetchAiInsightSymbolsAndSetInitial = async () => {
-      setLoadingAnalysis(true); // AI 분석 관련 전체 로딩 시작
-      try {
-        // 백엔드에서 오늘자 AI 분석을 가진 '모든' 코인 심볼 목록을 가져옵니다.
-        let availableInsightSymbolsFromBackend = await fetchTodayInsightSymbols();
-
-        // 고객님 요청에 따른 AI 분석 드롭다운의 고정 표시 순서 및 목록 정의
-        const preferredFixedSymbols = ['MARKET_OVERALL', 'KRW-BTC', 'KRW-ETH', 'KRW-SOL', 'KRW-XRP'];
-
-        let finalDropdownSymbols = [];
-        const addedSymbols = new Set(); // 중복 추가 방지를 위한 Set
-
-        // 1. 고정적으로 표시되어야 하는 심볼을 우선적으로 추가합니다.
-        for (const symbol of preferredFixedSymbols) {
-          const insight = availableInsightSymbolsFromBackend.find(s => s.symbol === symbol);
-          if (insight) {
-            finalDropdownSymbols.push(insight);
-            addedSymbols.add(symbol);
-          }
-        }
-
-        // 2. 고정 목록에 없는, AI가 추천한 나머지 코인들을 추가합니다.
-        // 이제 KRW-DOGE 제외 로직은 없습니다.
-        const recommendedCoins = availableInsightSymbolsFromBackend.filter(insight =>
-            !addedSymbols.has(insight.symbol)
-        ).sort((a, b) => a.koreanName.localeCompare(b.koreanName)); // 한글 이름 기준으로 정렬
-
-        // 추천 코인 중 최대 5개까지만 추가
-        for (let i = 0; i < Math.min(5, recommendedCoins.length); i++) {
-          finalDropdownSymbols.push(recommendedCoins[i]);
-        }
-
-        setAiInsightSymbols(finalDropdownSymbols);
-
-        // 드롭다운 기본 선택 및 해당 AI 분석 결과 설정
-        if (finalDropdownSymbols.length > 0) {
-          const defaultSelectedSymbol = 'MARKET_OVERALL';
-          const initialSymbol = finalDropdownSymbols.find(option => option.symbol === defaultSelectedSymbol)
-              ? defaultSelectedSymbol
-              : finalDropdownSymbols[0].symbol; // 전체 시장이 없으면 첫 번째 옵션 선택
-
-          setSelectedCoinSymbol(initialSymbol);
-
-          // 초기 로딩 시 기본 선택된 심볼의 AI 분석 데이터도 함께 가져옴
-          setSelectedCoinAnalysis(await fetchCoinInsight(initialSymbol));
-        } else {
-          setSelectedCoinAnalysis(null);
-        }
-
-      } catch (error) {
-        console.error("AI 분석 드롭다운 목록 및 초기 분석 데이터 구성 중 오류 발생:", error);
-        setAiInsightSymbols([]);
-        setSelectedCoinAnalysis(null);
-      } finally {
-        setLoadingAnalysis(false); // AI 분석 관련 전체 로딩 완료
-      }
-    };
-
-    fetchAiInsightSymbolsAndSetInitial();
-  }, []); // 컴포넌트 마운트 시 한 번만 실행
-
-  // 드롭다운에서 선택된 특정 코인에 대한 AI 분석 가져오기
-  // 이 useEffect는 selectedCoinSymbol이 변경될 때마다 해당 코인의 분석 결과를 다시 불러옵니다.
-  useEffect(() => {
-    const getSelectedCoinInsight = async () => {
-      if (!selectedCoinSymbol) {
-        setSelectedCoinAnalysis(null);
-        return;
-      }
-      setLoadingAnalysis(true); // 선택 변경 시 로딩 시작
-      try {
-        setSelectedCoinAnalysis(await fetchCoinInsight(selectedCoinSymbol));
-      } catch (error) {
-        console.error(`선택된 코인(${selectedCoinSymbol})의 AI 인사이트를 불러오는 데 실패했습니다:`, error);
-        setSelectedCoinAnalysis(null);
-      } finally {
-        setLoadingAnalysis(false); // 선택 변경 시 로딩 완료
-      }
-    };
-    // aiInsightSymbols가 로드된 후에만 getSelectedCoinInsight 호출
-    if (aiInsightSymbols.length > 0 && selectedCoinSymbol) {
-      getSelectedCoinInsight();
-    }
-  }, [selectedCoinSymbol, aiInsightSymbols]); // aiInsightSymbols가 로드되어야 selectedCoinSymbol이 유효하게 설정될 수 있음
-
-  // 마켓 데이터 (거래대금, 상승/하락폭, 유의/주의 종목) 가져오기
-  useEffect(() => {
-    const getMarketData = async () => {
-      setLoadingMarket(true);
-      try {
-        const [highTradePrice, priceIncrease, priceDecrease, warningCoins, alertCoins] = await Promise.all([
-          fetchTop5HighTradePriceCoins(),
-          fetchTop5PriceIncreaseCoins(),
-          fetchTop5PriceDecreaseCoins(),
-          fetchWarningCoins(),
-          fetchAlertCoins(),
-        ]);
-        setMarketData({ highTradePrice, priceIncrease, priceDecrease, warningCoins, alertCoins });
-      } catch (error) {
-        console.error("마켓 데이터를 불러오는 데 실패했습니다:", error);
-        setMarketData({
-          highTradePrice: [],
-          priceIncrease: [],
-          priceDecrease: [],
-          warningCoins: [],
-          alertCoins: [],
+    useEffect(() => {
+        fetchTodayInsightSymbols().then((list) => {
+            const pinned = PINNED.map((s) => list.find((x) => x.symbol === s)).filter(Boolean);
+            const others = list
+                .filter((x) => !PINNED.includes(x.symbol))
+                .sort((a, b) => a.koreanName.localeCompare(b.koreanName, "ko"))
+                .slice(0, 5);
+            const all = [...pinned, ...others];
+            setOptions(all);
+            setSymbol(all[0]?.symbol ?? null);
+            if (!all.length) setInsight(null);
         });
-      } finally {
-        setLoadingMarket(false);
-      }
-    };
-    getMarketData();
+    }, []);
 
-    // 1분마다 데이터 갱신
-    const interval = setInterval(getMarketData, 60000);
-    return () => clearInterval(interval);
-  }, []);
+    useEffect(() => {
+        if (!symbol) return;
+        let alive = true;
+        setInsight(undefined);
+        fetchCoinInsight(symbol).then((res) => alive && setInsight(res ?? null));
+        return () => {
+            alive = false;
+        };
+    }, [symbol]);
 
-  // 뉴스 데이터 가져오기 (키워드 또는 페이지 변경 시)
-  useEffect(() => {
-    const getNews = async () => {
-      setLoadingNews(true);
-      try {
-        const newsResponse = await fetchNews(keyword, currentPage);
-        setNewsData(newsResponse.newsData);
-        setTotalNewsPages(newsResponse.totalPage);
-      } catch (error) {
-        console.error("뉴스 데이터를 불러오는 데 실패했습니다:", error);
-        setNewsData([]);
-        setTotalNewsPages(1);
-      } finally {
-        setLoadingNews(false);
-        if (newsCardRef.current) {
-          newsCardRef.current.scrollTop = 0;
-        }
-      }
-    };
-    if (keyword) {
-      getNews();
-    }
-  }, [keyword, currentPage]);
+    const label = (o) => (o.symbol === "MARKET_OVERALL" ? "시장 전체" : o.koreanName);
 
-  const handleKeywordChange = (e) => {
-    setKeyword(e.target.value);
-    setCurrentPage(1);
-  };
-
-  const handlePopularCoinSelect = (e) => {
-    setKeyword(e.target.value);
-    setCurrentPage(1);
-  };
-
-  const handlePageChange = (newPage) => {
-    if (newPage > 0 && newPage <= totalNewsPages) {
-      setCurrentPage(newPage);
-    }
-  };
-
-  const handleCoinSelectForAnalysis = (e) => {
-    setSelectedCoinSymbol(e.target.value);
-  };
-
-  return (
-      <div className="trends-container">
-
-        {/* -------------------- 첫 번째 줄 -------------------- */}
-
-        {/* === AI 분석 카드 (드롭다운 선택 코인) === */}
-        <div className="trend-card bitcoin-analysis">
-          <div className="card-header">
-            <h3 className="card-title">AI 코인 분석</h3>
-            <div className="coin-select-wrapper">
-              <select
-                  className="popular-coin-select"
-                  value={selectedCoinSymbol}
-                  onChange={handleCoinSelectForAnalysis}
-                  disabled={loadingAnalysis || aiInsightSymbols.length === 0}
-              >
-                {aiInsightSymbols.length === 0 ? (
-                    <option value="">분석 코인 불러오는 중...</option>
-                ) : (
-                    aiInsightSymbols.map((coinDto) => (
-                        <option key={coinDto.symbol} value={coinDto.symbol}>
-                          {coinDto.koreanName} ({coinDto.symbol.replace('KRW-', '')})
-                        </option>
-                    ))
-                )}
-              </select>
+    return (
+        <Card className="flex flex-col gap-4 p-5 md:col-span-2 md:p-6">
+            <div className="flex items-baseline justify-between gap-2">
+                <h2 className="text-base font-bold md:text-[17px]">오늘의 AI 분석</h2>
+                <span className="text-xs text-fg-3">매일 아침 갱신</span>
             </div>
-          </div>
-          <div className="card-content">
-            {loadingAnalysis ? (
-                <div className="analysis-loading">AI가 분석 중입니다...</div>
-            ) : selectedCoinAnalysis ? (
-                <div className="ai-analysis-results">
-                  <p className="analysis-text">{selectedCoinAnalysis.insight}</p>
-                  <div className="analysis-meta">
-                  <span className={`analysis-score ${selectedCoinAnalysis.score >= 60 ? 'positive' : 'negative'}`}> {/* 60점 이상이면 positive */}
-                    점수: {selectedCoinAnalysis.score}
-                  </span>
-                    <span className="analysis-date">
-                    분석일: {new Date(selectedCoinAnalysis.date).toLocaleDateString('ko-KR')}
-                  </span>
-                  </div>
+            {options?.length > 0 && (
+                <div role="tablist" aria-label="분석 종목" className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
+                    {options.map((o) => (
+                        <button
+                            key={o.symbol}
+                            type="button"
+                            role="tab"
+                            aria-selected={o.symbol === symbol}
+                            onClick={() => setSymbol(o.symbol)}
+                            className={`h-9 shrink-0 whitespace-nowrap rounded-full border px-3.5 text-[13px] font-semibold ${
+                                o.symbol === symbol ? "border-fg bg-fg text-bg" : "border-line text-fg-2 hover:text-fg"
+                            }`}
+                        >
+                            {label(o)}
+                        </button>
+                    ))}
+                </div>
+            )}
+            {insight === undefined && options !== null && options.length > 0 ? (
+                <p className="py-8 text-center text-sm text-fg-3">불러오는 중…</p>
+            ) : insight ? (
+                <div className="flex flex-col gap-3">
+                    <p className="whitespace-pre-wrap text-[15px] leading-[1.75] text-fg-2">{insight.insight}</p>
+                    <div className="flex flex-wrap items-center gap-3 text-xs text-fg-3">
+                        <span className={`rounded-full px-2.5 py-1 text-[13px] font-bold ${insight.score >= 60 ? "bg-up/10 text-up" : "bg-down/10 text-down"}`}>
+                            전망 점수 {insight.score}
+                        </span>
+                        <span className="num">{new Date(insight.date).toLocaleDateString("ko-KR")} 분석</span>
+                        <span>투자 권유가 아닌 참고용 분석이에요.</span>
+                    </div>
                 </div>
             ) : (
-                <div className="no-results">선택된 코인에 대한 AI 분석이 없습니다.</div>
+                <p className="py-8 text-center text-sm text-fg-3">{options === null ? "불러오는 중…" : "오늘 분석이 아직 없어요."}</p>
             )}
-          </div>
-        </div>
+        </Card>
+    );
+}
 
-        {/* === 거래대금 TOP 5 === */}
-        <div className="trend-card high-volume">
-          <div className="card-header">
-            <h3 className="card-title">거래대금 TOP 5</h3>
-          </div>
-          <div className="card-content">
-            {loadingMarket ? (
-                <div className="loading-text">데이터 불러오는 중...</div>
-            ) : marketData.highTradePrice.length > 0 ? (
-                <ul className="coin-list">
-                  {marketData.highTradePrice.map((coin, index) => (
-                      <li key={index} className="coin-item">
-                        <span className="coin-name">{coin.koreanName} <span className="coin-symbol">({coin.symbol})</span></span>
-                        <span className="coin-value">{new Intl.NumberFormat('ko-KR').format(coin.tradePrice24h)}원</span>
-                      </li>
-                  ))}
-                </ul>
-            ) : (
-                <div className="no-results">데이터가 없습니다.</div>
-            )}
-          </div>
-        </div>
+function CautionCard() {
+    const [tab, setTab] = useState("warning");
+    const [lists, setLists] = useState(null);
 
-        {/* -------------------- 두 번째 줄 (기존) -------------------- */}
+    useEffect(() => {
+        Promise.all([fetchWarningCoins(), fetchAlertCoins()]).then(([warning, alert]) => setLists({warning, alert}));
+    }, []);
 
-        {/* === 최신 뉴스 === */}
-        <div className="trend-card latest-news">
-          <div className="card-header">
-            <h3 className="card-title">최신 뉴스</h3>
-            <div className="news-search-controls">
-              <input
-                  type="text"
-                  placeholder="뉴스 검색 키워드"
-                  className="news-search-input"
-                  value={keyword}
-                  onChange={handleKeywordChange}
-                  onKeyPress={(e) => {
-                    if (e.key === 'Enter') {
-                      setCurrentPage(1);
-                    }
-                  }}
-              />
-              <select
-                  className="popular-coin-select"
-                  value={keyword}
-                  onChange={handlePopularCoinSelect}
-              >
-                {POPULAR_COIN_KEYWORDS.map((kw) => (
-                    <option key={kw} value={kw}>{kw}</option>
-                ))}
-              </select>
+    const items = lists?.[tab] ?? [];
+    return (
+        <Card className="flex flex-col gap-2 p-5 md:p-6">
+            <div className="flex items-center justify-between gap-2 pb-2">
+                <h2 className="text-base font-bold md:text-[17px]">주의 종목</h2>
+                <SegmentedTabs
+                    label="주의 종류"
+                    items={[{value: "warning", label: "거래유의"}, {value: "alert", label: "투자주의"}]}
+                    value={tab}
+                    onChange={setTab}
+                    className="[&>button]:h-8 [&>button]:px-3 [&>button]:text-xs"
+                />
             </div>
-          </div>
-          <div className="card-content" ref={newsCardRef}>
-            {loadingNews ? (
-                <div className="loading-text">뉴스 불러오는 중...</div>
-            ) : newsData.length > 0 ? (
-                <ul className="news-list">
-                  {newsData.map((news, index) => (
-                      <li key={index} className="news-item">
-                        <a href={news.link} target="_blank" rel="noopener noreferrer" className="news-title" dangerouslySetInnerHTML={{ __html: news.title }}></a>
-                        <span className="news-date">{new Date(news.pubDate).toLocaleDateString('ko-KR')}</span>
-                      </li>
-                  ))}
-                </ul>
-            ) : (
-                <div className="no-results">검색된 뉴스가 없습니다.</div>
-            )}
-          </div>
-          <div className="news-pagination">
-            <button onClick={() => handlePageChange(currentPage - 1)} disabled={currentPage === 1}>이전</button>
-            <span>{currentPage} / {totalNewsPages}</span>
-            <button onClick={() => handlePageChange(currentPage + 1)} disabled={currentPage === totalNewsPages}>다음</button>
-          </div>
-        </div>
+            {lists === null && <p className="py-6 text-center text-sm text-fg-3">불러오는 중…</p>}
+            {lists && items.length === 0 && <p className="py-6 text-center text-sm text-fg-3">지금은 {tab === "warning" ? "거래유의" : "투자주의"} 종목이 없어요.</p>}
+            <ul>
+                {items.map((c) => (
+                    <li key={c.symbol}>
+                        <Link to={`/trade?market=${c.symbol}`} className="flex items-center justify-between gap-3 py-2">
+                            <span className="truncate text-sm font-semibold">{c.koreanName} <span className="font-normal text-fg-3">{c.symbol.replace("KRW-", "")}</span></span>
+                            <span className={`shrink-0 rounded-md px-2 py-0.5 text-xs font-bold ${tab === "warning" ? "bg-up/10 text-up" : "bg-brand-soft text-brand-fg"}`}>
+                                {tab === "warning" ? "유의" : "주의"}
+                            </span>
+                        </Link>
+                    </li>
+                ))}
+            </ul>
+        </Card>
+    );
+}
 
-        {/* === 상승폭 큰 종목 === */}
-        <div className="trend-card price-increase">
-          <div className="card-header">
-            <h3 className="card-title">상승폭 큰 종목</h3>
-          </div>
-          <div className="card-content">
-            {loadingMarket ? (
-                <div className="loading-text">데이터 불러오는 중...</div>
-            ) : marketData.priceIncrease.length > 0 ? (
-                <ul className="coin-list">
-                  {marketData.priceIncrease.map((coin, index) => (
-                      <li key={index} className="coin-item">
-                        <span className="coin-name">{coin.koreanName} <span className="coin-symbol">({coin.symbol})</span></span>
-                        <span className="coin-value positive">+{coin.changeRate.toFixed(2)}%</span>
-                      </li>
-                  ))}
-                </ul>
-            ) : (
-                <div className="no-results">데이터가 없습니다.</div>
-            )}
-          </div>
-        </div>
+function NewsCard() {
+    const [keyword, setKeyword] = useState(NEWS_KEYWORDS[0]);
+    const [draft, setDraft] = useState("");
+    const [page, setPage] = useState(1);
+    const [news, setNews] = useState(null);
+    const [totalPages, setTotalPages] = useState(1);
 
-        {/* -------------------- 세 번째 줄 (기존) -------------------- */}
+    useEffect(() => {
+        let alive = true;
+        setNews(null);
+        fetchNews(keyword, page, NEWS_PAGE_SIZE).then((res) => {
+            if (!alive) return;
+            setNews(res.newsData ?? []);
+            setTotalPages(res.totalPage ?? 1);
+        });
+        return () => {
+            alive = false;
+        };
+    }, [keyword, page]);
 
-        {/* === 거래유의 종목 === */}
-        <div className="trend-card caution-trading">
-          <div className="card-header">
-            <h3 className="card-title">거래유의 종목</h3>
-          </div>
-          <div className="card-content">
-            {loadingMarket ? (
-                <div className="loading-text">데이터 불러오는 중...</div>
-            ) : marketData.warningCoins.length > 0 ? (
-                <ul className="coin-list">
-                  {marketData.warningCoins.map((coin, index) => (
-                      <li key={index} className="coin-item">
-                        <span className="coin-name">{coin.koreanName} <span className="coin-warning-item">({coin.symbol})</span></span>
-                        <span className="coin-warning">⛔️ 유의</span>
-                      </li>
-                  ))}
-                </ul>
-            ) : (
-                <div className="no-results">현재 거래유의 종목이 없습니다.</div>
-            )}
-          </div>
-        </div>
+    const search = (e) => {
+        e.preventDefault();
+        if (!draft.trim()) return;
+        setKeyword(draft.trim());
+        setPage(1);
+    };
 
-        {/* === 투자주의 종목 === */}
-        <div className="trend-card alert-trading">
-          <div className="card-header">
-            <h3 className="card-title">투자주의 종목</h3>
-          </div>
-          <div className="card-content">
-            {loadingMarket ? (
-                <div className="loading-text">데이터 불러오는 중...</div>
-            ) : marketData.alertCoins.length > 0 ? (
-                <ul className="coin-list">
-                  {marketData.alertCoins.map((coin, index) => (
-                      <li key={index} className="coin-item">
-                        <span className="coin-name">{coin.koreanName} <span className="coin-warning-item">({coin.symbol})</span></span>
-                        <span className="coin-warning">⚠️ 주의</span>
-                      </li>
-                  ))}
-                </ul>
-            ) : (
-                <div className="no-results">현재 투자주의 종목이 없습니다.</div>
-            )}
-          </div>
-        </div>
+    return (
+        <Card className="flex flex-col gap-3 p-5 md:col-span-2 md:p-6">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+                <h2 className="text-base font-bold md:text-[17px]">최신 뉴스 <span className="font-normal text-fg-3">· {keyword}</span></h2>
+                <form onSubmit={search} className="flex h-9 w-full items-center gap-2 rounded-[10px] bg-surface-2 px-3 text-fg-3 sm:w-60">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+                    <label className="sr-only" htmlFor="news-q">뉴스 검색</label>
+                    <input id="news-q" value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="키워드 검색" className="min-w-0 flex-1 text-[13px] text-fg outline-none placeholder:text-fg-3"/>
+                </form>
+            </div>
+            <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1">
+                {NEWS_KEYWORDS.map((k) => (
+                    <button
+                        key={k}
+                        type="button"
+                        onClick={() => {
+                            setKeyword(k);
+                            setPage(1);
+                        }}
+                        aria-pressed={k === keyword}
+                        className={`h-8 shrink-0 rounded-full px-3 text-xs font-semibold ${k === keyword ? "bg-brand-soft text-brand-fg" : "bg-surface-2 text-fg-2"}`}
+                    >
+                        {k}
+                    </button>
+                ))}
+            </div>
+            {news === null && <p className="py-10 text-center text-sm text-fg-3">불러오는 중…</p>}
+            {news?.length === 0 && <p className="py-10 text-center text-sm text-fg-3">검색된 뉴스가 없어요.</p>}
+            <ul>
+                {news?.map((n) => (
+                    <li key={n.link} className="border-t border-line first:border-t-0">
+                        <a href={n.originallink || n.link} target="_blank" rel="noopener noreferrer" className="group flex flex-col gap-1 py-3">
+                            <span className="text-[15px] font-semibold group-hover:underline">{plain(n.title)}</span>
+                            <span className="line-clamp-2 text-[13px] leading-relaxed text-fg-3">{plain(n.description)}</span>
+                            <span className="num text-xs text-fg-3">{new Date(n.pubDate).toLocaleString("ko-KR", {month: "long", day: "numeric", hour: "2-digit", minute: "2-digit"})}</span>
+                        </a>
+                    </li>
+                ))}
+            </ul>
+            <div className="flex items-center justify-center gap-3 pt-1">
+                <button type="button" onClick={() => setPage((p) => p - 1)} disabled={page <= 1} className="h-9 rounded-[10px] border border-line px-4 text-sm font-semibold text-fg-2 disabled:opacity-40">이전</button>
+                <span className="num text-sm text-fg-3">{page} / {totalPages}</span>
+                <button type="button" onClick={() => setPage((p) => p + 1)} disabled={page >= totalPages} className="h-9 rounded-[10px] border border-line px-4 text-sm font-semibold text-fg-2 disabled:opacity-40">다음</button>
+            </div>
+        </Card>
+    );
+}
 
-        {/* === 하락폭 큰 종목 === */}
-        <div className="trend-card price-decrease">
-          <div className="card-header">
-            <h3 className="card-title">하락폭 큰 종목</h3>
-          </div>
-          <div className="card-content">
-            {loadingMarket ? (
-                <div className="loading-text">데이터 불러오는 중...</div>
-            ) : marketData.priceDecrease.length > 0 ? (
-                <ul className="coin-list">
-                  {marketData.priceDecrease.map((coin, index) => (
-                      <li key={index} className="coin-item">
-                        <span className="coin-name">{coin.koreanName} <span className="coin-symbol">({coin.symbol})</span></span>
-                        <span className="coin-value negative">{coin.changeRate.toFixed(2)}%</span>
-                      </li>
-                  ))}
-                </ul>
-            ) : (
-                <div className="no-results">데이터가 없습니다.</div>
-            )}
-          </div>
+/** 최신동향: AI 분석 · TOP5 · 주의 종목 · 뉴스 */
+export default function CoinTrends() {
+    return (
+        <div className="rd mx-auto flex max-w-[1280px] flex-col gap-4 px-5 pt-4 pb-10 md:gap-5 md:px-8 md:pt-8 md:pb-14">
+            <h1 className="text-xl font-extrabold md:text-[28px]">최신동향</h1>
+            <div className="grid items-start gap-4 md:grid-cols-3 md:gap-5">
+                <AiInsightCard/>
+                <TopCoins/>
+                <NewsCard/>
+                <CautionCard/>
+            </div>
         </div>
-      </div>
-  );
+    );
 }

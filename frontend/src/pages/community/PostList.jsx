@@ -1,311 +1,107 @@
-import "../../styles/community/post.css";
-import {useNavigate} from 'react-router-dom';
-import {fetchPosts as fetchPostPage} from "../../api/communityApi.js";
 import {useEffect, useState} from "react";
-import {HiOutlinePhoto} from "react-icons/hi2";
-import {TIER_FRAMES} from '../../constants/tiers.js';
+import {Link, useSearchParams} from "react-router-dom";
+import {fetchPosts} from "../../api/communityApi.js";
+import Card from "../../components/ui/Card.jsx";
+import Button from "../../components/ui/Button.jsx";
+import Avatar from "../../components/ui/Avatar.jsx";
+import Pagination from "../../components/ui/Pagination.jsx";
+import SegmentedTabs from "../../components/ui/SegmentedTabs.jsx";
+import {CATEGORIES, CATEGORY_LABEL, CATEGORY_STYLE, postTime} from "../../components/community/post.js";
 
-/**
- * 게시글 목록 페이지 컴포넌트
- * - 전체 게시글 목록 표시
- * - 카테고리별 필터링 기능
- * - 정렬 기능 (최신순, 오래된순, 인기순)
- * - 페이지네이션 지원
- */
-const PostList = () => {
-    const navigate = useNavigate();
-    const [currentCategory, setCurrentCategory] = useState('전체');
-    const [posts, setPosts] = useState([]);
-    const [currentPage, setCurrentPage] = useState(0);
-    const [totalPages, setTotalPages] = useState(0);
-    const [sortOrder, setSortOrder] = useState("latest");
+const PAGE_SIZE = 15;
+const SORTS = [
+    {value: "latest", label: "최신순"},
+    {value: "popular", label: "인기순"},
+    {value: "views", label: "조회순"},
+    {value: "oldest", label: "오래된순"},
+];
 
-    const handleWrite = () => navigate('/community/write');
+/** 커뮤니티 목록: 분류 · 정렬 · 쪽 이동. 분류·정렬·쪽은 주소에 남겨 뒤로 가기로 돌아올 수 있게 한다 */
+export default function PostList() {
+    const [params, setParams] = useSearchParams();
+    const category = params.get("category") ?? "ALL";
+    const sort = params.get("sort") ?? "latest";
+    const page = Number(params.get("page") ?? 0);
+    const [data, setData] = useState(null);
 
-    const handlePostClick = (postId) => {
-        navigate(`/community/${postId}`);
-    };
-
-    const handleCategoryClick = (category) => {
-        setCurrentCategory(category);
-        setCurrentPage(0);
-        fetchPosts(0, category);
-    };
-
-    const tdStyle = {
-        verticalAlign: 'middle',
-        textAlign: 'center',
-        // height: '40px',
-        // lineHeight: '40px'
-    };
-
-    const titleStyle = {
-        ...tdStyle,
-        textAlign: 'left',
-        cursor: 'pointer',
-        // maxWidth: '600px',
-        overflow: 'hidden',
-        // textOverflow: 'ellipsis',
-        // whiteSpace: 'nowrap'
-    };
-
-    const commentStyle = {
-        color: '#FC5754',
-        marginLeft: '5px',
-        // fontSize: '0.9em'
-    };
-
-    const imageIconStyle = {
-        marginLeft: '5px',
-        marginTop: '3px',
-        fontSize: '1.2em',
-        color: '#8c8c8c'
-    };
-
-    const categoryButtonStyle = (category) => ({
-        backgroundColor: currentCategory === category ? '#FC5754' : 'white',
-        color: currentCategory === category ? 'white' : '#8C8C8C',
-        padding: '0 20px',
-        cursor: 'pointer',
-    });
-
-    const fetchPosts = async (page = 0, category = currentCategory, sort = sortOrder) => {
-        try {
-            const data = await fetchPostPage({
-                page,
-                size: 15,
-                category: category === '전체' ? null : category,
-                sort
-            });
-            setPosts(data.content);
-            setTotalPages(data.totalPages);
-        } catch (err) {
-            console.error('게시글 불러오기 실패:', err);
-        }
-    };
+    const update = (next) => setParams({category, sort, page: 0, ...next}, {replace: true});
 
     useEffect(() => {
-        fetchPosts(currentPage, currentCategory, sortOrder);
-    }, [currentPage, currentCategory, sortOrder]);
-
-    const filteredPosts = currentCategory === '전체'
-        ? posts
-        : posts.filter(post => post.category === currentCategory);
-
-    const handleSortChange = (e) => {
-        setSortOrder(e.target.value);
-    };
-
-    const formatCreatedAt = (createdAt) => {
-        if (!createdAt) return '';
-        const postDate = new Date(createdAt);
-        const now = new Date();
-        const isToday = postDate.toDateString() === now.toDateString();
-        if (isToday) {
-            return `${postDate.getHours().toString().padStart(2, '0')}:${postDate.getMinutes().toString().padStart(2, '0')}`;
-        } else {
-            return `${(postDate.getMonth() + 1).toString().padStart(2, '0')}-${postDate.getDate().toString().padStart(2, '0')}`;
-        }
-    };
+        let alive = true;
+        setData(null);
+        fetchPosts({page, size: PAGE_SIZE, category: category === "ALL" ? null : category, sort})
+            .then((res) => alive && setData(res))
+            .catch((error) => {
+                console.error("게시글 조회 실패:", error);
+                if (alive) setData({content: [], totalPages: 0});
+            });
+        return () => {
+            alive = false;
+        };
+    }, [category, sort, page]);
 
     return (
-        <div className={"post-container"}>
+        <div className="rd mx-auto flex max-w-[960px] flex-col gap-4 px-5 pt-4 pb-24 md:gap-5 md:pt-8 md:pb-14">
+            <div className="flex items-center justify-between gap-3">
+                <h1 className="text-xl font-extrabold md:text-[28px]">커뮤니티</h1>
+                <Button as={Link} to="/community/write" size="sm" className="max-md:hidden">글쓰기</Button>
+            </div>
 
-            <div className='postlist'>
-                <table className='posttable'>
-                    <colgroup>
-                        <col style={{width: '5%'}}/>
-                        <col style={{width: '59%'}}/>
-                        <col style={{width: '17%'}}/>
-                        <col style={{width: '6%'}}/>
-                        <col style={{width: '8%'}}/>
-                        <col style={{width: '5%'}}/>
-                    </colgroup>
-                    <thead className='postbtns'>
-                    <tr>
-                        <th colSpan="6" style={{textAlign: 'left'}}>
-                            <div className="button-group">
-                                {['전체', 'CHAT', 'QUESTION', 'INFO'].map(cat => (
-                                    <button
-                                        key={cat}
-                                        onClick={() => handleCategoryClick(cat)}
-                                        style={categoryButtonStyle(cat)}>
-                                        {cat === '전체' ? '전체' : cat === 'CHAT' ? '잡담' : cat === 'QUESTION' ? '질문' : '정보'}
-                                    </button>
-                                ))}
-                            </div>
-                        </th>
-                        <th style={{textAlign: 'right'}}>
-                            <select className="sort" onChange={handleSortChange} value={sortOrder}>
-                                <option value="latest">최신순</option>
-                                <option value="oldest">오래된순</option>
-                                <option value="popular">인기순</option>
-                                <option value="views">조회순</option>
-                            </select>
-                        </th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    <tr className='posttable-body-header'>
-                        <td style={tdStyle}>번호</td>
-                        <td style={tdStyle}>제목</td>
-                        <td style={tdStyle}>글쓴이</td>
-                        <td style={tdStyle}>등록일</td>
-                        <td style={tdStyle}>조회수</td>
-                        <td style={tdStyle}>좋아요</td>
-                        <td style={tdStyle}>싫어요</td>
-                    </tr>
-                    {filteredPosts.map(post => (
-                        <tr key={post.id}>
-                            <td style={tdStyle}>{post.id}</td>
-                            <td style={titleStyle} onClick={() => handlePostClick(post.id)}>
-                                [{post.category}] {post.title}
-                                <span className="title-icon">
-                                    <span style={commentStyle}>[{post.commentCount}]</span>
-                                    {post.hasImage && <HiOutlinePhoto style={imageIconStyle}/>}
-                                </span>
-                            </td>
-                            <td style={tdStyle}>
-                                <div className="user-icon-div">
-                                    <div className="post-user-icon">
-                                        {post.tier !== 0 ? (
-                                            <>
-                                                <img
-                                                    src={TIER_FRAMES[post.tier]}
-                                                    alt=""
-                                                    className="post-tier-image"
-                                                />
-                                                {post.profileImage && (
-                                                    <img
-                                                        src={post.profileImage}
-                                                        alt=""
-                                                        className="post-rank-profile-image"
-                                                    />
-                                                )}
-                                            </>
-                                        ) : (
-                                            post.profileImage && (
-                                                <img
-                                                    src={post.profileImage}
-                                                    alt=""
-                                                    className="post-rank-profile-image"
-                                                />
-                                            )
+            <div className="flex flex-wrap items-center justify-between gap-2">
+                <SegmentedTabs label="분류" items={CATEGORIES} value={category} onChange={(value) => update({category: value})}/>
+                <select
+                    aria-label="정렬"
+                    value={sort}
+                    onChange={(e) => update({sort: e.target.value})}
+                    className="h-10 rounded-xl border border-line bg-surface px-3 text-sm font-semibold"
+                >
+                    {SORTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+                </select>
+            </div>
+
+            <Card className="overflow-hidden">
+                {data === null && <p className="px-5 py-14 text-center text-sm text-fg-3">불러오는 중…</p>}
+                {data?.content.length === 0 && <p className="px-5 py-14 text-center text-sm text-fg-3">아직 글이 없어요. 첫 글을 남겨 보세요!</p>}
+                <ul>
+                    {data?.content.map((post) => (
+                        <li key={post.id} className="border-b border-line last:border-b-0">
+                            <Link to={`/community/${post.id}`} className="flex flex-col gap-2 px-5 py-4 hover:bg-surface-2">
+                                <span className="flex items-start gap-2">
+                                    <span className={`mt-0.5 shrink-0 rounded-md px-1.5 py-0.5 text-[11px] font-bold ${CATEGORY_STYLE[post.category] ?? "bg-surface-2 text-fg-2"}`}>
+                                        {CATEGORY_LABEL[post.category] ?? post.category}
+                                    </span>
+                                    <span className="min-w-0 flex-1 text-[15px] font-semibold leading-snug">
+                                        {post.title}
+                                        {post.commentCount > 0 && <span className="num ml-1.5 text-[13px] font-bold text-up">{post.commentCount}</span>}
+                                        {post.hasImage && (
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="ml-1.5 inline align-[-1px] text-fg-3" aria-label="사진 있음"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/></svg>
                                         )}
-                                    </div>
-                                    <span>{post.name}</span>
-                                </div>
-                            </td>
-                            <td style={tdStyle}>{formatCreatedAt(post.createdAt)}</td>
-                            <td style={tdStyle}>{post.views}</td>
-                            <td style={tdStyle}>{post.likes}</td>
-                            <td style={tdStyle}>{post.dislikes}</td>
-                        </tr>
+                                    </span>
+                                </span>
+                                <span className="num flex items-center gap-2 text-xs text-fg-3">
+                                    <Avatar src={post.profileImage} name={post.name} tier={post.tier} size="xs"/>
+                                    <span className="font-semibold text-fg-2">{post.name}</span>
+                                    <span>· {postTime(post.createdAt)}</span>
+                                    <span className="ml-auto flex gap-3">
+                                        <span>조회 {post.views}</span>
+                                        <span>좋아요 {post.likes}</span>
+                                    </span>
+                                </span>
+                            </Link>
+                        </li>
                     ))}
+                </ul>
+            </Card>
+            <Pagination page={page} totalPages={data?.totalPages ?? 0} onChange={(p) => update({page: p})}/>
 
-                    </tbody>
-                    <tfoot>
-                    <tr>
-                        <td colSpan="7" style={{textAlign: 'center', padding: '30px 0 0 0'}}>
-                            <button
-                                className="pagination-btn"
-                                disabled={currentPage === 0}
-                                onClick={() => setCurrentPage(currentPage - 1)}>
-                                &lt; 이전
-                            </button>
-                            {Array.from({length: totalPages}, (_, i) => (
-                                <button
-                                    key={i}
-                                    className={`pagination-btn ${i === currentPage ? 'active' : ''}`}
-                                    onClick={() => setCurrentPage(i)}>
-                                    {i + 1}
-                                </button>
-                            ))}
-                            <button
-                                className="pagination-btn"
-                                disabled={currentPage === totalPages - 1}
-                                onClick={() => setCurrentPage(currentPage + 1)}>
-                                다음 &gt;
-                            </button>
-                        </td>
-                    </tr>
-                    </tfoot>
-                </table>
-            </div>
-            <div className='postheader'>
-                <button type='button' className='listbtn'>&lt; 목록</button>
-                &nbsp;&nbsp;
-                <button type='button' className='writebtn' onClick={handleWrite}>📝 글쓰기</button>
-            </div>
-            {/* 모바일 카드형 UI */}
-            <div className="post-card-list">
-                {filteredPosts.map(post => (
-                    <div
-                        key={post.id}
-                        className="post-card"
-                        onClick={() => handlePostClick(post.id)}
-                    >
-                        <div className="post-card-title">
-                            [{post.category}] {post.title}
-                        </div>
-                        <div className="post-card-userinfo">
-                            <div className={"post-card-usernametag"}>
-                                <div className="post-user-icon-small">
-                                    {/* 티어 이미지: tier가 존재할 때만 출력 */}
-                                    {post.tier !== 0 && TIER_FRAMES[post.tier] && (
-                                        <img
-                                            src={TIER_FRAMES[post.tier]}
-                                            alt={`티어 ${post.tier}`}
-                                            className="post-tier-image"
-                                        />
-                                    )}
-
-                                    {/* 프로필 이미지는 항상 출력 (있을 경우) */}
-                                    {post.profileImage && (
-                                        <img
-                                            src={post.profileImage}
-                                            alt="프로필"
-                                            className="post-rank-profile-image"
-                                        />
-                                    )}
-                                </div>
-                            <span className="post-card-author">{post.name}</span>
-                            </div>
-                            <div className="post-card-stats-row">
-                                <div className="post-card-stats">
-                                    <span>👁 {post.views}</span>
-                                    <span>❤️ {post.likes}</span>
-                                </div>
-                                <div className="post-card-date">{formatCreatedAt(post.createdAt)}</div>
-                            </div>
-                        </div>
-                    </div>
-                ))}
-                <div className="post-card-pagination">
-                    <button
-                        className="pagination-btn"
-                        disabled={currentPage === 0}
-                        onClick={() => setCurrentPage(currentPage - 1)}>
-                        &lt; 이전
-                    </button>
-                    {Array.from({ length: totalPages }, (_, i) => (
-                        <button
-                            key={i}
-                            className={`pagination-btn ${i === currentPage ? 'active' : ''}`}
-                            onClick={() => setCurrentPage(i)}>
-                            {i + 1}
-                        </button>
-                    ))}
-                    <button
-                        className="pagination-btn"
-                        disabled={currentPage === totalPages - 1}
-                        onClick={() => setCurrentPage(currentPage + 1)}>
-                        다음 &gt;
-                    </button>
-                </div>
-            </div>
+            {/* 모바일: 아래 탭 위에 떠 있는 글쓰기 버튼 */}
+            <Link
+                to="/community/write"
+                aria-label="글쓰기"
+                className="fixed right-5 bottom-[calc(88px+env(safe-area-inset-bottom))] z-30 flex size-14 items-center justify-center rounded-full bg-brand text-[#111827] shadow-lg md:hidden"
+            >
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+            </Link>
         </div>
     );
-};
-
-export default PostList;
+}

@@ -1,26 +1,14 @@
 import React, {createContext, useContext, useState, useCallback, useEffect, useMemo} from 'react';
-import {IoIosCloseCircleOutline, IoIosInformationCircleOutline} from "react-icons/io";
 
-// 토스트 타입 정의
-const TOAST_TYPES = {
-    default: {
-        className: 'toast-default',
-        showIcon: true,
-        icon: IoIosInformationCircleOutline
-    },
-    error: {
-        className: 'toast-error',
-        showIcon: true,
-        icon: IoIosCloseCircleOutline
-    }
-};
+const INFO_ICON = 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 16v-4M12 8h.01';
+const ERROR_ICON = 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM15 9l-6 6M9 9l6 6';
 
 // 사라지는 애니메이션 시간 (CSS transition과 맞춤)
 const LEAVE_ANIMATION_MS = 300;
 
 const ToastContext = createContext(null);
 
-// 화면 하단 알림 메시지. 실시간 알림(SSE)은 notifications/NotificationProvider가 이 토스트를 사용한다
+// 화면 위쪽 알림 메시지. 실시간 알림(SSE)은 notifications/NotificationProvider가 이 토스트를 사용한다
 export const ToastProvider = ({children}) => {
     const [toasts, setToasts] = useState([]);
 
@@ -42,13 +30,11 @@ export const ToastProvider = ({children}) => {
         return id;
     }, [removeToast]);
 
-    // 함수 참조가 렌더마다 바뀌지 않도록 묶어 둔다 (useEffect 의존성으로 써도 반복 실행되지 않음)
-    const value = useMemo(() => ({
-        toasts,
-        addToast,
-        infoAlert: (message, duration) => addToast(message, 'default', duration),
-        errorAlert: (message, duration) => addToast(message, 'error', duration),
-    }), [toasts, addToast]);
+    // 알림 함수는 토스트 목록이 바뀌어도 같은 참조를 유지한다.
+    // (목록에 묶어 두면 useEffect 의존성으로 쓴 곳이 토스트를 띄울 때마다 다시 실행돼 같은 알림이 반복된다)
+    const infoAlert = useCallback((message, duration) => addToast(message, 'default', duration), [addToast]);
+    const errorAlert = useCallback((message, duration) => addToast(message, 'error', duration), [addToast]);
+    const value = useMemo(() => ({toasts, addToast, infoAlert, errorAlert}), [toasts, addToast, infoAlert, errorAlert]);
 
     return (
         <ToastContext.Provider value={value}>
@@ -61,34 +47,32 @@ export const ToastProvider = ({children}) => {
 // 개별 Toast 컴포넌트
 const Toast = ({toast}) => {
     const [isVisible, setIsVisible] = useState(false);
-
-    const toastConfig = TOAST_TYPES[toast.type] || TOAST_TYPES.default;
-    const IconComponent = toastConfig.icon;
+    const error = toast.type === 'error';
 
     useEffect(() => {
-        // 마운트 시 애니메이션 시작
+        // 마운트 직후 한 프레임 뒤에 나타나게 해서 슬라이드 효과를 준다
         const timer = setTimeout(() => setIsVisible(true), 10);
         return () => clearTimeout(timer);
     }, []);
 
-    const toastClasses = `
-    toast-base
-    ${toastConfig.className}
-    ${isVisible && !toast.isLeaving ? 'toast-visible' : 'toast-hidden'}
-  `;
-
+    const shown = isVisible && !toast.isLeaving;
     return (
-        <div className={toastClasses}>
-            {toastConfig.showIcon && IconComponent && (
-                <IconComponent size={20} className="toast-icon"/>
-            )}
-            <span className="toast-message">{toast.message}</span>
+        <div
+            role={error ? 'alert' : 'status'}
+            className={`pointer-events-auto flex w-full items-center gap-3 rounded-2xl px-4 py-3.5 shadow-xl transition duration-300 md:w-[360px] ${
+                error ? 'bg-up text-white' : 'border border-line bg-surface text-fg'
+            } ${shown ? 'translate-y-0 opacity-100' : '-translate-y-2 opacity-0'}`}
+        >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`shrink-0 ${error ? '' : 'text-brand-fg'}`} aria-hidden="true">
+                <path d={error ? ERROR_ICON : INFO_ICON}/>
+            </svg>
+            <span className="flex-1 whitespace-pre-wrap text-sm font-medium">{toast.message}</span>
         </div>
     );
 };
 
 const ToastContainer = ({toasts}) => (
-    <div className="toast-container">
+    <div className="rd pointer-events-none fixed inset-x-3 top-16 z-[10000] flex flex-col items-center gap-2 md:inset-x-auto md:top-20 md:right-5 md:items-end">
         {toasts.map((toast) => <Toast key={toast.id} toast={toast}/>)}
     </div>
 );
