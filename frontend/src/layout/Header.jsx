@@ -56,7 +56,7 @@ export default function Header() {
                             <Link to="/mypage" aria-label="마이페이지" className="hidden md:block">
                                 <Avatar src={user?.profileImage} name={user?.name} tier={user?.tier} size="sm" badge={false}/>
                             </Link>
-                            <Button variant="ghost" size="sm" onClick={logout} className="hidden md:inline-flex">
+                            <Button variant="ghost" size="sm" onClick={logout} className="max-md:hidden">
                                 로그아웃
                             </Button>
                         </>

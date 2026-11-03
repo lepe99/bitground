@@ -91,14 +91,18 @@ export default function OrderPanel({market, currentPrice, cash, holdings, onOrde
         setTotal(display(isBuy ? Math.ceil(p * a) : Math.floor(p * a)));
     }, [price, amount, isReserve, isBuy]);
 
+    // 소수 8자리에서 내림. 1e-6을 더해 0.00048359 × 1e8 = 48358.999… 같은 부동소수 오차로 한 단위가 빠지지 않게 한다
+    const floor8 = (n) => Math.floor(n * 1e8 + 1e-6) / 1e8;
+
     const applyPercent = (ratio) => {
         if (isBuy) {
             const budget = Math.floor(cash * ratio);
             const unitPrice = isReserve ? toNumber(price) : currentPrice;
             if (!isReserve) setTotal(display(budget));
-            setAmount(unitPrice > 0 ? display(Math.floor((budget / unitPrice) * 1e8) / 1e8) : '');
+            setAmount(unitPrice > 0 ? display(floor8(budget / unitPrice)) : '');
         } else {
-            setAmount(display(Math.floor(holdings * ratio * 1e8) / 1e8));
+            // 최대는 보유 수량 그대로 (계산하면 끝자리가 남을 수 있음)
+            setAmount(display(ratio === 1 ? holdings : floor8(holdings * ratio)));
         }
     };
 

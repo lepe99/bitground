@@ -44,5 +44,10 @@ export default function TradingViewWidget({market, height = 400, compact = false
         };
     }, [market, theme, compact]);
 
-    return <div ref={containerRef} className="tradingview-widget-container w-full" style={{height}}/>;
+    // 위젯 스크립트가 컨테이너의 style을 height:100%로 덮어쓰므로 높이는 바깥 상자에 둔다
+    return (
+        <div className="w-full" style={{height}}>
+            <div ref={containerRef} className="tradingview-widget-container size-full"/>
+        </div>
+    );
 }

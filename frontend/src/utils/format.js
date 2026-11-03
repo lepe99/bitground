@@ -9,14 +9,16 @@ export const formatKRW = (value) => formatNumber(Math.round(Number(value ?? 0)))
 
 /** 부호 붙인 금액: 1200 → '+1,200', -300 → '-300' */
 export const formatSignedKRW = (value) => {
-    const n = Math.round(Number(value ?? 0));
+    const n = Math.round(Number(value ?? 0)) || 0; // -0 → 0
     return (n > 0 ? '+' : '') + formatNumber(n);
 };
 
 /** 부호 붙인 퍼센트: 1.234 → '+1.23%' */
 export const formatPercent = (value, digits = 2) => {
     const n = Number(value ?? 0);
-    return (n > 0 ? '+' : '') + n.toFixed(digits) + '%';
+    const text = n.toFixed(digits);
+    if (Number(text) === 0) return (0).toFixed(digits) + '%'; // 반올림해서 0이면 부호를 붙이지 않는다 (-0.00% 방지)
+    return (n > 0 ? '+' : '') + text + '%';
 };
 
 /** 상승·하락 색 클래스 (한국 관례: 상승 빨강, 하락 파랑) */
