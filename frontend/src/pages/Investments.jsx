@@ -1,7 +1,7 @@
 import {useCallback, useContext, useEffect, useMemo, useState} from "react";
 import {useNavigate} from "react-router-dom";
 import {AuthContext} from "../auth/AuthContext.js";
-import {TickerContext} from "../ticker/TickerProvider.jsx";
+import {TickerContext} from "../ticker/TickerContext.js";
 import {useNotifications} from "../notifications/useNotifications.js";
 import {addFavorite, fetchFavorites, fetchOwnedAssets, removeFavorite} from "../api/assetApi.js";
 import {fetchPendingOrders} from "../api/orderApi.js";
@@ -67,7 +67,7 @@ export default function Investments() {
     ];
 
     return (
-        <div className="rd flex flex-wrap gap-2 px-5 pt-2 pb-8 md:p-2">
+        <div className="flex flex-wrap gap-2 px-5 pt-2 pb-8 md:p-2">
             {!isWsConnected && <Loading/>}
             <div className="flex min-w-0 flex-[999_1_720px] flex-col gap-3 md:gap-2">
                 <h1 className="pt-2 text-xl font-extrabold md:sr-only">투자내역</h1>

@@ -1,6 +1,6 @@
 import {useEffect, useState} from "react";
 import {useNavigate, useSearchParams} from "react-router-dom";
-import {useToast} from "../components/Toast.jsx";
+import {useToast} from "../components/toastContext.js";
 import {useAuth} from "../auth/useAuth.js";
 import {fetchPublicRanking} from "../api/rankApi.js";
 import Hero from "../components/main/Hero.jsx";
@@ -35,7 +35,7 @@ export default function Main() {
     }, []);
 
     return (
-        <div className="rd mx-auto flex max-w-[1280px] flex-col gap-4 px-5 pt-4 pb-10 md:gap-8 md:px-8 md:pt-14 md:pb-16">
+        <div className="mx-auto flex max-w-[1280px] flex-col gap-4 px-5 pt-4 pb-10 md:gap-8 md:px-8 md:pt-14 md:pb-16">
             <section className="flex flex-wrap items-center gap-6 md:gap-12">
                 <div className="min-w-0 flex-[1_1_420px]">
                     {isLoggedIn ? <MySummary/> : <Hero seasonName={ranking?.seasonName}/>}

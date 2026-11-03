@@ -19,7 +19,7 @@ export default function Sheet({open, onClose, title, children}) {
             onClick={(e) => {
                 if (e.target === ref.current) onClose();
             }}
-            className="rd fixed inset-x-0 top-auto bottom-0 m-0 border-0 text-fg max-h-[90dvh] w-full max-w-none overflow-y-auto rounded-t-3xl bg-bg p-0 pb-[env(safe-area-inset-bottom)] backdrop:bg-black/50 md:inset-0 md:m-auto md:h-fit md:max-w-[420px] md:rounded-3xl md:pb-0"
+            className="fixed inset-x-0 top-auto bottom-0 m-0 border-0 text-fg max-h-[90dvh] w-full max-w-none overflow-y-auto rounded-t-3xl bg-bg p-0 pb-[env(safe-area-inset-bottom)] backdrop:bg-black/50 md:inset-0 md:m-auto md:h-fit md:max-w-[420px] md:rounded-3xl md:pb-0"
         >
             <div className="flex items-center justify-between px-5 pt-4 pb-2">
                 <span className="text-base font-bold">{title}</span>

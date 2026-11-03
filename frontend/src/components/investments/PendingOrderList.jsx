@@ -3,7 +3,7 @@ import Card from '../ui/Card.jsx';
 import Button from '../ui/Button.jsx';
 import CoinIcon from '../ui/CoinIcon.jsx';
 import SegmentedTabs from '../ui/SegmentedTabs.jsx';
-import {useToast} from '../Toast.jsx';
+import {useToast} from '../toastContext.js';
 import {cancelReserveOrder} from '../../api/orderApi.js';
 import {getErrorMessage} from '../../api/apiError.js';
 import {tickerOf} from '../../utils/coin.js';

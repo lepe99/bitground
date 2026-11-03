@@ -1,7 +1,7 @@
 import {useEffect, useState} from 'react';
 import {placeOrder, placeReserveOrder} from '../../api/orderApi.js';
 import {getErrorMessage} from '../../api/apiError.js';
-import {useToast} from '../Toast.jsx';
+import {useToast} from '../toastContext.js';
 import Button from '../ui/Button.jsx';
 import SegmentedTabs from '../ui/SegmentedTabs.jsx';
 import {formatAmount, formatKRW} from '../../utils/format.js';

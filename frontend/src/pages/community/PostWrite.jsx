@@ -1,6 +1,6 @@
 import {useState} from "react";
 import {useNavigate} from "react-router-dom";
-import {useToast} from "../../components/Toast.jsx";
+import {useToast} from "../../components/toastContext.js";
 import {createPost} from "../../api/communityApi.js";
 import {getErrorMessage} from "../../api/apiError.js";
 import Card from "../../components/ui/Card.jsx";
@@ -37,7 +37,7 @@ export default function PostWrite() {
     };
 
     return (
-        <div className="rd mx-auto flex max-w-[800px] flex-col gap-4 px-5 pt-4 pb-12 md:gap-5 md:pt-8">
+        <div className="mx-auto flex max-w-[800px] flex-col gap-4 px-5 pt-4 pb-12 md:gap-5 md:pt-8">
             <h1 className="text-xl font-extrabold md:text-[28px]">글쓰기</h1>
             <Card as="form" onSubmit={submit} className="flex flex-col gap-4 p-5 md:p-7">
                 <SegmentedTabs label="분류" items={WRITE_CATEGORIES} value={category} onChange={setCategory} className="w-fit"/>

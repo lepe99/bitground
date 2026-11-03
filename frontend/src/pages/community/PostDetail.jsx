@@ -1,7 +1,7 @@
 import {useEffect, useState} from "react";
 import {Link, useNavigate, useParams} from "react-router-dom";
 import {useAuth} from "../../auth/useAuth.js";
-import {useToast} from "../../components/Toast.jsx";
+import {useToast} from "../../components/toastContext.js";
 import {deletePost, fetchPost, sendReaction} from "../../api/communityApi.js";
 import {getErrorMessage} from "../../api/apiError.js";
 import Card from "../../components/ui/Card.jsx";
@@ -56,10 +56,10 @@ export default function PostDetail() {
         }
     };
 
-    if (!post) return <p className="rd py-20 text-center text-sm text-fg-3">불러오는 중…</p>;
+    if (!post) return <p className="py-20 text-center text-sm text-fg-3">불러오는 중…</p>;
 
     return (
-        <div className="rd mx-auto flex max-w-[800px] flex-col gap-4 px-5 pt-3 pb-12 md:gap-5 md:pt-8">
+        <div className="mx-auto flex max-w-[800px] flex-col gap-4 px-5 pt-3 pb-12 md:gap-5 md:pt-8">
             <Link to="/community" className="flex w-fit items-center gap-1 text-sm font-semibold text-fg-2 hover:text-fg">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>
                 커뮤니티

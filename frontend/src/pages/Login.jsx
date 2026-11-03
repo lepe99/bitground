@@ -1,7 +1,7 @@
 import {useEffect} from 'react';
 import {useSearchParams} from 'react-router-dom';
 import {useAuth} from '../auth/useAuth';
-import {useToast} from '../components/Toast.jsx';
+import {useToast} from '../components/toastContext.js';
 import Logo from '../components/ui/Logo.jsx';
 
 // 각 서비스의 로그인 버튼 안내에 맞춘 색
@@ -24,7 +24,7 @@ export default function Login() {
     }, [errorCode, errorAlert]);
 
     return (
-        <div className="rd flex min-h-[calc(100dvh-56px-72px)] items-center justify-center px-5 py-10 md:min-h-[calc(100dvh-64px)]">
+        <div className="flex min-h-[calc(100dvh-56px-72px)] items-center justify-center px-5 py-10 md:min-h-[calc(100dvh-64px)]">
             <div className="flex w-full max-w-[400px] flex-col gap-7 rounded-3xl bg-surface p-7 md:border md:border-line md:p-9">
                 <div className="flex flex-col items-center gap-3 text-center">
                     <Logo size={44} withText={false}/>

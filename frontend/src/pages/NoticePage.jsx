@@ -1,6 +1,6 @@
 import {useEffect, useState} from "react";
 import {useAuth} from "../auth/useAuth.js";
-import {useToast} from "../components/Toast.jsx";
+import {useToast} from "../components/toastContext.js";
 import {createNotice, deleteNotice, fetchNotices} from "../api/noticeApi.js";
 import {getErrorMessage} from "../api/apiError.js";
 import Card from "../components/ui/Card.jsx";
@@ -99,7 +99,7 @@ export default function NoticePage() {
     };
 
     return (
-        <div className="rd mx-auto flex max-w-[880px] flex-col gap-4 px-5 pt-4 pb-10 md:gap-5 md:pt-8 md:pb-14">
+        <div className="mx-auto flex max-w-[880px] flex-col gap-4 px-5 pt-4 pb-10 md:gap-5 md:pt-8 md:pb-14">
             <div className="flex flex-wrap items-center justify-between gap-3">
                 <h1 className="text-xl font-extrabold md:text-[28px]">공지사항</h1>
                 {isAdmin && !writing && <Button size="sm" onClick={() => setWriting(true)}>공지 등록</Button>}

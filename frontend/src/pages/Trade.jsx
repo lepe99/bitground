@@ -2,7 +2,7 @@ import {useCallback, useContext, useEffect, useState} from "react";
 import {useSearchParams} from "react-router-dom";
 import {addFavorite, fetchAvailableAssets, fetchFavorites, fetchOwnedAssets, removeFavorite} from "../api/assetApi.js";
 import {AuthContext} from "../auth/AuthContext.js";
-import {TickerContext} from "../ticker/TickerProvider.jsx";
+import {TickerContext} from "../ticker/TickerContext.js";
 import {useNotifications} from "../notifications/useNotifications.js";
 import {useIsMobile} from "../hooks/useMediaQuery.js";
 import Loading from "../components/Loading.jsx";
@@ -88,7 +88,7 @@ export default function Trade() {
 
     if (isMobile) {
         return (
-            <div className="rd">
+            <div >
                 {!isWsConnected && <Loading/>}
                 {marketParam ? (
                     <MobileCoinDetail
@@ -109,7 +109,7 @@ export default function Trade() {
     }
 
     return (
-        <div className="rd flex flex-wrap gap-2 p-2">
+        <div className="flex flex-wrap gap-2 p-2">
             {!isWsConnected && <Loading/>}
             <div className="flex min-w-0 flex-[999_1_720px] flex-col gap-2">
                 <CoinSummary

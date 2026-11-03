@@ -13,7 +13,7 @@ export default function BottomNav() {
     return (
         <nav
             aria-label="하단 메뉴"
-            className="rd fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-line bg-surface pb-[max(8px,env(safe-area-inset-bottom))] md:hidden"
+            className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-line bg-surface pb-[max(8px,env(safe-area-inset-bottom))] md:hidden"
         >
             {TABS.map((tab) => (
                 <NavLink

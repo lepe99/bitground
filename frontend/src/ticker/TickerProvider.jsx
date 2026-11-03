@@ -1,4 +1,5 @@
-import React, {createContext, useState, useEffect, useMemo} from 'react';
+import {useState, useEffect, useMemo} from 'react';
+import {TickerContext} from './TickerContext.js';
 import {fetchCoinSymbols} from "../api/coinApi.js";
 
 // Upbit 공개 시세 WebSocket. 인증이 필요 없어 브라우저가 직접 연결한다 (우리 서버를 거쳐 중계하지 않음)
@@ -7,12 +8,6 @@ const UPBIT_WS_URL = 'wss://api.upbit.com/websocket/v1';
 const FLUSH_INTERVAL_MS = 200;
 const RECONNECT_DELAY_MS = 3000;
 
-export const TickerContext = createContext({
-    markets: [],
-    selectedMarket: null,
-    tickerMap: {},
-    setSelectedMarket: () => {}
-});
 
 const toTicker = (tick) => ({
     price:      tick.trade_price,

@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/useAuth';
-import {useToast} from "../../components/Toast.jsx";
+import {useToast} from "../../components/toastContext.js";
 import Loading from "../../components/Loading.jsx";
 
 const Callback = () => {

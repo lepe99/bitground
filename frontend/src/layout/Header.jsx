@@ -1,4 +1,3 @@
-import "../style.css"
 import {Link, NavLink, useLocation} from "react-router-dom";
 import {useAuth} from "../auth/useAuth";
 import Logo from "../components/ui/Logo.jsx";
@@ -7,7 +6,7 @@ import Button from "../components/ui/Button.jsx";
 import ThemeToggle from "../components/ui/ThemeToggle.jsx";
 import NotificationMenu from "./NotificationMenu.jsx";
 
-export const NAV_ITEMS = [
+const NAV_ITEMS = [
     {to: "/trade", label: "거래소"},
     {to: "/investments", label: "투자내역"},
     {to: "/trends", label: "최신동향"},
@@ -28,7 +27,7 @@ export default function Header() {
     const dense = DENSE_PATHS.includes(pathname);
 
     return (
-        <header className="rd sticky top-0 z-40 border-b border-line bg-surface">
+        <header className="sticky top-0 z-40 border-b border-line bg-surface">
             <div className={`flex items-center gap-6 md:gap-10 ${dense ? "h-14 px-5" : "mx-auto h-14 max-w-[1280px] px-5 md:h-16 md:px-8"}`}>
                 <Link to="/" aria-label="Bitground 홈" className="text-fg">
                     <Logo size={dense ? 26 : 30}/>

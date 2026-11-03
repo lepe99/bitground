@@ -206,7 +206,7 @@ function NewsCard() {
 /** 최신동향: AI 분석 · TOP5 · 주의 종목 · 뉴스 */
 export default function CoinTrends() {
     return (
-        <div className="rd mx-auto flex max-w-[1280px] flex-col gap-4 px-5 pt-4 pb-10 md:gap-5 md:px-8 md:pt-8 md:pb-14">
+        <div className="mx-auto flex max-w-[1280px] flex-col gap-4 px-5 pt-4 pb-10 md:gap-5 md:px-8 md:pt-8 md:pb-14">
             <h1 className="text-xl font-extrabold md:text-[28px]">최신동향</h1>
             <div className="grid items-start gap-4 md:grid-cols-3 md:gap-5">
                 <AiInsightCard/>

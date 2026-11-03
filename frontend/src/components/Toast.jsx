@@ -1,4 +1,5 @@
-import React, {createContext, useContext, useState, useCallback, useEffect, useMemo} from 'react';
+import {useState, useCallback, useEffect, useMemo} from 'react';
+import {ToastContext} from './toastContext.js';
 
 const INFO_ICON = 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 16v-4M12 8h.01';
 const ERROR_ICON = 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM15 9l-6 6M9 9l6 6';
@@ -6,7 +7,6 @@ const ERROR_ICON = 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM15 9l-6 6M9 9l6 6'
 // 사라지는 애니메이션 시간 (CSS transition과 맞춤)
 const LEAVE_ANIMATION_MS = 300;
 
-const ToastContext = createContext(null);
 
 // 화면 위쪽 알림 메시지. 실시간 알림(SSE)은 notifications/NotificationProvider가 이 토스트를 사용한다
 export const ToastProvider = ({children}) => {
@@ -72,17 +72,7 @@ const Toast = ({toast}) => {
 };
 
 const ToastContainer = ({toasts}) => (
-    <div className="rd pointer-events-none fixed inset-x-3 top-16 z-[10000] flex flex-col items-center gap-2 md:inset-x-auto md:top-20 md:right-5 md:items-end">
+    <div className="pointer-events-none fixed inset-x-3 top-16 z-[10000] flex flex-col items-center gap-2 md:inset-x-auto md:top-20 md:right-5 md:items-end">
         {toasts.map((toast) => <Toast key={toast.id} toast={toast}/>)}
     </div>
 );
-
-// useToast 훅: { infoAlert, errorAlert, addToast }
-export const useToast = () => {
-    const context = useContext(ToastContext);
-    if (!context) {
-        throw new Error('useToast는 ToastProvider 내부에서 사용되어야 합니다.');
-    }
-    const {infoAlert, errorAlert, addToast} = context;
-    return {infoAlert, errorAlert, addToast};
-};

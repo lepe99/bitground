@@ -3,7 +3,7 @@ import Card from '../ui/Card.jsx';
 import Button from '../ui/Button.jsx';
 import Avatar from '../ui/Avatar.jsx';
 import {useAuth} from '../../auth/useAuth.js';
-import {useToast} from '../Toast.jsx';
+import {useToast} from '../toastContext.js';
 import {softDeleteUser, updateUserInfo} from '../../api/userApi.js';
 import {getErrorMessage} from '../../api/apiError.js';
 

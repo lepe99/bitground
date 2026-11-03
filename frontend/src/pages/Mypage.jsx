@@ -28,7 +28,7 @@ export default function Mypage() {
     const tab = searchParams.get("tab") === "profile" ? "profile" : "report";
 
     return (
-        <div className="rd mx-auto grid max-w-[1280px] items-start gap-4 px-5 pt-4 pb-10 md:grid-cols-[220px_minmax(0,1fr)] md:gap-6 md:px-8 md:pt-8 md:pb-14">
+        <div className="mx-auto grid max-w-[1280px] items-start gap-4 px-5 pt-4 pb-10 md:grid-cols-[220px_minmax(0,1fr)] md:gap-6 md:px-8 md:pt-8 md:pb-14">
             <nav aria-label="마이페이지 메뉴" className="hidden flex-col gap-0.5 rounded-[20px] border border-line bg-surface p-2.5 md:flex">
                 {MENU.map((m) => (
                     <Link

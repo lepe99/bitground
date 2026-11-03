@@ -66,7 +66,7 @@ export default function Rank() {
     const season = view === "current" ? current?.[0]?.seasonName ?? "이번 시즌" : seasons.find((s) => s.id === pastId)?.name;
 
     return (
-        <div className="rd mx-auto flex max-w-[1280px] flex-col gap-4 px-5 pt-4 pb-10 md:gap-6 md:px-8 md:pt-8 md:pb-14">
+        <div className="mx-auto flex max-w-[1280px] flex-col gap-4 px-5 pt-4 pb-10 md:gap-6 md:px-8 md:pt-8 md:pb-14">
             <section className="flex flex-wrap items-end justify-between gap-3">
                 <div className="flex flex-col gap-1.5">
                     <h1 className="text-xl font-extrabold tracking-[-0.02em] md:text-[28px]">{season} 랭킹</h1>

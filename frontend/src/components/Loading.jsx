@@ -22,14 +22,14 @@ export default function Loading({ inline = false }) {
 
     if (inline) {
         return (
-            <div className="rd flex min-h-[100px] w-full items-center justify-center" role="status" aria-label="불러오는 중">
+            <div className="flex min-h-[100px] w-full items-center justify-center" role="status" aria-label="불러오는 중">
                 <span className="size-10 animate-spin rounded-full border-4 border-line border-t-fg-2"/>
             </div>
         );
     }
 
     return createPortal(
-        <div className="rd fixed inset-0 z-[9999] flex items-center justify-center bg-bg/80" role="status" aria-label="불러오는 중">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-bg/80" role="status" aria-label="불러오는 중">
             <span className="size-10 animate-spin rounded-full border-4 border-line border-t-fg-2"/>
         </div>,
         document.body

@@ -1,10 +1,5 @@
-/*
- * 디자인 토큰과 Tailwind 진입점.
- * 레이어 순서: legacy(리디자인 전 CSS) < utilities. 기존 화면을 다 옮기면(8단계) preflight를 켜고 legacy를 지운다.
- */
-@layer theme, legacy, base, components, utilities;
-@import "tailwindcss/theme.css" layer(theme);
-@import "tailwindcss/utilities.css" layer(utilities);
+/* 디자인 토큰과 Tailwind 진입점 */
+@import "tailwindcss";
 
 /* dark: 변형은 OS 설정이 아니라 <html data-theme="dark"> 기준 */
 @custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
@@ -77,44 +72,10 @@
         background: var(--c-bg);
         color: var(--c-fg);
         font-family: var(--font-sans);
-        font-size: 16px;
-        font-weight: 400;
         -webkit-font-smoothing: antialiased;
     }
-
-    /*
-     * 새 화면은 루트에 .rd를 붙인다. legacy의 `*` 규칙(색·크기 고정) 대신 부모 값을 물려받고,
-     * preflight를 켜기 전까지 필요한 초기화만 .rd 안에 적용한다.
-     */
-    /* legacy의 `*` 규칙이 html에도 걸려 1rem이 14.4px가 되는 것을 되돌린다 */
-    html { font-size: 16px; }
-
-    .rd {
-        color: var(--c-fg);
-        font-family: var(--font-sans);
-        font-size: 1rem;
-        font-weight: 400;
-    }
-    .rd * {
-        color: inherit;
-        font-size: inherit;
-        font-weight: inherit;
-        font-family: inherit;
-    }
-    .rd :where(h1, h2, h3, h4, h5, h6, p, dl, dd, figure) { margin: 0; }
-    .rd :where(button, input, select, textarea) {
-        font: inherit;
-        color: inherit;
-        background: transparent;
-        border: 0;
-        padding: 0;
-    }
-    .rd :where(button, [role=button]) { cursor: pointer; }
-    .rd :where(ul, ol) { margin: 0; padding: 0; list-style: none; }
-    .rd :where(a) { color: inherit; text-decoration: inherit; }
-    .rd :where(img, video) { display: block; max-width: 100%; }
-    .rd :where(table) { border-collapse: collapse; }
-    .rd :where(:focus-visible) { outline: 2px solid var(--c-brand); outline-offset: 2px; }
+    button:not(:disabled), [role=button]:not(:disabled) { cursor: pointer; }
+    :focus-visible { outline: 2px solid var(--c-brand); outline-offset: 2px; }
 }
 
 /* 숫자 자리 맞춤 */

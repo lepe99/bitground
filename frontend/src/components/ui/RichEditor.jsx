@@ -2,7 +2,7 @@ import {useCallback, useMemo, useRef} from 'react';
 import ReactQuill from 'react-quill-new';
 import 'react-quill-new/dist/quill.snow.css';
 import {uploadImage} from '../../api/uploadApi.js';
-import {useToast} from '../Toast.jsx';
+import {useToast} from '../toastContext.js';
 import {getErrorMessage} from '../../api/apiError.js';
 
 const TOOLBAR = [

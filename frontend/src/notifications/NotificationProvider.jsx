@@ -2,7 +2,7 @@ import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {NotificationContext} from './NotificationContext.js';
 import {formatNotification} from './formatNotification.js';
 import {useAuth} from '../auth/useAuth.js';
-import {useToast} from '../components/Toast.jsx';
+import {useToast} from '../components/toastContext.js';
 import {fetchUnreadNotificationCount} from '../api/notificationApi.js';
 
 const SSE_URL = `${import.meta.env.VITE_API_URL}/notifications/subscribe`;

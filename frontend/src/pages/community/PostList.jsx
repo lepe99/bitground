@@ -41,7 +41,7 @@ export default function PostList() {
     }, [category, sort, page]);
 
     return (
-        <div className="rd mx-auto flex max-w-[960px] flex-col gap-4 px-5 pt-4 pb-24 md:gap-5 md:pt-8 md:pb-14">
+        <div className="mx-auto flex max-w-[960px] flex-col gap-4 px-5 pt-4 pb-24 md:gap-5 md:pt-8 md:pb-14">
             <div className="flex items-center justify-between gap-3">
                 <h1 className="text-xl font-extrabold md:text-[28px]">커뮤니티</h1>
                 <Button as={Link} to="/community/write" size="sm" className="max-md:hidden">글쓰기</Button>
