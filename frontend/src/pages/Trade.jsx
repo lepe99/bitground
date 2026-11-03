@@ -10,6 +10,7 @@ import {AuthContext} from "../auth/AuthContext.js";
 import {TickerContext} from "../ticker/TickerProvider.jsx";
 import {useNotifications} from "../notifications/useNotifications.js";
 import Loading from "../components/Loading.jsx";
+import {useSearchParams} from "react-router-dom";
 
 export default function Trade() {
     const [favoriteMarkets, setFavoriteMarkets] = useState([]);
@@ -23,6 +24,13 @@ export default function Trade() {
     const [userAssets, setUserAssets] = useState({});
 
     const { userCash } = useNotifications();
+
+    // 다른 화면에서 /trade?market=KRW-BTC 로 들어오면 그 종목을 연다
+    const [searchParams] = useSearchParams();
+    const marketParam = searchParams.get('market');
+    useEffect(() => {
+        if (marketParam) setSelectedMarket(marketParam);
+    }, [marketParam, setSelectedMarket]);
 
     const fetchOwned = async () => {
         try {

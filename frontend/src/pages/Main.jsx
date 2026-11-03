@@ -1,47 +1,55 @@
-import '../styles/Main.css';
-import MarketChart from "../components/main/MarketChart.jsx";
-import AltChart from "../components/main/AltChart.jsx";
-import MainRanking from "../components/main/MainRanking.jsx";
+import {useEffect, useState} from "react";
+import {useNavigate, useSearchParams} from "react-router-dom";
 import {useToast} from "../components/Toast.jsx";
-import {useEffect} from "react";
-import {useNavigate} from "react-router-dom";
-
-
+import {useAuth} from "../auth/useAuth.js";
+import {fetchPublicRanking} from "../api/rankApi.js";
+import Hero from "../components/main/Hero.jsx";
+import MySummary from "../components/main/MySummary.jsx";
+import LivePrices from "../components/main/LivePrices.jsx";
+import MarketIndexCard from "../components/main/MarketIndexCard.jsx";
+import TopCoins from "../components/main/TopCoins.jsx";
+import SeasonRankingPreview from "../components/main/SeasonRankingPreview.jsx";
 
 export default function Main() {
-
     const {infoAlert} = useToast();
+    const {isLoggedIn} = useAuth();
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+    const loggedOut = searchParams.get('logout');
+    const [ranking, setRanking] = useState(undefined); // undefined: 불러오는 중, null: 실패
+
+    // 로그아웃 후 /?logout=true 로 돌아오면 안내하고 주소를 정리한다
+    useEffect(() => {
+        if (!loggedOut) return;
+        infoAlert("로그아웃 되었습니다.");
+        navigate('/', {replace: true});
+    }, [loggedOut, infoAlert, navigate]);
 
     useEffect(() => {
-        // url 파라미터에 로그아웃 메시지가 있다면 표시
-        const logoutMessage = new URLSearchParams(window.location.search).get('logout');
-        if (logoutMessage) {
-            infoAlert("로그아웃 되었습니다.");
-            navigate('/');
-        }
+        fetchPublicRanking()
+            .then(setRanking)
+            .catch((error) => {
+                console.error("랭킹 미리보기 조회 실패:", error);
+                setRanking(null);
+            });
     }, []);
 
-
     return (
-        <div className="main-container">
-            <div className={"banner-container"}>
-                <div className={"text-banner"}>Invest everything</div>
-                <div className={"mask-wrapper"}>
-                    <div className={"banner-back"}>
-                        <div className={"ipad"}>
-                            <div className={"ipad-screen"}></div>
-                        </div>
-                    </div>
+        <div className="rd mx-auto flex max-w-[1280px] flex-col gap-4 px-5 pt-4 pb-10 md:gap-8 md:px-8 md:pt-14 md:pb-16">
+            <section className="flex flex-wrap items-center gap-6 md:gap-12">
+                <div className="min-w-0 flex-[1_1_420px]">
+                    {isLoggedIn ? <MySummary/> : <Hero seasonName={ranking?.seasonName}/>}
                 </div>
-            </div>
-            <div className={"market-price-container"}>
-                <MarketChart />
-                <AltChart />
-            </div>
-            <div className={"rank-container"}>
-                <MainRanking />
-            </div>
+                <div className="min-w-0 flex-[1_1_520px]">
+                    <LivePrices/>
+                </div>
+            </section>
+
+            <section className="grid gap-4 md:grid-cols-[repeat(auto-fit,minmax(300px,1fr))] md:gap-5">
+                <MarketIndexCard/>
+                <TopCoins/>
+                <SeasonRankingPreview ranking={ranking}/>
+            </section>
         </div>
     );
 }
