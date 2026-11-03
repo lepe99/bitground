@@ -26,3 +26,27 @@ export const changeColor = (value) => {
     if (n < 0) return 'text-down';
     return 'text-fg-3';
 };
+
+/**
+ * 코인 가격. 업비트 원화 호가 단위처럼 가격대에 따라 소수 자릿수를 바꾼다
+ * (1,000원 이상 정수, 100원 이상 1자리, 10원 이상 2자리, 1원 이상 3자리, 그 밑 최대 8자리)
+ */
+export const formatPrice = (value) => {
+    if (value == null || Number.isNaN(Number(value))) return '—';
+    const n = Number(value);
+    const abs = Math.abs(n);
+    const digits = abs >= 1000 ? 0 : abs >= 100 ? 1 : abs >= 10 ? 2 : abs >= 1 ? 3 : 8;
+    return n.toLocaleString('ko-KR', {maximumFractionDigits: digits});
+};
+
+/** 코인 수량 (최대 8자리, 끝의 0은 생략) */
+export const formatAmount = (value) =>
+    Number(value ?? 0).toLocaleString('ko-KR', {maximumFractionDigits: 8});
+
+/** 큰 원화 금액을 짧게: 4812억, 35백만 */
+export const formatCompactKRW = (won) => {
+    const n = Number(won ?? 0);
+    if (n >= 1e8) return `${formatNumber(Math.round(n / 1e8))}억`;
+    if (n >= 1e6) return `${formatNumber(Math.round(n / 1e6))}백만`;
+    return formatNumber(Math.round(n));
+};

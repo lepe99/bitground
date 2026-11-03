@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext } from "react";
-import Sidebar from "../components/trade/Sidebar.jsx";
+import MarketList from "../components/trade/MarketList.jsx";
 import PortfolioHeader from "../components/investments/PortfolioHeader.jsx";
 import AssetSummary from "../components/investments/AssetSummary.jsx";
 import HoldingsList from "../components/investments/HoldingsList.jsx";
@@ -9,10 +9,8 @@ import { AuthContext } from "../auth/AuthContext";
 import { TickerContext } from "../ticker/TickerProvider.jsx";
 import {addFavorite, fetchFavorites, fetchOwnedAssets, removeFavorite} from "../api/assetApi.js";
 import '../styles/investments/Investments.css';
-import "../styles/trade/Trade.css";
 import Loading from "../components/Loading.jsx";
 import { useNavigate } from 'react-router-dom';
-import '../styles/trade/sidebar.css'
 
 export default function Investments() {
     const navigate = useNavigate();
@@ -94,7 +92,7 @@ export default function Investments() {
             </div>
 
             <aside className={"invest-sidebar"}>
-                <Sidebar
+                <MarketList
                     markets={markets}
                     tickerMap={tickerMap}
                     ownedMarkets={ownedMarkets}

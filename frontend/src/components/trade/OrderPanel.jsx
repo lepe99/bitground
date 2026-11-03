@@ -1,0 +1,234 @@
+import {useEffect, useState} from 'react';
+import {placeOrder, placeReserveOrder} from '../../api/orderApi.js';
+import {getErrorMessage} from '../../api/apiError.js';
+import {useToast} from '../Toast.jsx';
+import Button from '../ui/Button.jsx';
+import SegmentedTabs from '../ui/SegmentedTabs.jsx';
+import {formatAmount, formatKRW} from '../../utils/format.js';
+
+const MODES = [
+    {value: 'market', label: '시장가'},
+    {value: 'reserve', label: '예약 주문'},
+];
+const PERCENTS = [0.1, 0.25, 0.5, 1];
+
+// '1,234.5' → 1234.5 (입력이 비었거나 숫자가 아니면 NaN)
+const toNumber = (text) => parseFloat(String(text ?? '').replace(/,/g, ''));
+
+// 입력 중에는 쉼표 없이 두고, 칸을 벗어나면 쉼표를 넣는다
+const display = (value) => {
+    const n = typeof value === 'number' ? value : toNumber(value);
+    if (Number.isNaN(n)) return '';
+    return n.toLocaleString('en-US', {maximumFractionDigits: 10});
+};
+
+const DECIMAL = /^(\d+\.?\d*|\.\d*)?$/;
+const INTEGER = /^\d*$/;
+
+function NumberField({label, unit, value, onChange, onBlur, readOnly = false, pattern = DECIMAL}) {
+    return (
+        <label className="flex flex-col gap-1.5 text-xs text-fg-3">
+            {label}
+            <span className={`flex h-11 items-center rounded-[10px] border border-line px-3 ${readOnly ? 'bg-surface-2' : 'bg-surface focus-within:border-fg-3'}`}>
+                <input
+                    inputMode="decimal"
+                    value={value}
+                    readOnly={readOnly}
+                    onChange={(e) => {
+                        const raw = e.target.value.replace(/,/g, '');
+                        if (pattern.test(raw)) onChange?.(raw);
+                    }}
+                    onBlur={onBlur}
+                    className="num min-w-0 flex-1 text-right text-[15px] font-semibold text-fg outline-none"
+                />
+                <span className="ml-2 text-[13px] text-fg-3">{unit}</span>
+            </span>
+        </label>
+    );
+}
+
+/**
+ * 매수·매도 주문 (시장가 / 예약 주문)
+ * 시장가 매수는 주문 총액, 시장가 매도는 수량, 예약 주문은 가격과 수량으로 낸다.
+ */
+export default function OrderPanel({market, currentPrice, cash, holdings, onOrderPlaced, initialSide = 'BUY', className = ''}) {
+    const {infoAlert, errorAlert} = useToast();
+    const [side, setSide] = useState(initialSide);
+    const [mode, setMode] = useState('market');
+    const [price, setPrice] = useState('');
+    const [amount, setAmount] = useState('');
+    const [total, setTotal] = useState('');
+    const [loading, setLoading] = useState(false);
+
+    const symbol = market.split('-')[1];
+    const isBuy = side === 'BUY';
+    const isReserve = mode === 'reserve';
+
+    // 종목이 바뀌면 처음 상태로
+    useEffect(() => {
+        setSide(initialSide);
+        setMode('market');
+    }, [market, initialSide]);
+
+    // 매수/매도·주문 방식을 바꾸면 입력을 비우고 가격은 현재가로 채운다
+    useEffect(() => {
+        setPrice(display(currentPrice));
+        setAmount('');
+        setTotal('');
+        // 현재가가 바뀔 때마다 입력을 지우지 않도록 currentPrice는 의존성에서 뺀다
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [side, mode, market]);
+
+    // 예약 주문은 가격 × 수량으로 총액을 계산한다 (매수는 올림, 매도는 내림)
+    useEffect(() => {
+        if (!isReserve) return;
+        const p = toNumber(price);
+        const a = toNumber(amount);
+        if (Number.isNaN(p) || Number.isNaN(a)) {
+            setTotal('');
+            return;
+        }
+        setTotal(display(isBuy ? Math.ceil(p * a) : Math.floor(p * a)));
+    }, [price, amount, isReserve, isBuy]);
+
+    const applyPercent = (ratio) => {
+        if (isBuy) {
+            const budget = Math.floor(cash * ratio);
+            const unitPrice = isReserve ? toNumber(price) : currentPrice;
+            if (!isReserve) setTotal(display(budget));
+            setAmount(unitPrice > 0 ? display(Math.floor((budget / unitPrice) * 1e8) / 1e8) : '');
+        } else {
+            setAmount(display(Math.floor(holdings * ratio * 1e8) / 1e8));
+        }
+    };
+
+    const submit = async () => {
+        const rawAmount = toNumber(amount);
+        const rawPrice = toNumber(price);
+        const rawTotal = toNumber(total);
+
+        if (isReserve) {
+            if (!(rawAmount > 0)) return errorAlert('예약 주문 수량을 입력해주세요.');
+            if (!(rawPrice > 0)) return errorAlert('예약 가격을 입력해주세요.');
+            if (isBuy && cash < rawAmount * rawPrice) {
+                setAmount(display(Math.floor((cash / rawPrice) * 1e10) / 1e10));
+                errorAlert('잔액이 부족합니다.');
+                return infoAlert('보유 현금에 맞게 수량이 자동 조정되었습니다.');
+            }
+            if (!isBuy && holdings < rawAmount) {
+                setAmount(display(holdings));
+                errorAlert('보유 수량이 부족합니다.');
+                return infoAlert('보유 수량에 맞게 수량이 자동 조정되었습니다.');
+            }
+        } else if (isBuy) {
+            if (!(rawTotal > 0)) return errorAlert('주문 총액을 입력해주세요.');
+            if (cash < rawTotal) return errorAlert('잔액이 부족합니다.');
+        } else if (!(rawAmount > 0)) {
+            return errorAlert('매도 수량을 입력해주세요.');
+        }
+
+        const payload = {
+            symbol: market,
+            orderType: side,
+            ...(isReserve
+                ? {amount: rawAmount, reservePrice: rawPrice}
+                : isBuy ? {totalPrice: rawTotal} : {amount: rawAmount}),
+        };
+
+        setLoading(true);
+        try {
+            const result = isReserve ? await placeReserveOrder(payload) : await placeOrder(payload);
+            if (isReserve) infoAlert('예약 주문이 접수되었습니다.');
+            else if (isBuy) infoAlert(`${formatAmount(result.amount)} ${symbol} 매수 주문이 체결되었습니다.`);
+            else infoAlert(`${formatKRW(Math.floor(result.tradePrice * result.amount))}원에 매도 주문이 체결되었습니다.`);
+            onOrderPlaced?.(result);
+            setAmount('');
+            setTotal('');
+        } catch (err) {
+            errorAlert(getErrorMessage(err, '주문 처리 중 오류가 발생했습니다.'));
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const estimatedQty = !isReserve && isBuy && currentPrice > 0 && toNumber(total) > 0 ? toNumber(total) / currentPrice : null;
+
+    return (
+        <section className={`flex flex-col overflow-hidden rounded-xl border border-line bg-surface ${className}`}>
+            <div role="tablist" aria-label="매수·매도" className="grid grid-cols-2 border-b border-line">
+                {[['BUY', '매수', 'border-up text-up'], ['SELL', '매도', 'border-down text-down']].map(([value, label, active]) => (
+                    <button
+                        key={value}
+                        type="button"
+                        role="tab"
+                        aria-selected={side === value}
+                        onClick={() => setSide(value)}
+                        className={`h-11 border-b-2 text-sm ${side === value ? `${active} font-bold` : 'border-transparent font-semibold text-fg-3'}`}
+                    >
+                        {label}
+                    </button>
+                ))}
+            </div>
+
+            <form
+                className="flex flex-col gap-3 p-4"
+                onSubmit={(e) => {
+                    e.preventDefault();
+                    void submit();
+                }}
+            >
+                <SegmentedTabs label="주문 방식" items={MODES} value={mode} onChange={setMode} fill className="[&>button]:h-8 [&>button]:text-[13px]"/>
+
+                <div className="flex items-center justify-between text-[13px]">
+                    <span className="text-fg-3">주문 가능</span>
+                    <span className="num font-semibold">{isBuy ? `${formatKRW(cash)} KRW` : `${formatAmount(holdings)} ${symbol}`}</span>
+                </div>
+
+                {isReserve && (
+                    <NumberField
+                        label={isBuy ? '매수 가격' : '매도 가격'}
+                        unit="KRW"
+                        value={price}
+                        onChange={setPrice}
+                        onBlur={() => setPrice(display(price))}
+                    />
+                )}
+
+                {(!isBuy || isReserve) && (
+                    <NumberField label="주문 수량" unit={symbol} value={amount} onChange={setAmount} onBlur={() => setAmount(display(amount))}/>
+                )}
+
+                <div className="grid grid-cols-4 gap-1.5">
+                    {PERCENTS.map((p) => (
+                        <button key={p} type="button" onClick={() => applyPercent(p)} className="h-8 rounded-lg border border-line text-xs font-semibold text-fg-2 hover:bg-surface-2">
+                            {p === 1 ? '최대' : `${p * 100}%`}
+                        </button>
+                    ))}
+                </div>
+
+                {(isBuy || isReserve) && (
+                    <NumberField
+                        label="주문 총액"
+                        unit="KRW"
+                        value={total}
+                        pattern={INTEGER}
+                        onChange={setTotal}
+                        onBlur={() => setTotal(display(total))}
+                        readOnly={isReserve}
+                    />
+                )}
+
+                {estimatedQty != null && (
+                    <div className="flex justify-between text-[13px]">
+                        <span className="text-fg-3">예상 수량</span>
+                        <span className="num font-semibold">≈ {formatAmount(estimatedQty)} {symbol}</span>
+                    </div>
+                )}
+
+                <Button type="submit" variant={isBuy ? 'buy' : 'sell'} disabled={loading} className="mt-1 h-12 rounded-[10px]">
+                    {loading ? '주문 처리 중…' : `${isReserve ? '예약 ' : '시장가 '}${isBuy ? '매수' : '매도'}`}
+                </Button>
+            </form>
+        </section>
+    );
+}
