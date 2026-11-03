@@ -257,7 +257,7 @@ public class UserSseEmitters {
                 message = getMessage(seasonFlag, seasonName);
             } else if (request.getMessage() == Message.NOTICE) {
                 String title = (String) dataMap.get("title");
-                message = String.format("🔔 새로운 공지사항이 등록되었습니다.\n고객센터 탭에서 확인해보세요.\n[%s]", title);
+                message = String.format("🔔 새로운 공지사항이 등록되었습니다.\n공지사항 탭에서 확인해보세요.\n[%s]", title);
             }
             
             Notification notification = Notification.builder()
