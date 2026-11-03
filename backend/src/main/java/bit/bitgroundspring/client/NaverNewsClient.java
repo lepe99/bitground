@@ -15,13 +15,15 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 
 /**
- * 네이버 뉴스 검색 API 클라이언트
+ * 네이버 뉴스 검색 API 클라이언트 (NAVER API HUB, 네이버 클라우드 플랫폼)
+ * 기존 NAVER Developers Center(openapi.naver.com)에서 이관: 호출 주소와 인증 헤더 이름이 다르고 응답 형식은 같다.
+ * https://guide.ncloud-docs.com/docs/apihub-migration
  */
 @Component
 @RequiredArgsConstructor
 public class NaverNewsClient {
 
-    private static final String BASE_URL = "https://openapi.naver.com/v1/search/news.json";
+    private static final String BASE_URL = "https://naverapihub.apigw.ntruss.com/search/v1/news";
 
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
@@ -45,8 +47,8 @@ public class NaverNewsClient {
                 .toUri();
 
         RequestEntity<Void> request = RequestEntity.get(uri)
-                .header("X-Naver-Client-Id", clientId)
-                .header("X-Naver-Client-Secret", clientSecret)
+                .header("X-NCP-APIGW-API-KEY-ID", clientId)
+                .header("X-NCP-APIGW-API-KEY", clientSecret)
                 .build();
         try {
             String body = restTemplate.exchange(request, String.class).getBody();
