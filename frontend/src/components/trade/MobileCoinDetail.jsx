@@ -4,7 +4,7 @@ import StarIcon from '../ui/StarIcon.jsx';
 import Button from '../ui/Button.jsx';
 import TradingViewWidget from './TradingViewWidget.jsx';
 import OrderPanel from './OrderPanel.jsx';
-import OrderSheet from './OrderSheet.jsx';
+import Sheet from '../ui/Sheet.jsx';
 import {changeColor, formatAmount, formatKRW, formatPercent, formatPrice, formatSignedKRW} from '../../utils/format.js';
 
 /** 모바일 코인 상세 (토스증권식): 현재가 · 차트 · 내 보유 · 아래 고정 구매/판매 버튼 */
@@ -74,7 +74,7 @@ export default function MobileCoinDetail({market, name, ticker, isFav, onToggleF
                 <Button variant="buy" size="lg" onClick={() => setSheetSide('BUY')}>구매하기</Button>
             </div>
 
-            <OrderSheet open={sheetSide != null} onClose={() => setSheetSide(null)} title={`${name ?? symbol} ${sheetSide === 'SELL' ? '판매' : '구매'}`}>
+            <Sheet open={sheetSide != null} onClose={() => setSheetSide(null)} title={`${name ?? symbol} ${sheetSide === 'SELL' ? '판매' : '구매'}`}>
                 <OrderPanel
                     market={market}
                     currentPrice={ticker?.price ?? 0}
@@ -86,7 +86,7 @@ export default function MobileCoinDetail({market, name, ticker, isFav, onToggleF
                         setSheetSide(null);
                     }}
                 />
-            </OrderSheet>
+            </Sheet>
         </div>
     );
 }

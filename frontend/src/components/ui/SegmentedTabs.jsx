@@ -15,7 +15,7 @@ export default function SegmentedTabs({items, value, onChange, label, fill = fal
                         role="tab"
                         aria-selected={selected}
                         onClick={() => onChange(item.value)}
-                        className={`inline-flex h-9 items-center justify-center gap-1.5 rounded-[9px] px-4 text-sm transition ${fill ? 'flex-1' : ''} ${
+                        className={`inline-flex h-9 items-center justify-center gap-1.5 whitespace-nowrap rounded-[9px] px-4 text-sm transition ${fill ? 'flex-1' : ''} ${
                             selected ? 'bg-surface font-bold text-fg shadow-sm' : 'font-semibold text-fg-3 hover:text-fg-2'
                         }`}
                     >
