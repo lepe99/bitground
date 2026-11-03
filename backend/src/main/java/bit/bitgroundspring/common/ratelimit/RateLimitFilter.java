@@ -44,7 +44,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
     static final List<Rule> RULES = List.of(
             // 주문: 매크로·스크립트로 초당 수십 건 넣는 것 방지
             new Rule("order", "POST", "/trade", 30, 60, false),
-            new Rule("order", "POST", "/trade/reserve", 30, 60, false),
+            new Rule("order", "POST", "/orders/reserve", 30, 60, false),
             // 업로드: S3 저장 공간·트래픽
             new Rule("upload", "POST", "/uploads/images", 10, 60, false),
             new Rule("upload", "PUT", "/users/me", 10, 60, false),

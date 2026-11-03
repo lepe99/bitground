@@ -89,7 +89,7 @@ class ApiResponseContractTest extends IntegrationTest {
         @Test
         void 없는_리소스는_도메인_에러_코드() throws Exception {
             mvc.perform(get("/posts/999999").cookie(userCookie)).andExpect(problem(ErrorCode.POST_NOT_FOUND));
-            mvc.perform(delete("/orders/999999").cookie(userCookie)).andExpect(problem(ErrorCode.ORDER_NOT_FOUND));
+            mvc.perform(delete("/orders/reserve/999999").cookie(userCookie)).andExpect(problem(ErrorCode.ORDER_NOT_FOUND));
             mvc.perform(get("/coins/KRW-NONE/insight")).andExpect(problem(ErrorCode.AI_INSIGHT_NOT_FOUND));
         }
 

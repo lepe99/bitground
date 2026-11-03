@@ -74,7 +74,7 @@ class OrderValidationTest extends IntegrationTest {
     }
 
     private ResultActions reserveOrder(String type, double amount, double price) throws Exception {
-        return mvc.perform(post("/trade/reserve").cookie(cookie).contentType(MediaType.APPLICATION_JSON)
+        return mvc.perform(post("/orders/reserve").cookie(cookie).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"symbol\":\"KRW-BTC\",\"orderType\":\"%s\",\"amount\":%s,\"reservePrice\":%s}".formatted(type, amount, price)));
     }
 
@@ -162,7 +162,7 @@ class OrderValidationTest extends IntegrationTest {
 
         @Test
         void 필수_필드가_없으면_400_INVALID_INPUT() throws Exception {
-            mvc.perform(post("/trade/reserve").cookie(cookie).contentType(MediaType.APPLICATION_JSON).content("{\"symbol\":\"KRW-BTC\"}"))
+            mvc.perform(post("/orders/reserve").cookie(cookie).contentType(MediaType.APPLICATION_JSON).content("{\"symbol\":\"KRW-BTC\"}"))
                     .andExpect(problem(ErrorCode.INVALID_INPUT));
         }
     }

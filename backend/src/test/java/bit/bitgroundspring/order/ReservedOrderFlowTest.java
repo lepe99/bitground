@@ -170,7 +170,7 @@ class ReservedOrderFlowTest extends IntegrationTest {
         Order order = reserveBuy(0.01, 50_000_000f);
         Cookie cookie = fixtures.login(user);
 
-        mvc.perform(delete("/orders/" + order.getId()).cookie(cookie)).andExpect(status().isNoContent());
+        mvc.perform(delete("/orders/reserve/" + order.getId()).cookie(cookie)).andExpect(status().isNoContent());
 
         assertThat(orderRepository.findById(order.getId())).isEmpty();
         assertThat(inBook(order)).isFalse();

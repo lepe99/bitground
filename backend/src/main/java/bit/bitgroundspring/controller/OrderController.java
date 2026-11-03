@@ -1,57 +1,58 @@
 package bit.bitgroundspring.controller;
 
-import bit.bitgroundspring.security.token.AuthUser;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import bit.bitgroundspring.dto.response.OrderDto;
 import bit.bitgroundspring.dto.projection.OrderProjection;
+import bit.bitgroundspring.dto.request.CreateOrderRequest;
+import bit.bitgroundspring.dto.response.OrderDto;
+import bit.bitgroundspring.dto.response.ReserveOrderResponse;
+import bit.bitgroundspring.entity.Order;
+import bit.bitgroundspring.security.token.AuthUser;
 import bit.bitgroundspring.service.OrderService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+/**
+ * 주문 내역과 예약 주문
+ * 예약 주문은 접수·조회·취소를 /orders/reserve 아래에 둔다 (시장가 즉시 주문은 POST /trade)
+ */
 @RestController
 @RequestMapping("/orders")
 @RequiredArgsConstructor
 public class OrderController {
+
     private final OrderService orderService;
 
-    @GetMapping("/{seasonId}")
-    public List<OrderProjection> getOrders(
-            @PathVariable Integer seasonId,
-            @AuthenticationPrincipal AuthUser authUser) {
-
-        Integer userId = authUser.id();
-        return orderService.getOrdersBySeason(seasonId, userId);
+    // 시즌별 내 주문 내역 (체결·미체결 전체)
+    @GetMapping
+    public List<OrderProjection> getOrders(@AuthenticationPrincipal AuthUser authUser,
+                                           @RequestParam Integer seasonId) {
+        return orderService.getOrdersBySeason(seasonId, authUser.id());
     }
-    
+
+    // 예약 주문 접수
+    @PostMapping("/reserve")
+    public ResponseEntity<ReserveOrderResponse> createReserveOrder(@AuthenticationPrincipal AuthUser authUser,
+                                                                   @Valid @RequestBody CreateOrderRequest request) {
+        Order order = orderService.createReserveOrder(authUser.id(), request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(ReserveOrderResponse.from(order));
+    }
+
+    // 현재 시즌의 미체결 예약 주문
     @GetMapping("/reserve")
-    public ResponseEntity<List<OrderDto>> getReserveOrders(
-            @AuthenticationPrincipal AuthUser authUser) {
-
-        // 1. 로그인 유저 ID 추출
-        Integer userId = authUser.id();
-
-        // 2. 현재 시즌 ID 조회
-        Integer currentSeasonId = orderService.getCurrentSeasonId(); // 또는 SeasonService 사용
-
-        // 3. 예약 주문만 조회
-        List<OrderDto> orders = orderService.getPendingOrders(userId, currentSeasonId);
-
-        return ResponseEntity.ok(orders);
+    public List<OrderDto> getReserveOrders(@AuthenticationPrincipal AuthUser authUser) {
+        return orderService.getPendingOrders(authUser.id(), orderService.getCurrentSeasonId());
     }
 
-    //삭제
-    @DeleteMapping("/{orderId}")
-    public ResponseEntity<Void> cancelReserveOrder(
-            @PathVariable Integer orderId,
-            @AuthenticationPrincipal AuthUser authUser) {
-
-        Integer userId = authUser.id();
-        orderService.cancelOrder(orderId, userId);
+    // 예약 주문 취소 (본인 주문, 미체결일 때만)
+    @DeleteMapping("/reserve/{orderId}")
+    public ResponseEntity<Void> cancelReserveOrder(@AuthenticationPrincipal AuthUser authUser,
+                                                   @PathVariable Integer orderId) {
+        orderService.cancelOrder(orderId, authUser.id());
         return ResponseEntity.noContent().build();
     }
-
-
 }

@@ -151,10 +151,23 @@
 
 | 대상 | 기준 | 1분당 |
 |---|---|---|
-| `POST /trade`, `POST /trade/reserve` (주문) | 사용자 | 30 |
+| `POST /trade`, `POST /orders/reserve` (주문) | 사용자 | 30 |
 | `POST /uploads/images`, `PUT /users/me` (이미지 업로드) | 사용자 | 10 |
 | `GET /mypage/ai-advice` (Gemini 호출) | 사용자 | 5 |
 | `GET /oauth2/authorization/**` (로그인 시도) | IP | 20 |
 | `POST /auth/refresh` | IP | 30 |
 
 규칙: `backend/src/main/java/bit/bitgroundspring/common/ratelimit/RateLimitFilter.java`
+
+## 8. 주문 API
+
+| 엔드포인트 | 설명 | 성공 |
+|---|---|---|
+| `POST /trade` | 시장가·지정가 즉시 주문 | `200` 체결 결과 |
+| `GET /trade/history?symbol=` | 종목 최근 체결 내역 | `200` |
+| `GET /orders?seasonId=` | 시즌별 내 주문 내역 | `200` |
+| `POST /orders/reserve` | 예약 주문 접수 | `201` |
+| `GET /orders/reserve` | 현재 시즌 미체결 예약 주문 | `200` |
+| `DELETE /orders/reserve/{orderId}` | 예약 주문 취소 (본인·미체결만) | `204` |
+
+예약 주문은 접수·조회·취소를 모두 `/orders/reserve` 아래에 둡니다. 실시간 체결 내역은 WebSocket `/ws/trade/history`로 받습니다.
