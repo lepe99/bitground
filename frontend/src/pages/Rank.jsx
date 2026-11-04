@@ -4,6 +4,7 @@ import {fetchCurrentRanking, fetchSeasonRanking} from "../api/rankApi.js";
 import {fetchSeasons} from "../api/seasonApi.js";
 import {useMediaQuery} from "../hooks/useMediaQuery.js";
 import SegmentedTabs from "../components/ui/SegmentedTabs.jsx";
+import SeasonSchedule from "../components/season/SeasonSchedule.jsx";
 import RankPodium from "../components/rank/RankPodium.jsx";
 import RankTable from "../components/rank/RankTable.jsx";
 import MyPosition from "../components/rank/MyPosition.jsx";
@@ -94,6 +95,8 @@ export default function Rank() {
                     )}
                 </div>
             </section>
+
+            {view === "current" && <SeasonSchedule/>}
 
             {/* 모바일: 내 위치를 맨 위에 */}
             {view === "current" && current && <div className="md:hidden"><MyPosition me={me} rankings={current}/></div>}

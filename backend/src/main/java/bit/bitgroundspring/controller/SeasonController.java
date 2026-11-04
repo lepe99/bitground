@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import bit.bitgroundspring.dto.response.CurrentSeasonDto;
 import java.util.List;
 
 @RestController
@@ -30,6 +31,14 @@ public class SeasonController {
     @GetMapping
     public ResponseEntity<List<SeasonProjection>> getLatestSeasons() {
         return ResponseEntity.ok(seasonService.getLatestSeasons());
+    }
+
+    /**
+     * 진행 중인 시즌의 이름·스플릿·종료 시각 (로그인하지 않아도 볼 수 있음)
+     */
+    @GetMapping("/current")
+    public CurrentSeasonDto getCurrentSeason() {
+        return seasonService.getCurrentSeason();
     }
 
     /**

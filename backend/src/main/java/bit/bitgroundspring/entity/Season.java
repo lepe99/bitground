@@ -29,6 +29,12 @@ public class Season {
     
     @Column(name = "end_at")
     private LocalDate endAt;
+
+    @Column(name = "split_starts_at")
+    private LocalDateTime splitStartsAt; // 스플릿 2 시작 (추가 자금 지급)
+
+    @Column(name = "ends_at")
+    private LocalDateTime endsAt; // 시즌 정산(종료) 시각 = 다음 시즌 시작
     
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, columnDefinition = "enum('PENDING', 'COMPLETED') default 'PENDING'")

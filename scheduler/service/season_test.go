@@ -3,6 +3,8 @@ package service
 import (
 	"testing"
 	"time"
+
+	"Bitground-go/util"
 )
 
 func TestProcessSeasonStrings(t *testing.T) {
@@ -63,6 +65,35 @@ func TestSeasonPeriod(t *testing.T) {
 				t.Errorf("seasonPeriod() = %s ~ %s, want %s ~ %s",
 					start.Format(time.DateOnly), end.Format(time.DateOnly),
 					tt.now.Format(time.DateOnly), tt.wantEnd.Format(time.DateOnly))
+			}
+		})
+	}
+}
+
+func TestSeasonMilestones(t *testing.T) {
+	at := func(m time.Month, d, h int) time.Time { return time.Date(2026, m, d, h, 0, 0, 0, time.UTC) }
+	tests := []struct {
+		name            string
+		now, endAt      time.Time
+		mode            string
+		wantSplit, want time.Time
+	}{
+		{"1일 시즌: 8일 스플릿, 16일 종료", at(11, 1, 0), at(11, 15, 0), "prod", at(11, 8, 0), at(11, 16, 0)},
+		{"16일 시즌: 23일 스플릿, 다음 달 1일 종료", at(11, 16, 0), at(11, 30, 0), "prod", at(11, 23, 0), at(12, 1, 0)},
+		{"dev: 3시간 뒤 스플릿, 6시간 뒤 종료", at(11, 4, 18), at(11, 4, 0), "dev", at(11, 4, 21), at(11, 5, 0)},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			split, ends := seasonMilestones(tt.now, tt.mode, tt.endAt)
+			if !split.Equal(tt.wantSplit) || !ends.Equal(tt.want) {
+				t.Errorf("seasonMilestones() = %s, %s", split, ends)
+			}
+			// TimeCheck와 같은 시각이어야 한다
+			if f := util.TimeCheck(split, tt.mode); !f.Split {
+				t.Errorf("%s는 스플릿 시각이 아님", split)
+			}
+			if f := util.TimeCheck(ends, tt.mode); !f.Season {
+				t.Errorf("%s는 시즌 정산 시각이 아님", ends)
 			}
 		})
 	}

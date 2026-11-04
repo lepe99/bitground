@@ -2,5 +2,5 @@ package bit.bitgroundspring.entity;
 
 
 public enum Message {
-    NOTICE, ORDER_EXECUTION, SEASON_UPDATE
+    NOTICE, ORDER_EXECUTION, SEASON_UPDATE, COMMENT
 }

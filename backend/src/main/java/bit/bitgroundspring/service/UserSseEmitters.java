@@ -1,6 +1,7 @@
 package bit.bitgroundspring.service;
 
 import bit.bitgroundspring.entity.Message;
+import bit.bitgroundspring.entity.MessageType;
 import bit.bitgroundspring.dto.response.NotificationResponse;
 import bit.bitgroundspring.entity.Notification;
 import bit.bitgroundspring.entity.User;
@@ -104,6 +105,18 @@ public class UserSseEmitters {
         sendToUser(userId, data);
     }
     
+    /** 저장해 둔 알림을 접속 중이면 실시간으로 보낸다 (댓글 알림: 문구는 저장한 것을 그대로 쓴다) */
+    public void sendSaved(Notification notification) {
+        Map<String, Object> data = new HashMap<>();
+        data.put("text", notification.getMessage());
+        data.put("postId", notification.getPostId());
+        sendToUser(notification.getUser().getId(), NotificationResponse.builder()
+                .messageType(MessageType.INFO)
+                .message(notification.getMessageType())
+                .data(data)
+                .build());
+    }
+
     // 하트비트 전송 - 30초마다 실행
     @Scheduled(fixedRate = 30000)
     public void sendHeartbeat() {

@@ -8,5 +8,6 @@ public interface NotificationProjection {
     Integer getId();
     String getMessage();
     Message getMessageType();
+    Integer getPostId();
     LocalDateTime getCreatedAt();
 }

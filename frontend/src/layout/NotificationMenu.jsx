@@ -5,12 +5,13 @@ import {fetchNotifications, markAllNotificationsRead} from '../api/notificationA
 
 const PAGE_SIZE = 10;
 
-// 알림 종류별 이동할 화면
+// 알림 종류별 이동할 화면 (댓글 알림은 그 게시글)
 const TARGETS = {
     NOTICE: '/notice',
     ORDER_EXECUTION: '/investments',
     SEASON_UPDATE: '/rank',
 };
+const targetOf = (item) => (item.messageType === 'COMMENT' && item.postId ? `/community/${item.postId}` : TARGETS[item.messageType]);
 
 /** 헤더의 알림 버튼 + 펼침 목록. 열면 모두 읽음 처리하고, 끝까지 내리면 다음 쪽을 불러온다 */
 export default function NotificationMenu() {
@@ -74,8 +75,8 @@ export default function NotificationMenu() {
         }
     };
 
-    const go = (type) => {
-        const to = TARGETS[type];
+    const go = (item) => {
+        const to = targetOf(item);
         if (to) navigate(to);
         setOpen(false);
     };
@@ -112,7 +113,7 @@ export default function NotificationMenu() {
                         )}
                         {items.map((item, index) => (
                             <li key={`${item.id}-${index}`} className="border-b border-line last:border-b-0">
-                                <button type="button" onClick={() => go(item.messageType)} className="flex w-full flex-col gap-1 px-4 py-3 text-left hover:bg-surface-2">
+                                <button type="button" onClick={() => go(item)} className="flex w-full flex-col gap-1 px-4 py-3 text-left hover:bg-surface-2">
                                     <span className="whitespace-pre-wrap text-sm leading-relaxed">{item.message}</span>
                                     {item.createdAt && (
                                         <span className="num text-xs text-fg-3">{new Date(item.createdAt).toLocaleString('ko-KR')}</span>

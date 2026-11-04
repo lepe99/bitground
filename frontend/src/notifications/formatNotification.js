@@ -18,6 +18,8 @@ export const formatNotification = ({message, data}) => {
             }
             return '';
         }
+        case 'COMMENT':
+            return data.text; // 문구는 서버가 저장한 알림과 같다
         case 'NOTICE':
             return `🔔 새로운 공지사항이 등록되었습니다.\n공지사항 탭에서 확인해보세요.\n[${data.title}]\n`;
         default:

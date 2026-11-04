@@ -37,6 +37,9 @@ public class Notification {
     @Enumerated(EnumType.STRING)
     @Column(name = "message_type", nullable = false)
     private Message messageType;
+
+    @Column(name = "post_id")
+    private Integer postId; // 댓글 알림이면 그 게시글 (누르면 이동)
     
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, columnDefinition = "datetime(6) DEFAULT CURRENT_TIMESTAMP(6)")

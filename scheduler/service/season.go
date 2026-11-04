@@ -77,6 +77,7 @@ func settleSeason(ctx context.Context, tx *sql.Tx, cfg config.Config, now time.T
 	if err != nil {
 		return err
 	}
+	splitAt, endsAt := seasonMilestones(now, cfg.Mode, endAt)
 
 	steps := []struct {
 		name  string
@@ -87,8 +88,9 @@ func settleSeason(ctx context.Context, tx *sql.Tx, cfg config.Config, now time.T
 		{"이전 시즌 종료", `UPDATE seasons SET status = 'COMPLETED', reward_calculated = 1 WHERE id = ?`,
 			[]any{seasonID}},
 		// 3. 새 시즌 시작
-		{"새 시즌 생성", `INSERT INTO seasons (name, start_at, end_at) VALUES (?, ?, ?)`,
-			[]any{newSeasonName, startAt.Format(time.DateOnly), endAt.Format(time.DateOnly)}},
+		{"새 시즌 생성", `INSERT INTO seasons (name, start_at, end_at, split_starts_at, ends_at) VALUES (?, ?, ?, ?, ?)`,
+			[]any{newSeasonName, startAt.Format(time.DateOnly), endAt.Format(time.DateOnly),
+				splitAt.Format(time.DateTime), endsAt.Format(time.DateTime)}},
 		// 4. 이전 시즌 최종 랭킹의 티어를 사용자에게 반영 (랭킹에 없으면 0)
 		{"티어 반영", `
 			UPDATE users u
@@ -149,6 +151,18 @@ func seasonPeriod(now time.Time, mode string) (time.Time, time.Time, error) {
 	default:
 		return time.Time{}, time.Time{}, fmt.Errorf("시즌 종료일 설정 실패: %d일은 시즌 시작일이 아님", now.Day())
 	}
+}
+
+// seasonMilestones 새 시즌의 스플릿 2 시작 시각과 시즌 종료(다음 시즌 시작) 시각. 화면이 남은 시간을 보여줄 때 쓴다.
+// TimeCheck와 같은 일정이어야 한다: prod는 시작 7일 뒤 0시(8일·23일)에 스플릿, 종료일 다음 날 0시에 정산.
+// dev는 6시간 시즌(0·6·12·18시)의 3시간째에 스플릿. 문자열로 넣어 DB 연결 시간대와 상관없이 한국 시각 그대로 저장된다
+func seasonMilestones(now time.Time, mode string, endAt time.Time) (time.Time, time.Time) {
+	if mode == "dev" {
+		return now.Add(3 * time.Hour), now.Add(6 * time.Hour)
+	}
+	day := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	end := time.Date(endAt.Year(), endAt.Month(), endAt.Day(), 0, 0, 0, 0, endAt.Location())
+	return day.AddDate(0, 0, 7), end.AddDate(0, 0, 1)
 }
 
 // processSeasonStrings 함수는 문자열 a와 b를 비교하여 새로운 문자열 c를 반환합니다.
