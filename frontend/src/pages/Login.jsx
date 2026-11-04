@@ -71,7 +71,7 @@ export default function Login() {
 
                 <p className="text-center text-xs leading-relaxed text-fg-3">
                     로그인하면 <Link to="/terms" className="font-semibold text-fg-2 underline underline-offset-2">서비스 이용약관</Link>과{' '}
-                    <Link to="/privacy" className="font-semibold text-fg-2 underline underline-offset-2">개인정보처리방침</Link>에 동의하는 것으로 봅니다.
+                    <Link to="/privacy" className="font-semibold text-fg-2 underline underline-offset-2">개인정보처리방침</Link>에 동의하게 됩니다.
                 </p>
 
                 <p className="flex items-center justify-center gap-1.5 text-xs text-fg-3">

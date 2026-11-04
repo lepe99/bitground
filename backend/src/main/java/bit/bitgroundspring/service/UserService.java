@@ -13,10 +13,12 @@ import bit.bitgroundspring.repository.SeasonRepository;
 import bit.bitgroundspring.repository.UserRepository;
 import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class UserService {
@@ -61,16 +63,28 @@ public class UserService {
         return storageService.uploadImage("profile", file);
     }
 
-    //isDeleted -> 1
+    // 탈퇴한 회원의 이름 대신 보여줄 표시 (게시글·지난 시즌 순위는 남기되 누구인지 알 수 없게)
+    public static final String WITHDRAWN_NAME = "탈퇴한 회원";
+
+    // 탈퇴: 행은 남겨 거래·순위·게시글 기록을 유지하고, 개인을 알아볼 수 있는 정보는 지운다 (개인정보처리방침 '보유 기간과 파기')
     @Loggable("회원 탈퇴")
     public void softDeleteUser(Integer userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+        String uploadedImage = user.getProfileImage();
         user.setIsDeleted(true);
         user.setTier(0);
+        user.setName(WITHDRAWN_NAME);
         user.setEmail(null);
         user.setProviderId(null);
+        user.setProfileImage(null);
         userRepository.save(user);
+        // 직접 올린 프로필 사진 파일도 지운다 (소셜 프로필 URL은 무시됨). 파일 삭제가 실패해도 탈퇴는 진행한다
+        try {
+            storageService.deleteByUrl(uploadedImage);
+        } catch (RuntimeException e) {
+            log.warn("[user] 탈퇴 회원 프로필 사진 삭제 실패 - userId: {}", userId, e);
+        }
         // 모든 기기의 리프레시 토큰과 이미 발급된 액세스 토큰을 즉시 무효화
         authTokenService.revokeAll(userId);
     }
