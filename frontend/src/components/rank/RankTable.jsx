@@ -10,9 +10,10 @@ const COLS = 'md:grid-cols-[56px_minmax(0,1fr)_120px_160px]';
 
 /**
  * 4위부터의 순위표. 내 행은 강조하고, 20명씩 더 보기
+ * @param participants 시즌 전체 참가자 수 (호버 카드의 상위 %)
  * @param onSelect 행을 눌렀을 때 (터치 화면용. 없으면 행은 누를 수 없고 사진 호버로 티어 이력을 본다)
  */
-export default function RankTable({rows, myUserId, onSelect}) {
+export default function RankTable({rows, myUserId, onSelect, participants}) {
     const [shown, setShown] = useState(PAGE);
     const Row = onSelect ? 'button' : 'div';
 
@@ -37,7 +38,7 @@ export default function RankTable({rows, myUserId, onSelect}) {
                             >
                                 <span className="num w-6 text-[15px] font-bold text-fg-2 md:w-auto md:text-fg">{u.ranks}</span>
                                 <span className="flex min-w-0 flex-1 items-center gap-3">
-                                    <TierHistoryHover user={u}>
+                                    <TierHistoryHover user={u} participants={participants}>
                                         <Avatar src={u.profileImage} name={u.name} tier={u.tier} size="md" outline={mine ? 'text-brand-soft' : 'text-surface'}/>
                                     </TierHistoryHover>
                                     <span className="flex min-w-0 flex-col">

@@ -33,7 +33,7 @@ public class RankService {
     }
     
     /**
-     * 유저의 최고 티어, 지난 5시즌 티어 조회
+     * 유저의 최고 티어, 참여한 최근 5시즌 기록(티어·순위·자산), 참여 시즌 수 조회
      */
     public RankDetailResponse getUserTierDetails(Integer userId) {
         User user = User.builder().id(userId).build();
@@ -46,9 +46,12 @@ public class RankService {
                 PageRequest.of(0, 5)
         );
 
+        long seasonCount = userRankingRepository.countSeasonsByUser(user, Status.COMPLETED);
+
         return RankDetailResponse.builder()
                 .highestTier(highestTier != null ? highestTier : 0)
                 .pastSeasonTiers(pastSeasonTiers)
+                .seasonCount(seasonCount)
                 .build();
     }
 }

@@ -4,7 +4,7 @@ import {TIER_NAMES, TIER_TEXT} from '../../constants/tiers.js';
 import {formatKRW} from '../../utils/format.js';
 
 /** 1~3위 단상: 가운데 1위를 크게. onSelect가 없으면 누를 수 없고 사진 호버로 티어 이력을 본다 */
-export default function RankPodium({top, onSelect}) {
+export default function RankPodium({top, onSelect, participants}) {
     if (top.length === 0) return null;
     const order = [top[1], top[0], top[2]].filter(Boolean);
     const Item = onSelect ? 'button' : 'div';
@@ -22,7 +22,7 @@ export default function RankPodium({top, onSelect}) {
                         }`}
                     >
                         <span className={`num text-xs font-extrabold md:text-sm ${first ? 'text-brand-fg' : 'text-fg-2'}`}>{u.ranks}위</span>
-                        <TierHistoryHover user={u} className="my-1">
+                        <TierHistoryHover user={u} participants={participants} className="my-1">
                             <Avatar src={u.profileImage} name={u.name} tier={u.tier} size={first ? '2xl' : 'xl'} className={first ? 'max-md:size-16' : 'max-md:size-[54px]'}/>
                         </TierHistoryHover>
                         <span className="w-full truncate text-[13px] font-semibold md:text-base md:font-bold">{u.name}</span>

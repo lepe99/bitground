@@ -51,8 +51,9 @@ public interface UserRankingRepository extends JpaRepository<UserRanking, Long> 
             "ORDER BY ur.ranks ASC")
     List<RankProjection> findCurrentSeasonRankings();
     
-    // 툴팁용: 시즌 엔티티 포함해서 최대 5개
-    @Query("SELECT ur.season.name as name, ur.tier as tier " +
+    // 툴팁용: 참여한 완료 시즌 중 최근 것부터 (개수는 Pageable로 제한). 시즌별 최종 순위·자산·참가자 수 포함
+    @Query("SELECT ur.season.name as name, ur.tier as tier, ur.ranks as ranks, ur.totalValue as totalValue, " +
+            "(SELECT COUNT(r2) FROM UserRanking r2 WHERE r2.season = ur.season) as participants " +
             "FROM UserRanking ur " +
             "WHERE ur.user = :user AND ur.season.status = :status " +
             "ORDER BY ur.season.id DESC")
@@ -62,6 +63,10 @@ public interface UserRankingRepository extends JpaRepository<UserRanking, Long> 
             Pageable pageable
     );
     
+    // 참여한 완료 시즌 수
+    @Query("SELECT COUNT(ur) FROM UserRanking ur WHERE ur.user = :user AND ur.season.status = :status")
+    long countSeasonsByUser(@Param("user") User user, @Param("status") Status status);
+
     // 전체 시즌 중 최고 티어
     @Query("SELECT MAX(r.tier) FROM UserRanking r WHERE r.user = :user AND r.season.status <> 'PENDING'")
     Integer findHighestTierByUser(@Param("user") User user);
