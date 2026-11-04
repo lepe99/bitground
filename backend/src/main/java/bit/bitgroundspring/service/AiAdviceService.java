@@ -7,6 +7,8 @@ import bit.bitgroundspring.common.error.BusinessException;
 import bit.bitgroundspring.common.error.ErrorCode;
 import bit.bitgroundspring.dto.response.AiAdviceDto;
 import bit.bitgroundspring.dto.InvestmentSummaryDto;
+import bit.bitgroundspring.dto.SeasonReviewContent;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import bit.bitgroundspring.entity.AiAdvice;
 import bit.bitgroundspring.entity.Season;
 import bit.bitgroundspring.entity.Status;
@@ -33,6 +35,7 @@ public class AiAdviceService {
     private final AiAdviceRepository aiAdviceRepository;
     private final UserRepository userRepository;
     private final SeasonRepository seasonRepository;
+    private final ObjectMapper objectMapper;
 
     /**
      * 특정 사용자 및 특정 시즌에 대한 AI 투자 조언을 생성하고 저장합니다.
@@ -88,28 +91,19 @@ public class AiAdviceService {
             }
             log.debug("[AiAdviceService] 투자 요약 데이터 생성 완료: {}", summaryDto);
 
-            log.info("[AiAdviceService] GeminiService.generateInvestmentAdvice() 호출 중...");
-            AiAdviceDto generatedAdviceDto = geminiService.generateInvestmentAdvice(summaryDto);
-            if (generatedAdviceDto == null) {
-                log.error("[AiAdviceService] Gemini API로부터 AI 조언 생성 실패. generateInvestmentAdvice()가 null을 반환했습니다. User ID={}, Season ID={}", userId, seasonId);
-                throw new BusinessException(ErrorCode.AI_ADVICE_UNAVAILABLE, "AI 조언 생성에 실패했습니다 (Gemini API 호출 오류 또는 빈 응답).");
-            }
-            if (generatedAdviceDto.getAdvice() == null || generatedAdviceDto.getAdvice().isEmpty()) {
-                log.warn("[AiAdviceService] Gemini API로부터 받은 조언 내용이 비어 있습니다. User ID={}, Season ID={}", userId, seasonId);
-                throw new BusinessException(ErrorCode.AI_ADVICE_UNAVAILABLE, "AI 조언 내용이 비어 있습니다.");
-            }
-            log.info("[AiAdviceService] Gemini API로부터 AI 조언 성공적으로 생성. Score: {}, Advice Length: {}",
-                    generatedAdviceDto.getScore(), generatedAdviceDto.getAdvice().length());
-
-            // 점수는 tinyint 컬럼에 들어가므로 0~100으로 자른다 (모델이 범위를 벗어난 값을 줄 수 있음)
-            Integer rawScore = generatedAdviceDto.getScore();
-            int finalScore = rawScore == null ? 0 : Math.max(0, Math.min(100, rawScore));
+            // 점수는 정해진 규칙으로 코드가 계산하고, 모델은 그 이유와 회고만 쓴다
+            SeasonReviewScorer.Score score = SeasonReviewScorer.score(summaryDto);
+            SeasonReviewContent review = geminiService.generateSeasonReview(summaryDto, score)
+                    .withScoreBreakdown(score.parts());
+            log.info("[AiAdviceService] 시즌 리뷰 생성 완료. User ID={}, Season ID={}, Score={}", userId, seasonId, score.total());
 
             AiAdvice newAdvice = AiAdvice.builder()
                     .user(user)
                     .season(season)
-                    .score(finalScore)
-                    .advice(generatedAdviceDto.getAdvice())
+                    .score(score.total())
+                    .advice(objectMapper.writeValueAsString(review))
+                    .promptVersion(GeminiService.PROMPT_VERSION)
+                    .model(geminiService.getModelName())
                     .createdAt(LocalDateTime.now())
                     .build();
 
@@ -183,6 +177,7 @@ public class AiAdviceService {
                 .seasonId(aiAdvice.getSeason().getId())
                 .score(aiAdvice.getScore()) // AiAdvice 엔티티의 getScore는 Integer를 반환해야 합니다.
                 .advice(aiAdvice.getAdvice())
+                .promptVersion(aiAdvice.getPromptVersion())
                 .createdAt(aiAdvice.getCreatedAt())
                 .build();
     }

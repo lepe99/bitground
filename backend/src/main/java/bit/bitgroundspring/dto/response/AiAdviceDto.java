@@ -22,6 +22,7 @@ public class AiAdviceDto {
     private LocalDateTime createdAt; // 조언 생성 일시
 
     // AI가 생성한 결과 (기존 AiAdviceResult의 내용)
-    private Integer score; // AI가 평가한 투자 성과 점수
-    private String advice; // AI가 제공하는 구체적인 조언 내용
+    private Integer score; // 시즌 점수 (season-review-v2부터 코드가 계산)
+    private String advice; // v1: 마크다운 본문 / season-review-v2: SeasonReviewContent JSON
+    private String promptVersion;
 }

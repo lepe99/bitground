@@ -27,7 +27,7 @@ function ScoreRing({score}) {
     const value = Math.max(0, Math.min(100, Number(score) || 0));
     return (
         <div className="relative size-[132px] shrink-0 md:size-[150px]">
-            <svg viewBox="0 0 120 120" className="size-full" role="img" aria-label={`AI 투자 점수 ${value}점`}>
+            <svg viewBox="0 0 120 120" className="size-full" role="img" aria-label={`시즌 점수 ${value}점`}>
                 <circle cx="60" cy="60" r="50" fill="none" className="stroke-surface-2" strokeWidth="10"/>
                 <circle cx="60" cy="60" r="50" fill="none" className="stroke-brand" strokeWidth="10" strokeLinecap="round"
                         strokeDasharray={`${(value / 100) * RING} ${RING}`} transform="rotate(-90 60 60)"/>
@@ -37,6 +37,98 @@ function ScoreRing({score}) {
                 <span className="pt-1 text-xs text-fg-3">/ 100점</span>
             </div>
         </div>
+    );
+}
+
+// season-review-v2부터 리뷰 본문은 섹션별 JSON (그 전 리뷰는 마크다운 글 하나)
+const parseReview = (advice) => {
+    if (!advice.promptVersion?.startsWith('season-review-v')) return null;
+    try {
+        return JSON.parse(advice.advice);
+    } catch {
+        return null;
+    }
+};
+
+function ReviewSection({title, children}) {
+    return (
+        <section className="flex flex-col gap-1.5">
+            <h4 className="text-[13px] font-bold text-fg-3">{title}</h4>
+            {children}
+        </section>
+    );
+}
+
+function ReviewList({items}) {
+    return (
+        <ul className="flex flex-col gap-1.5">
+            {items.map((text, i) => (
+                <li key={i} className="flex gap-2 text-[15px] leading-relaxed text-fg-2">
+                    <span className="mt-[9px] size-1.5 shrink-0 rounded-full bg-fg-3" aria-hidden="true"/>
+                    <span>{text}</span>
+                </li>
+            ))}
+        </ul>
+    );
+}
+
+/** AI 시즌 리뷰: 점수(코드 계산)와 구성 요소, 총평·잘한 점·아쉬운 점·다음 시즌 제안 */
+function AdviceView({advice}) {
+    const review = parseReview(advice);
+    const disclaimer = <p className="text-xs text-fg-3">AI가 이 시즌의 매매 기록만 보고 만든 회고이며, 투자 권유가 아닙니다.</p>;
+
+    return (
+        <>
+            <div className="flex w-full flex-col items-center gap-3 md:w-[220px] md:shrink-0">
+                <ScoreRing score={advice.score}/>
+                <span className="text-sm font-bold">시즌 점수</span>
+                {review?.scoreBreakdown?.length > 0 && (
+                    <dl className="flex w-full flex-col gap-2 pt-1">
+                        {review.scoreBreakdown.map((part) => (
+                            <div key={part.label} className="flex flex-col gap-1" title={part.basis}>
+                                <div className="flex justify-between text-xs">
+                                    <dt className="text-fg-2">{part.label}</dt>
+                                    <dd className="num font-semibold">{part.points}<span className="text-fg-3">/{part.max}</span></dd>
+                                </div>
+                                <div className="h-1.5 overflow-hidden rounded-full bg-surface-2" aria-hidden="true">
+                                    <div className="h-full rounded-full bg-brand" style={{width: `${(part.points / part.max) * 100}%`}}/>
+                                </div>
+                                <span className="num text-[11px] text-fg-3">{part.basis}</span>
+                            </div>
+                        ))}
+                    </dl>
+                )}
+            </div>
+            <div className="flex min-w-0 flex-1 flex-col gap-4">
+                <h3 className="text-[17px] font-bold">AI 시즌 리뷰</h3>
+                {review ? (
+                    <>
+                        <p className="text-lg font-extrabold leading-snug">{review.headline}</p>
+                        <ReviewSection title="잘한 점"><ReviewList items={review.strengths ?? []}/></ReviewSection>
+                        <ReviewSection title="아쉬운 점"><ReviewList items={review.weaknesses ?? []}/></ReviewSection>
+                        <ReviewSection title="다음 시즌에 해 볼 것">
+                            <ol className="flex flex-col gap-2">
+                                {(review.nextSeason ?? []).map((item, i) => (
+                                    <li key={i} className="flex gap-2.5 rounded-xl bg-surface-2 px-3.5 py-3">
+                                        <span className="num flex size-5 shrink-0 items-center justify-center rounded-full bg-fg text-[11px] font-bold text-bg">{i + 1}</span>
+                                        <span className="flex flex-col gap-0.5">
+                                            <span className="text-[15px] font-semibold">{item.action}</span>
+                                            <span className="text-[13px] leading-relaxed text-fg-3">{item.reason}</span>
+                                        </span>
+                                    </li>
+                                ))}
+                            </ol>
+                        </ReviewSection>
+                        <ReviewSection title="점수 이유">
+                            <p className="text-[15px] leading-relaxed text-fg-2">{review.scoreReason}</p>
+                        </ReviewSection>
+                    </>
+                ) : (
+                    <p className="whitespace-pre-wrap text-[15px] leading-[1.75] text-fg-2">{advice.advice}</p>
+                )}
+                {disclaimer}
+            </div>
+        </>
     );
 }
 
@@ -164,17 +256,7 @@ export default function SeasonReport() {
 
             <Card className="flex flex-col items-center gap-5 p-5 md:flex-row md:items-start md:gap-8 md:p-7">
                 {advice ? (
-                    <>
-                        <div className="flex flex-col items-center gap-2">
-                            <ScoreRing score={advice.score}/>
-                            <span className="text-sm font-bold">AI 투자 점수</span>
-                        </div>
-                        <div className="flex min-w-0 flex-1 flex-col gap-3">
-                            <h3 className="text-[17px] font-bold">AI 시즌 리뷰</h3>
-                            <p className="whitespace-pre-wrap text-[15px] leading-[1.75] text-fg-2">{advice.advice}</p>
-                            <p className="text-xs text-fg-3">AI가 이 시즌의 매매 기록만 보고 만든 분석이며, 투자 권유가 아닙니다.</p>
-                        </div>
-                    </>
+                    <AdviceView advice={advice}/>
                 ) : advice === undefined || !report ? (
                     <p className="w-full py-6 text-center text-sm text-fg-3">불러오는 중…</p>
                 ) : report.rank ? (

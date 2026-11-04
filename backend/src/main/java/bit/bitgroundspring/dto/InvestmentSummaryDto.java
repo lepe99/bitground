@@ -40,6 +40,9 @@ public class InvestmentSummaryDto {
     private Float totalProfitLossPercentage; // 총 수익률 (%) (진행 중인 시즌이면 null)
     private Integer finalRank;             // 시즌 최종 랭크
     private Integer participantCount;      // 시즌 랭킹 참가자 수
+    private Float marketIndexChangePercentage; // 같은 기간 시장 지수 등락률 (%) — 비교 기준. 기록이 없으면 null
+    private Float btcChangePercentage;         // 같은 기간 BTC 등락률 (%) — 시장 지수가 없을 때 비교 기준
+    private Float maxDrawdownPercentage;       // 일별 총자산의 최대 낙폭 (%, 양수). 기록이 2일 미만이면 null
 
     // 3. 거래 활동 요약
     private Integer totalTradeCount;             // 총 거래 횟수 (시즌 종료 시 일괄 청산 기록 포함)

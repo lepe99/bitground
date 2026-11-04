@@ -12,6 +12,7 @@ import bit.bitgroundspring.repository.SeasonRepository;
 import bit.bitgroundspring.repository.UserDailyBalanceRepository;
 import bit.bitgroundspring.repository.CoinPriceHistoryRepository;
 import bit.bitgroundspring.repository.CoinRepository;
+import bit.bitgroundspring.repository.MarketIndexRepository;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,6 +27,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -40,6 +42,10 @@ public class InvestmentAnalysisService {
     private final UserDailyBalanceRepository userDailyBalanceRepository;
     private final CoinPriceHistoryRepository coinPriceHistoryRepository;
     private final CoinRepository coinRepository;
+    private final MarketIndexRepository marketIndexRepository;
+
+    // 시장 지수 기록이 없을 때 쓰는 비교 기준 코인
+    private static final String BENCHMARK_COIN = "KRW-BTC";
 
     /**
      * 특정 사용자 및 시즌에 대한 투자 요약 데이터를 생성합니다. (AI 시즌 리뷰의 입력)
@@ -115,9 +121,21 @@ public class InvestmentAnalysisService {
                         user, season, season.getStartAt(), season.getEndAt()
                 );
 
-        // 4. 주요 코인들의 시즌 내 시세 변동 요약
-        Map<String, String> coinMarketPerformanceSummary = summarizeCoinPerformance(season,
-                distinct(mostTradedCoinSymbol, highestProfitCoinSymbol, lowestProfitCoinSymbol));
+        // 4. 주요 코인들의 시즌 내 시세 변동 요약 + 비교 기준(BTC) 등락
+        List<String> keyCoins = distinct(mostTradedCoinSymbol, highestProfitCoinSymbol, lowestProfitCoinSymbol);
+        Map<String, float[]> seasonPrices = seasonStartEndPrices(season, distinct(BENCHMARK_COIN, mostTradedCoinSymbol, highestProfitCoinSymbol, lowestProfitCoinSymbol));
+        Map<String, String> coinMarketPerformanceSummary = new HashMap<>();
+        for (String symbol : keyCoins) {
+            float[] p = seasonPrices.get(symbol);
+            if (p != null) {
+                coinMarketPerformanceSummary.put(symbol, String.format(
+                        "초기 %.2f원 -> 최종 %.2f원 (변동률: %.2f%%)", p[0], p[1], changePercent(p[0], p[1])));
+            }
+        }
+        float[] btc = seasonPrices.get(BENCHMARK_COIN);
+        Float btcChange = btc != null ? changePercent(btc[0], btc[1]) : null;
+        Float marketIndexChange = marketIndexChange(season);
+        Float maxDrawdown = maxDrawdownPercent(dailyBalanceTrend);
 
         // 5. 최종 자산·기준 자금·총 손익 (위 설명 참고)
         Long finalTotalValue = userRanking != null ? userRanking.getTotalValue() : null;
@@ -143,6 +161,9 @@ public class InvestmentAnalysisService {
                 .totalProfitLossPercentage(totalProfitLossPercentage)
                 .finalRank(userRanking != null ? userRanking.getRanks() : null)
                 .participantCount(participantCount)
+                .marketIndexChangePercentage(marketIndexChange)
+                .btcChangePercentage(btcChange)
+                .maxDrawdownPercentage(maxDrawdown)
                 .totalTradeCount(totalTradeCount)
                 .buyOrderCount(buyOrderCount)
                 .sellOrderCount(sellOrderCount)
@@ -163,10 +184,40 @@ public class InvestmentAnalysisService {
                 .build();
     }
 
-    /** 대상 코인(최대 3개)의 시즌 시작일 시가 → 종료일 종가. 쿼리 두 번으로 가져온다 */
-    private Map<String, String> summarizeCoinPerformance(Season season, List<String> symbols) {
-        Map<String, String> summary = new HashMap<>();
-        if (symbols.isEmpty()) return summary;
+    /** 시장 지수의 시즌 첫 기록 → 마지막 기록 등락률. 기록이 없으면 null */
+    private Float marketIndexChange(Season season) {
+        Optional<MarketIndex> first = marketIndexRepository.findFirstByDateBetweenOrderByDateAscHourAsc(season.getStartAt(), season.getEndAt());
+        Optional<MarketIndex> last = marketIndexRepository.findFirstByDateBetweenOrderByDateDescHourDesc(season.getStartAt(), season.getEndAt());
+        if (first.isEmpty() || last.isEmpty() || first.get().getId().equals(last.get().getId())) return null;
+        return changePercent(first.get().getMarketIndex(), last.get().getMarketIndex());
+    }
+
+    /**
+     * 일별 총자산의 최대 낙폭(%, 양수). 직전 최고점 대비 가장 크게 떨어진 비율. 기록이 2일 미만이면 null.
+     * 스플릿 지급은 자산을 늘리기만 하므로 낙폭을 부풀리지 않는다
+     */
+    static Float maxDrawdownPercent(List<UserDailyBalance> balances) {
+        if (balances == null || balances.size() < 2) return null;
+        long peak = 0;
+        double worst = 0;
+        for (UserDailyBalance b : balances) {
+            long value = b.getTotalValue() != null ? b.getTotalValue() : 0;
+            peak = Math.max(peak, value);
+            if (peak > 0) worst = Math.max(worst, (peak - value) * 100.0 / peak);
+        }
+        return (float) worst;
+    }
+
+    private static float changePercent(float start, float end) {
+        return start == 0 ? 0f : (end - start) / start * 100;
+    }
+
+    /**
+     * 코인별 시즌 시작일 시가와 종료일 종가 {시가, 종가}. 쿼리 두 번으로 가져오고, 둘 중 하나라도 없으면 그 코인은 빠진다
+     */
+    private Map<String, float[]> seasonStartEndPrices(Season season, List<String> symbols) {
+        Map<String, float[]> result = new HashMap<>();
+        if (symbols.isEmpty()) return result;
 
         Map<String, Coin> coinsBySymbol = coinRepository.findAllBySymbolIn(symbols).stream()
                 .collect(Collectors.toMap(Coin::getSymbol, c -> c));
@@ -195,15 +246,13 @@ public class InvestmentAnalysisService {
                     .orElse(null);
 
             if (startPrice != null && endPrice != null && startPrice != 0) {
-                summary.put(symbol, String.format(
-                        "초기 %.2f원 -> 최종 %.2f원 (변동률: %.2f%%)",
-                        startPrice, endPrice, ((endPrice - startPrice) / startPrice) * 100));
+                result.put(symbol, new float[]{startPrice, endPrice});
             } else {
                 log.warn("코인 {}의 시즌 시작/종료 가격 데이터를 찾을 수 없거나 시작 가격이 0입니다. (시즌 기간: {} ~ {})",
                         symbol, season.getStartAt(), season.getEndAt());
             }
         }
-        return summary;
+        return result;
     }
 
     private static long toWon(BigDecimal value) {
