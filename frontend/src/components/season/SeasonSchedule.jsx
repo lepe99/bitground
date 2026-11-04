@@ -57,6 +57,39 @@ function useCurrentSeason() {
     return {season, now: current};
 }
 
+const short = (d) => `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}시`;
+
+/**
+ * 시즌의 한 단계(스플릿). 두 단계를 같은 너비로 나란히 두고, 단계마다 지난 시간만큼 채운다
+ * (시간 비례 막대 하나는 스플릿 길이가 다르면 표시가 한쪽에 몰리고, 어디가 지금인지 읽기 어려웠다)
+ */
+function Phase({name, from, to, now}) {
+    const done = now >= to.getTime();
+    const current = !done && now >= from.getTime();
+    const fill = done ? 100 : current ? ((now - from) / (to - from)) * 100 : 0;
+    const status = done ? '완료' : current ? '진행 중' : '예정';
+
+    return (
+        <li className="flex min-w-0 flex-col gap-1.5">
+            <div className="flex items-baseline justify-between gap-2 text-xs">
+                <span className={`font-bold ${current ? 'text-fg' : 'text-fg-3'}`}>{name}</span>
+                <span className={current ? 'font-semibold text-brand-fg' : 'text-fg-3'}>{status}</span>
+            </div>
+            <div
+                className={`h-2 overflow-hidden rounded-full ${current ? 'bg-brand-soft' : 'bg-surface-2'}`}
+                role="progressbar"
+                aria-label={`${name} ${status}`}
+                aria-valuenow={Math.round(fill)}
+                aria-valuemin={0}
+                aria-valuemax={100}
+            >
+                <div className={`h-full rounded-full ${done ? 'bg-fg-3/40' : 'bg-brand'}`} style={{width: `${fill}%`}}/>
+            </div>
+            <span className="num truncate text-[11px] text-fg-3">{short(from)} ~ {short(to)}</span>
+        </li>
+    );
+}
+
 function Milestone({label, at, note, now, done}) {
     return (
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
@@ -83,12 +116,11 @@ export default function SeasonSchedule({className = ''}) {
     const end = parse(season.endsAt);
     if (!start || !split || !end) return null;
 
-    const total = end - start;
-    const ratio = (t) => Math.min(100, Math.max(0, ((t - start) / total) * 100));
-    const pos = (t) => `${ratio(t)}%`;
-    // 스플릿 표시가 양 끝에 가까우면 '시작'·'종료' 글자와 겹치므로 그쪽 글자를 뺀다
-    const splitRatio = ratio(split);
     const inSplit2 = now >= split.getTime();
+    const phases = [
+        {name: '스플릿 1', from: start, to: split},
+        {name: '스플릿 2', from: split, to: end},
+    ];
 
     return (
         <Card className={`flex flex-col gap-4 p-5 md:flex-row md:items-center md:gap-8 md:p-6 ${className}`}>
@@ -99,26 +131,9 @@ export default function SeasonSchedule({className = ''}) {
                         스플릿 {inSplit2 ? 2 : 1} 진행 중
                     </span>
                 </div>
-                <div className="flex flex-col gap-1.5">
-                    <div
-                        className="relative h-2 rounded-full bg-surface-2"
-                        role="img"
-                        aria-label={`시즌 진행 ${pos(now)}, 스플릿 2는 ${when(split)}, 종료는 ${when(end)}`}
-                    >
-                        <div className="absolute inset-y-0 left-0 rounded-full bg-brand" style={{width: pos(now)}}/>
-                        <span className="absolute -top-1 h-4 w-0.5 -translate-x-1/2 rounded bg-fg-3" style={{left: pos(split)}} aria-hidden="true"/>
-                    </div>
-                    <div className="relative h-4 text-[11px] text-fg-3" aria-hidden="true">
-                        {splitRatio > 15 && <span className="absolute left-0">시작</span>}
-                        <span
-                            className={`absolute whitespace-nowrap ${splitRatio > 85 ? '-translate-x-full' : splitRatio < 15 ? '' : '-translate-x-1/2'}`}
-                            style={{left: pos(split)}}
-                        >
-                            스플릿 2
-                        </span>
-                        {splitRatio < 85 && <span className="absolute right-0">종료</span>}
-                    </div>
-                </div>
+                <ol className="grid grid-cols-2 gap-2" aria-label="시즌 진행 단계">
+                    {phases.map((p) => <Phase key={p.name} {...p} now={now}/>)}
+                </ol>
             </div>
             <div className="flex gap-4 border-t border-line pt-4 md:flex-1 md:border-t-0 md:border-l md:pt-0 md:pl-8">
                 <Milestone label="스플릿 2 시작" at={split} note="1,000만원 추가 지급" now={now} done={inSplit2}/>
