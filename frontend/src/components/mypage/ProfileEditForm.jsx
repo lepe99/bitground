@@ -44,7 +44,7 @@ export default function ProfileEditForm() {
         <Card as="form" onSubmit={submit} className="flex flex-col gap-5 p-5 md:max-w-[560px] md:p-7">
             <h2 className="text-lg font-extrabold">프로필 수정</h2>
 
-            <ProfileImagePicker preview={preview} tier={user?.tier} onPick={pickImage} onReset={resetImage}/>
+            <ProfileImagePicker preview={preview} tier={user?.currentTier ?? user?.tier} onPick={pickImage} onReset={resetImage}/>
 
             <Field label="닉네임" hint="2~8자">
                 <input value={name} onChange={(e) => setName(e.target.value)} maxLength={8} className={INPUT}/>

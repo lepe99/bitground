@@ -83,6 +83,7 @@ public class UserController {
                 .role(user.getRole())
                 .cash(user.getCash())
                 .tier(user.getTier())
+                .currentTier(userService.getCurrentTier(user))
                 .onboarded(Boolean.TRUE.equals(user.getIsOnboarded()))
                 .build();
     }

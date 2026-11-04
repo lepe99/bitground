@@ -53,6 +53,11 @@ public interface UserRankingRepository extends JpaRepository<UserRanking, Long> 
             "WHERE ur.season.status = 'PENDING' " +
             "ORDER BY ur.ranks ASC")
     List<RankProjection> findCurrentSeasonRankings();
+
+    // 진행 중인 시즌에서 이 사용자의 티어 (매시 랭킹 갱신 기준). 아직 랭킹에 없으면 빈 목록
+    @Query("SELECT ur.tier FROM UserRanking ur WHERE ur.user.id = :userId AND ur.season.status = 'PENDING' " +
+            "ORDER BY ur.season.startAt DESC")
+    List<Integer> findCurrentSeasonTiers(@Param("userId") Integer userId);
     
     // 툴팁용: 참여한 완료 시즌 중 최근 것부터 (개수는 Pageable로 제한). 시즌별 최종 순위·자산·참가자 수 포함
     @Query("SELECT ur.season.name as name, ur.tier as tier, ur.ranks as ranks, ur.totalValue as totalValue, " +

@@ -23,7 +23,7 @@ export default function ProfileCard() {
             .catch(() => setMine(null));
     }, [user?.id]);
 
-    const tier = mine?.tier ?? user?.tier ?? 0;
+    const tier = mine?.tier ?? user?.currentTier ?? user?.tier ?? 0;
     const percentile = mine ? Math.max(1, Math.round((mine.ranks / mine.total) * 100)) : null;
 
     return (

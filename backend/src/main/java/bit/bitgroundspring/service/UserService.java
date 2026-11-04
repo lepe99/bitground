@@ -41,6 +41,14 @@ public class UserService {
 
     private static final Pattern EMAIL = Pattern.compile("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$");
 
+    /** 이번 시즌 티어. 아직 이번 시즌 랭킹에 없으면 지난 시즌 확정 티어(users.tier) */
+    @Transactional(readOnly = true)
+    public int getCurrentTier(User user) {
+        return userRankingRepository.findCurrentSeasonTiers(user.getId()).stream()
+                .findFirst()
+                .orElse(user.getTier() == null ? 0 : user.getTier());
+    }
+
     /**
      * 프로필 수정 (처음 가입 후 확인 화면 /welcome 과 마이페이지가 함께 쓴다). 저장하면 첫 화면을 마친 것으로 본다
      * @param email     비우면 이메일 없음 (카카오처럼 이메일을 주지 않는 로그인)

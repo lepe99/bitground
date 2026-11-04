@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.core.exception.SdkException;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
@@ -60,7 +61,7 @@ public class StorageService {
                             .contentType(file.getContentType())
                             .build(),
                     RequestBody.fromInputStream(file.getInputStream(), file.getSize()));
-        } catch (IOException e) {
+        } catch (IOException | SdkException e) { // 스토리지에 연결할 수 없을 때도 500 대신 '업로드 실패'로 알린다
             throw new BusinessException(ErrorCode.FILE_UPLOAD_FAILED, e);
         }
         log.info("[storage] uploaded {}", key);
@@ -76,7 +77,12 @@ public class StorageService {
             return;
         }
         String key = url.substring(base.length());
-        s3Client.deleteObject(DeleteObjectRequest.builder().bucket(props.bucket()).key(key).build());
-        log.info("[storage] deleted {}", key);
+        // 이전 사진 정리는 부가 작업이라 스토리지가 잠시 안 돼도 프로필 저장은 그대로 진행한다 (남은 파일은 나중에 정리)
+        try {
+            s3Client.deleteObject(DeleteObjectRequest.builder().bucket(props.bucket()).key(key).build());
+            log.info("[storage] deleted {}", key);
+        } catch (SdkException e) {
+            log.warn("[storage] 삭제 실패, 건너뜀 {}: {}", key, e.getMessage());
+        }
     }
 }

@@ -56,7 +56,7 @@ export default function MySummary() {
     const buyTotal = rows.reduce((s, r) => s + r.buy, 0);
     const pnl = evalTotal - buyTotal;
     const total = cash + evalTotal;
-    const tier = rank?.tier ?? user?.tier ?? 0;
+    const tier = rank?.tier ?? user?.currentTier ?? user?.tier ?? 0;
     const percentile = rank?.rank && rank.total ? Math.max(1, Math.round((rank.rank / rank.total) * 100)) : null;
 
     return (

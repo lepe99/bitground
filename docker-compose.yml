@@ -90,6 +90,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      s3:
+        condition: service_started # 프로필 사진 업로드
 
   # ── scheduler 프로필: Go 스케줄러를 로컬에서 매시 실행 (운영의 Lambda + EventBridge 대신)
   #   docker compose --profile app --profile scheduler up -d --build scheduler

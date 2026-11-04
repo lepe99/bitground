@@ -48,7 +48,7 @@ export default function Header() {
                         <>
                             <NotificationMenu/>
                             <Link to="/mypage" aria-label="마이페이지" className="hidden rounded-full md:flex">
-                                <Avatar src={user?.profileImage} name={user?.name} tier={user?.tier} size="sm" badge={false}/>
+                                <Avatar src={user?.profileImage} name={user?.name} tier={user?.currentTier ?? user?.tier} size="sm" badge={false}/>
                             </Link>
                             <Button variant="ghost" size="sm" onClick={logout} className="max-md:hidden">
                                 로그아웃
