@@ -2,6 +2,7 @@ import {useEffect, useState} from "react";
 import {useAuth} from "../auth/useAuth.js";
 import {fetchCurrentRanking, fetchSeasonRanking} from "../api/rankApi.js";
 import {fetchSeasons} from "../api/seasonApi.js";
+import {useMediaQuery} from "../hooks/useMediaQuery.js";
 import SegmentedTabs from "../components/ui/SegmentedTabs.jsx";
 import RankPodium from "../components/rank/RankPodium.jsx";
 import RankTable from "../components/rank/RankTable.jsx";
@@ -33,6 +34,9 @@ export default function Rank() {
     const [pastId, setPastId] = useState(null);
     const [past, setPast] = useState({});         // seasonId → rankings
     const [selected, setSelected] = useState(null);
+    // 마우스가 있으면 사진에 올려 티어 이력을 보고, 터치 화면은 눌러서 시트로 본다
+    const canHover = useMediaQuery("(hover: hover) and (pointer: fine)");
+    const onSelect = canHover ? undefined : setSelected;
     const [now, setNow] = useState(() => Date.now());
 
     useEffect(() => {
@@ -102,9 +106,9 @@ export default function Rank() {
                 <p className="py-16 text-center text-sm text-fg-3">아직 순위에 오른 참가자가 없어요.</p>
             ) : (
                 <>
-                    <RankPodium top={rows.slice(0, 3)} onSelect={setSelected}/>
+                    <RankPodium top={rows.slice(0, 3)} onSelect={onSelect}/>
                     <section className="grid items-start gap-4 md:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)] md:gap-5">
-                        <RankTable rows={rows.slice(3)} myUserId={view === "current" ? user?.id : null} onSelect={setSelected}/>
+                        <RankTable rows={rows.slice(3)} myUserId={view === "current" ? user?.id : null} onSelect={onSelect}/>
                         <aside className="flex flex-col gap-4 md:gap-5">
                             {view === "current" && <div className="max-md:hidden"><MyPosition me={me} rankings={current}/></div>}
                             <TierGuide myTier={me?.tier}/>

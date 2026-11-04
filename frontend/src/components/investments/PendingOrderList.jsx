@@ -35,7 +35,6 @@ export default function PendingOrderList({orders, tickerMap, onChanged}) {
     const rows = (orders ?? []).filter((o) => type === 'ALL' || o.orderType === type);
 
     const cancel = async (order) => {
-        if (!window.confirm(`${order.koreanName ?? tickerOf(order.symbol)} 예약 주문을 취소할까요?`)) return;
         setCancelling(order.id);
         try {
             await cancelReserveOrder(order.id);
