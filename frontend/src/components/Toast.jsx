@@ -59,7 +59,7 @@ const Toast = ({toast}) => {
     return (
         <div
             role={error ? 'alert' : 'status'}
-            className={`pointer-events-auto flex w-full items-center gap-3 rounded-2xl px-4 py-3.5 shadow-xl transition duration-300 max-w-[360px] ${
+            className={`pointer-events-auto flex items-center gap-3 rounded-2xl px-4 py-3.5 shadow-xl transition duration-300 max-w-[360px] ${
                 error ? 'bg-up text-white' : 'border border-line bg-surface text-fg'
             } ${shown ? 'translate-y-0 opacity-100' : '-translate-y-2 opacity-0'}`}
         >
