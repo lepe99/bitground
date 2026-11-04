@@ -23,18 +23,18 @@ export default function Header() {
 
     return (
         <header className="sticky top-0 z-40 border-b border-line bg-surface">
-            <div className="flex h-14 items-center gap-6 px-5 md:gap-10">
+            <div className="flex h-14 items-center gap-6 px-5 md:gap-6 lg:gap-10">
                 <Link to="/" aria-label="Bitground 홈" className="text-fg">
                     <Logo size={26}/>
                 </Link>
 
-                <nav aria-label="주 메뉴" className="hidden flex-1 items-center gap-7 md:flex">
+                <nav aria-label="주 메뉴" className="hidden min-w-0 flex-1 items-center gap-4 md:flex lg:gap-7">
                     {NAV_ITEMS.map((item) => (
                         <NavLink
                             key={item.to}
                             to={item.to}
                             className={({isActive}) =>
-                                `text-sm ${isActive ? "font-bold text-fg" : "font-medium text-fg-2 hover:text-fg"}`
+                                `whitespace-nowrap text-sm ${isActive ? "font-bold text-fg" : "font-medium text-fg-2 hover:text-fg"}`
                             }
                         >
                             {item.label}

@@ -14,24 +14,44 @@ const NEWS_PAGE_SIZE = 5;
 // 네이버 뉴스 제목의 <b> 태그와 &quot; 같은 문자를 글자로 바꾼다
 const plain = (html) => new DOMParser().parseFromString(html ?? "", "text/html").body.textContent ?? "";
 
-// 분위기 라벨은 스케줄러가 등락률 규칙으로 정한다 (상승 빨강, 하락 파랑)
-const MOOD_STYLE = {
-    "강세": "bg-up/10 text-up",
-    "약간 강세": "bg-up/10 text-up",
-    "중립": "bg-surface-2 text-fg-2",
-    "약간 약세": "bg-down/10 text-down",
-    "약세": "bg-down/10 text-down",
+// 분위기 라벨은 스케줄러가 등락률 규칙으로 정한다 (상승 빨강 ▲, 하락 파랑 ▼)
+const MOOD = {
+    "강세": {tone: "bg-up text-white", arrow: "▲▲"},
+    "약간 강세": {tone: "bg-up/10 text-up", arrow: "▲"},
+    "중립": {tone: "bg-surface-2 text-fg-2", arrow: "–"},
+    "약간 약세": {tone: "bg-down/10 text-down", arrow: "▼"},
+    "약세": {tone: "bg-down text-white", arrow: "▼▼"},
 };
 
-function InsightList({title, items}) {
+// 'https://www.tokenpost.kr/news/…' → 'tokenpost.kr'
+const hostOf = (url) => {
+    try {
+        return new URL(url).hostname.replace(/^www\./, "");
+    } catch {
+        return "";
+    }
+};
+
+const ICONS = {
+    drivers: "M3 17l6-6 4 4 8-8M15 7h6v6",
+    risks: "M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z",
+};
+
+/** 근거·지켜볼 점 상자 */
+function InsightPoints({kind, title, items}) {
     if (!items?.length) return null;
     return (
-        <section className="flex flex-col gap-1.5">
-            <h3 className="text-[13px] font-bold text-fg-3">{title}</h3>
-            <ul className="flex flex-col gap-1.5">
+        <section className={`flex flex-col gap-2 rounded-2xl p-4 ${kind === "risks" ? "bg-brand-soft/60" : "bg-surface-2"}`}>
+            <h3 className="flex items-center gap-1.5 text-[13px] font-bold text-fg-2">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d={ICONS[kind]}/>
+                </svg>
+                {title}
+            </h3>
+            <ul className="flex flex-col gap-2">
                 {items.map((text, i) => (
-                    <li key={i} className="flex gap-2 text-[15px] leading-relaxed text-fg-2">
-                        <span className="mt-[9px] size-1.5 shrink-0 rounded-full bg-fg-3" aria-hidden="true"/>
+                    <li key={i} className="flex gap-2 text-sm leading-relaxed text-fg-2">
+                        <span className="mt-2 size-1 shrink-0 rounded-full bg-fg-3" aria-hidden="true"/>
                         <span>{text}</span>
                     </li>
                 ))}
@@ -40,41 +60,59 @@ function InsightList({title, items}) {
     );
 }
 
-/** AI 분석 본문: 분위기 라벨·선정 이유, 요약, 근거, 지켜볼 점, 참고 기사 (예전 형식은 요약만) */
-function InsightBody({insight}) {
-    const date = new Date(insight.date).toLocaleDateString("ko-KR");
+/** AI 분석 본문: 분위기 라벨·선정 이유 → 요약 → 근거·지켜볼 점 → 참고 기사 (예전 형식은 요약만) */
+function InsightBody({insight, title}) {
+    const date = new Date(insight.date).toLocaleDateString("ko-KR", {month: "long", day: "numeric"});
+    const mood = MOOD[insight.mood];
     return (
-        <div className="flex flex-col gap-4">
-            {insight.mood && (
-                <div className="flex flex-wrap items-center gap-2">
-                    <span className={`rounded-full px-2.5 py-1 text-[13px] font-bold ${MOOD_STYLE[insight.mood] ?? "bg-surface-2 text-fg-2"}`}>
-                        최근 24시간 {insight.mood}
+        <article className="flex flex-col gap-4">
+            <header className="flex flex-wrap items-center gap-2">
+                <h3 className="mr-1 text-lg font-extrabold">{title}</h3>
+                {mood && (
+                    <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[13px] font-bold ${mood.tone}`}>
+                        <span className="text-[10px]" aria-hidden="true">{mood.arrow}</span>
+                        {insight.mood}
                     </span>
-                    {insight.pickReason && insight.pickReason !== "주요 코인" && (
-                        <span className="rounded-full border border-line px-2.5 py-1 text-xs font-semibold text-fg-2">{insight.pickReason}</span>
-                    )}
+                )}
+                {insight.pickReason && insight.pickReason !== "주요 코인" && (
+                    <span className="rounded-full border border-line px-2.5 py-1 text-xs font-semibold text-fg-2">{insight.pickReason}</span>
+                )}
+                <span className="num ml-auto text-xs text-fg-3">{date} 0시 기준 · 최근 24시간</span>
+            </header>
+
+            <p className="whitespace-pre-wrap text-base font-medium leading-[1.75] text-fg">{insight.insight}</p>
+
+            {(insight.drivers?.length > 0 || insight.risks?.length > 0) && (
+                <div className="grid gap-2.5 sm:grid-cols-2">
+                    <InsightPoints kind="drivers" title="근거" items={insight.drivers}/>
+                    <InsightPoints kind="risks" title="지켜볼 점" items={insight.risks}/>
                 </div>
             )}
-            <p className="whitespace-pre-wrap text-[15px] leading-[1.75] text-fg-2">{insight.insight}</p>
-            <InsightList title="근거" items={insight.drivers}/>
-            <InsightList title="지켜볼 점" items={insight.risks}/>
+
             {insight.sources?.length > 0 && (
-                <section className="flex flex-col gap-1.5">
+                <section className="flex flex-col gap-2">
                     <h3 className="text-[13px] font-bold text-fg-3">참고 기사</h3>
-                    <ul className="flex flex-col gap-1">
+                    <ul className="grid gap-2 sm:grid-cols-2">
                         {insight.sources.map((s) => (
-                            <li key={s.id} className="flex flex-wrap items-baseline gap-x-2 text-sm">
-                                <a href={s.url} target="_blank" rel="noreferrer" className="text-fg-2 underline-offset-2 hover:text-fg hover:underline">{s.title}</a>
-                                <span className="num text-xs text-fg-3">{s.publishedAt}</span>
+                            <li key={s.id} className="min-w-0">
+                                <a href={s.url} target="_blank" rel="noopener noreferrer"
+                                   className="group flex h-full flex-col gap-1 rounded-xl border border-line px-3.5 py-3 hover:bg-surface-2">
+                                    <span className="line-clamp-2 text-sm font-semibold leading-snug group-hover:underline">{s.title}</span>
+                                    <span className="num flex items-center gap-1 text-xs text-fg-3">
+                                        {hostOf(s.url)} · {s.publishedAt}
+                                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg>
+                                    </span>
+                                </a>
                             </li>
                         ))}
                     </ul>
                 </section>
             )}
-            <p className="text-xs text-fg-3">
-                <span className="num">{date} 0시</span> 기준 업비트 시세{insight.sources?.length > 0 ? "·뉴스" : ""}로 AI가 정리한 참고용 요약이며, 투자 권유가 아니에요.
+
+            <p className="text-xs leading-relaxed text-fg-3">
+                업비트 시세{insight.sources?.length > 0 ? "와 뉴스" : ""}를 바탕으로 AI가 정리한 참고용 요약이에요. 분위기 라벨은 등락률 규칙으로 정했고, 투자 권유가 아니에요.
             </p>
-        </div>
+        </article>
     );
 }
 
@@ -107,16 +145,16 @@ function AiInsightCard() {
         };
     }, [symbol]);
 
-    const label = (o) => (o.symbol === "MARKET_OVERALL" ? "시장 전체" : o.koreanName);
+    const label = (o) => (o.symbol === "MARKET_OVERALL" ? "시장 전체" : o.koreanName ?? o.symbol);
 
     return (
-        <Card className="flex flex-col gap-4 p-5 md:col-span-2 md:p-6">
+        <Card className="flex min-w-0 flex-col gap-4 p-5 md:p-6 lg:col-span-2">
             <div className="flex items-baseline justify-between gap-2">
                 <h2 className="text-base font-bold md:text-[17px]">오늘의 AI 분석</h2>
                 <span className="text-xs text-fg-3">매일 0시 갱신</span>
             </div>
             {options?.length > 0 && (
-                <div role="tablist" aria-label="분석 종목" className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
+                <div role="tablist" aria-label="분석 종목" className="-mx-1 flex gap-1.5 overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                     {options.map((o) => (
                         <button
                             key={o.symbol}
@@ -136,7 +174,7 @@ function AiInsightCard() {
             {insight === undefined && options !== null && options.length > 0 ? (
                 <p className="py-8 text-center text-sm text-fg-3">불러오는 중…</p>
             ) : insight ? (
-                <InsightBody insight={insight}/>
+                <InsightBody insight={insight} title={label(options.find((o) => o.symbol === symbol) ?? {symbol})}/>
             ) : (
                 <p className="py-8 text-center text-sm text-fg-3">{options === null ? "불러오는 중…" : "오늘 분석이 아직 없어요."}</p>
             )}
@@ -211,7 +249,7 @@ function NewsCard() {
     };
 
     return (
-        <Card className="flex flex-col gap-3 p-5 md:col-span-2 md:p-6">
+        <Card className="flex min-w-0 flex-col gap-3 p-5 md:p-6 lg:col-span-2">
             <div className="flex flex-wrap items-center justify-between gap-3">
                 <h2 className="text-base font-bold md:text-[17px]">최신 뉴스 <span className="font-normal text-fg-3">· {keyword}</span></h2>
                 <form onSubmit={search} className="flex h-9 w-full items-center gap-2 rounded-[10px] bg-surface-2 px-3 text-fg-3 sm:w-60">
@@ -263,11 +301,14 @@ export default function CoinTrends() {
     return (
         <div className="mx-auto flex max-w-[1280px] flex-col gap-4 px-5 pt-4 pb-10 md:gap-5 md:px-8 md:pt-8 md:pb-14">
             <h1 className="text-xl font-extrabold md:text-[28px]">최신동향</h1>
-            <div className="grid items-start gap-4 md:grid-cols-3 md:gap-5">
+            {/* 모바일: 한 줄씩 / 태블릿: TOP 5·주의 종목만 나란히 / PC: 왼쪽 2단(AI·뉴스) + 오른쪽 1단(TOP 5·주의 종목) */}
+            <div className="grid items-start gap-4 md:gap-5 lg:grid-cols-3">
                 <AiInsightCard/>
-                <TopCoins/>
+                <div className="grid min-w-0 items-start gap-4 md:grid-cols-2 md:gap-5 lg:row-span-2 lg:grid-cols-1">
+                    <TopCoins/>
+                    <CautionCard/>
+                </div>
                 <NewsCard/>
-                <CautionCard/>
             </div>
         </div>
     );
