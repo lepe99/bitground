@@ -94,13 +94,32 @@ func run(ctx context.Context, db *sql.DB, cfg config.Config, now time.Time) erro
 	}
 
 	// 서로 독립적인 외부 API 작업은 병렬로 돌리고, 각자 자기 에러 변수에만 쓴다
-	var marketErr, insightErr error
+	var marketErr, insightErr, newsErr error
 	var wg sync.WaitGroup
 	wg.Go(func() {
 		marketErr = step("마켓 인덱스 업데이트", func() error {
 			return service.UpdateMarketIndex(ctx, db)
 		})
 	})
+	newsCfg := service.NewsArchiveConfig{
+		GeminiAPIKey:      cfg.GeminiAPIKey,
+		EmbedModel:        cfg.NewsEmbedModel,
+		EmbedDimension:    cfg.NewsEmbedDimension,
+		NaverClientID:     cfg.NaverClientID,
+		NaverClientSecret: cfg.NaverClientSecret,
+		PineconeAPIKey:    cfg.PineconeAPIKey,
+		PineconeIndex:     cfg.PineconeIndex,
+	}
+	if newsCfg.Enabled() {
+		// 매시간 새 기사를 쌓고, 0시에는 보관 기간이 지난 기사도 지운다
+		wg.Go(func() {
+			newsErr = step("뉴스 아카이브", func() error {
+				return service.ArchiveNews(ctx, newsCfg, symbolMap, now, flags.Coin)
+			})
+		})
+	} else {
+		log.Println("뉴스 아카이브 생략: Gemini·네이버·Pinecone 키 중 없는 것이 있음")
+	}
 	switch {
 	case !flags.Insight:
 		log.Println("인사이트 업데이트 생략")
@@ -160,7 +179,7 @@ func run(ctx context.Context, db *sql.DB, cfg config.Config, now time.Time) erro
 	}
 
 	wg.Wait()
-	errs = append(errs, marketErr, insightErr)
+	errs = append(errs, marketErr, insightErr, newsErr)
 	return errors.Join(errs...)
 }
 

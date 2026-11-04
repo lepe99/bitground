@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 	_ "time/tzdata" // Lambda 런타임에는 tz 데이터가 없으므로 바이너리에 포함
@@ -27,6 +28,12 @@ type Config struct {
 	NaverClientSecret string
 	// InsightPromptVersion 인사이트 프롬프트 버전 (service/prompts/{버전}/). 비우면 기본값
 	InsightPromptVersion string
+
+	// 뉴스 아카이브(Pinecone). PINECONE_API_KEY가 없으면 수집하지 않는다
+	PineconeAPIKey     string
+	PineconeIndex      string
+	NewsEmbedModel     string
+	NewsEmbedDimension int
 
 	SeasonName string
 
@@ -54,6 +61,9 @@ func Load() (Config, error) {
 		NaverClientID:        os.Getenv("NAVER_NEWS_CLIENT_ID"),
 		NaverClientSecret:    os.Getenv("NAVER_NEWS_CLIENT_SECRET"),
 		InsightPromptVersion: os.Getenv("INSIGHT_PROMPT_VERSION"),
+		PineconeAPIKey:       os.Getenv("PINECONE_API_KEY"),
+		PineconeIndex:        getEnv("PINECONE_INDEX", "bitground-news"),
+		NewsEmbedModel:       getEnv("NEWS_EMBED_MODEL", "gemini-embedding-2"),
 		SeasonName:           os.Getenv("SEASON_NAME"),
 		BackendURL:           strings.TrimRight(os.Getenv("BACKEND_URL"), "/"),
 		SchedulerKey:         os.Getenv("SEASON_UPDATE_KEY"),
@@ -64,6 +74,16 @@ func Load() (Config, error) {
 		return Config{}, fmt.Errorf("TIMEZONE 해석 실패: %w", err)
 	}
 	cfg.Location = loc
+
+	// Pinecone 인덱스 차원과 같아야 한다 (gemini-embedding-2 기본 3072, 768로 줄여 저장)
+	cfg.NewsEmbedDimension = 768
+	if v := os.Getenv("NEWS_EMBED_DIM"); v != "" {
+		dim, err := strconv.Atoi(v)
+		if err != nil || dim <= 0 {
+			return Config{}, fmt.Errorf("NEWS_EMBED_DIM이 올바르지 않습니다: %q", v)
+		}
+		cfg.NewsEmbedDimension = dim
+	}
 
 	var missing []string
 	for name, value := range map[string]string{
