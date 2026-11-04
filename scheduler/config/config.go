@@ -44,7 +44,7 @@ func Load() (Config, error) {
 		Mode:         getEnv("TYPE", "prod"),
 		TestTime:     os.Getenv("TEST_TIME"),
 		GeminiAPIKey: os.Getenv("GEMINI_API_KEY"),
-		GeminiModel:  getEnv("GEMINI_MODEL", "gemini-2.5-flash"),
+		GeminiModel:  getEnv("GEMINI_MODEL", "gemini-3.5-flash-lite"),
 		SeasonName:   os.Getenv("SEASON_NAME"),
 		BackendURL:   strings.TrimRight(os.Getenv("BACKEND_URL"), "/"),
 		SchedulerKey: os.Getenv("SEASON_UPDATE_KEY"),

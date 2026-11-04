@@ -82,6 +82,10 @@ public class AiAdviceService {
                 log.error("[AiAdviceService] 투자 요약 데이터 생성 실패. getUserInvestmentSummaryForSeason()가 null을 반환했습니다. User ID={}, Season ID={}", userId, seasonId);
                 throw new BusinessException(ErrorCode.AI_ADVICE_UNAVAILABLE, "투자 요약 데이터를 생성할 수 없습니다.");
             }
+            // 랭킹에 없으면(그 시즌에 체결한 거래가 없으면) 돌아볼 기록이 없으므로 모델을 부르지 않는다
+            if (summaryDto.getFinalRank() == null || summaryDto.getTotalTradeCount() == 0) {
+                throw new BusinessException(ErrorCode.AI_ADVICE_UNAVAILABLE, "이 시즌에는 거래 기록이 없어 리뷰를 만들 수 없어요.");
+            }
             log.debug("[AiAdviceService] 투자 요약 데이터 생성 완료: {}", summaryDto);
 
             log.info("[AiAdviceService] GeminiService.generateInvestmentAdvice() 호출 중...");

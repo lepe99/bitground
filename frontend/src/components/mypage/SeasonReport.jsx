@@ -1,4 +1,4 @@
-import {useEffect, useState} from 'react';
+import {useEffect, useRef, useState} from 'react';
 import Card from '../ui/Card.jsx';
 import CoinIcon from '../ui/CoinIcon.jsx';
 import TierBadge from '../ui/TierBadge.jsx';
@@ -6,7 +6,10 @@ import SegmentedTabs from '../ui/SegmentedTabs.jsx';
 import {useAuth} from '../../auth/useAuth.js';
 import {fetchSeasons} from '../../api/seasonApi.js';
 import {fetchSeasonRanking} from '../../api/rankApi.js';
-import {fetchAiAdvice, fetchMyTier, fetchTradeDetails, fetchTradeSummary} from '../../api/mypageApi.js';
+import {fetchAiAdvice, fetchMyTier, fetchTradeDetails, fetchTradeSummary, generateAiAdvice} from '../../api/mypageApi.js';
+import {getErrorMessage} from '../../api/apiError.js';
+import {useToast} from '../toastContext.js';
+import Button from '../ui/Button.jsx';
 import {TIER_NAMES, TIER_TEXT} from '../../constants/tiers.js';
 import {changeColor, formatKRW, formatNumber, formatPrice, formatSignedKRW} from '../../utils/format.js';
 
@@ -40,11 +43,15 @@ function ScoreRing({score}) {
 /** 종료된 시즌 리포트: 요약 · AI 리뷰 · 종목 하이라이트 · 종목별 성과/거래 내역 */
 export default function SeasonReport() {
     const {user} = useAuth();
+    const {errorAlert} = useToast();
     const [seasons, setSeasons] = useState(null);
     const [seasonId, setSeasonId] = useState(null);
     const [report, setReport] = useState(null);
-    const [advice, setAdvice] = useState(undefined); // undefined: 불러오는 중, null: 없음
+    const [advice, setAdvice] = useState(undefined); // undefined: 불러오는 중, null: 아직 안 만듦
+    const [generating, setGenerating] = useState(false);
     const [detailTab, setDetailTab] = useState('coins');
+    const currentSeason = useRef(null);
+    currentSeason.current = seasonId;
 
     useEffect(() => {
         fetchSeasons()
@@ -70,7 +77,7 @@ export default function SeasonReport() {
             const mine = ranking.find((r) => r.userId === user?.id);
             setReport({summary, details, tier: tier?.tier ?? mine?.tier ?? 0, rank: mine?.ranks, total: ranking.length, totalValue: mine?.totalValue});
         });
-        // AI 리뷰는 처음 열 때 서버가 생성하므로 따로 기다린다
+        // AI 리뷰는 이미 만든 것만 불러온다 (새로 만드는 건 사용자가 버튼을 눌렀을 때만)
         setAdvice(undefined);
         fetchAiAdvice(seasonId)
             .then((a) => alive && setAdvice(a ?? null))
@@ -79,6 +86,20 @@ export default function SeasonReport() {
             alive = false;
         };
     }, [seasonId, user?.id]);
+
+    const requestAdvice = async () => {
+        const target = seasonId;
+        setGenerating(true);
+        try {
+            const created = await generateAiAdvice(target);
+            // 생성하는 동안 다른 시즌으로 옮겼으면 그 화면에 덮어쓰지 않는다
+            if (currentSeason.current === target) setAdvice(created);
+        } catch (error) {
+            errorAlert(getErrorMessage(error, 'AI 리뷰를 만들지 못했어요. 잠시 후 다시 시도해 주세요.'));
+        } finally {
+            setGenerating(false);
+        }
+    };
 
     if (seasons === null) return <p className="py-16 text-center text-sm text-fg-3">불러오는 중…</p>;
     if (seasons.length === 0) {
@@ -154,10 +175,22 @@ export default function SeasonReport() {
                             <p className="text-xs text-fg-3">AI가 이 시즌의 매매 기록만 보고 만든 분석이며, 투자 권유가 아닙니다.</p>
                         </div>
                     </>
+                ) : advice === undefined || !report ? (
+                    <p className="w-full py-6 text-center text-sm text-fg-3">불러오는 중…</p>
+                ) : report.rank ? (
+                    // 리뷰는 시즌 정산 때 일괄로 만들지 않고, 원하는 사용자만 버튼으로 요청한다
+                    <div className="flex w-full flex-col items-center gap-3 py-4 text-center">
+                        <h3 className="text-[17px] font-bold">AI 시즌 리뷰</h3>
+                        <p className="text-sm leading-relaxed text-fg-2">
+                            이 시즌의 매매 기록을 AI가 돌아보고 잘한 점과 다음 시즌에 바꿔 볼 점을 정리해 드려요.
+                        </p>
+                        <Button onClick={requestAdvice} disabled={generating} className="min-w-40">
+                            {generating ? 'AI가 돌아보는 중… (최대 1분)' : 'AI 리뷰 받기'}
+                        </Button>
+                        <p className="text-xs text-fg-3">시즌마다 한 번 만들어지고, 다시 열면 같은 리뷰를 보여줘요.</p>
+                    </div>
                 ) : (
-                    <p className="w-full py-6 text-center text-sm text-fg-3">
-                        {advice === undefined ? 'AI가 시즌 매매를 돌아보는 중이에요…' : '이 시즌에는 AI 리뷰가 없어요. 거래 기록이 있어야 리뷰를 만들 수 있어요.'}
-                    </p>
+                    <p className="w-full py-6 text-center text-sm text-fg-3">이 시즌에는 거래 기록이 없어 AI 리뷰를 만들 수 없어요.</p>
                 )}
             </Card>
 

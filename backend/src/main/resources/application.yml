@@ -216,7 +216,7 @@ logging:
 
 gemini:
   api-key: ${GEMINI_API_KEY:}
-  model-name: ${GEMINI_MODEL:gemini-2.5-flash}
+  model-name: ${GEMINI_MODEL:gemini-3.5-flash-lite}
 
 # dev: 6시간 주기 시즌/스플릿, prod: 월 2회 시즌
 scheduler:
