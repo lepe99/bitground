@@ -18,6 +18,8 @@ const Investments = lazy(() => import("../pages/Investments.jsx"));
 const PostList = lazy(() => import("../pages/community/PostList.jsx"));
 const PostWrite = lazy(() => import("../pages/community/PostWrite.jsx"));
 const PostDetail = lazy(() => import("../pages/community/PostDetail.jsx"));
+const Privacy = lazy(() => import("../pages/legal/Privacy.jsx"));
+const Terms = lazy(() => import("../pages/legal/Terms.jsx"));
 const TickerProvider = lazy(() =>
     import("../ticker/TickerProvider.jsx").then(m => ({default: m.TickerProvider})));
 
@@ -32,6 +34,9 @@ export const router = createBrowserRouter([
             {path: "auth/callback", element: page(<Callback/>)},
             {path: "login", element: page(<Login/>)},
             {path: "trends", element: page(<CoinTrends/>)},
+            // 약관·개인정보처리방침은 로그인 없이 볼 수 있어야 한다 (OAuth 앱 검증)
+            {path: "privacy", element: page(<Privacy/>)},
+            {path: "terms", element: page(<Terms/>)},
             {
                 element: <ProtectedRoute />,
                 children: [
