@@ -23,6 +23,9 @@ const (
 
 var htmlTag = regexp.MustCompile(`<[^>]+>`)
 
+// 가상자산 기사인지 가르는 단어. 코인 이름이 일반 명사·회사명과 겹칠 때(예: '소폰' 디자인 스튜디오) 엉뚱한 기사를 거른다
+var cryptoContext = []string{"코인", "가상자산", "암호화폐", "가상화폐", "비트코인", "블록체인", "토큰", "거래소", "업비트", "빗썸", "시세", "상장"}
+
 // NewsItem 모델에 넘기는 기사 (ID로 인용하게 하고, 저장·표시할 때는 제목·링크·시각만 쓴다)
 type NewsItem struct {
 	ID          string `json:"id"`
@@ -42,7 +45,7 @@ type naverNewsResponse struct {
 	} `json:"items"`
 }
 
-// newsKeywords 코인 이름으로 검색하고, 결과 중 이름이나 티커가 제목·요약에 보이는 기사만 남긴다 (동명이인 기사 제외)
+// newsKeywords 코인 이름으로 검색하고, 결과 중 이름이나 티커가 제목·요약에 보이는 기사만 남긴다 (가상자산 맥락 단어도 함께 확인)
 func newsKeywords(d coinData) (query string, mustContain []string) {
 	return d.Name, []string{d.Name, strings.TrimPrefix(d.Symbol, "KRW-")}
 }
@@ -72,7 +75,7 @@ func fetchNews(ctx context.Context, clientID, clientSecret, query string, mustCo
 		}
 		title := cleanNewsText(it.Title)
 		desc := cleanNewsText(it.Description)
-		if !containsAny(title+" "+desc, mustContain) {
+		if !containsAny(title+" "+desc, mustContain) || !containsAny(title+" "+desc, cryptoContext) {
 			continue
 		}
 		link := it.OriginalLink

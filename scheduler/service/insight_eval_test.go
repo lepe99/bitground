@@ -7,7 +7,8 @@
 //
 //	go test -tags eval -run TestInsightEval -v -timeout 10m ./service
 //
-// GEMINI_API_KEY·GEMINI_MODEL은 환경변수 또는 scheduler/.env에서 읽고, EVAL_RUNS로 케이스당 반복 횟수를 정한다 (기본 2).
+// GEMINI_API_KEY·GEMINI_MODEL은 환경변수 또는 scheduler/.env에서 읽고, EVAL_RUNS로 케이스당 반복 횟수(기본 2),
+// EVAL_DELAY_MS로 호출 간격(기본 4000ms)을 정한다.
 package service
 
 import (
@@ -80,6 +81,11 @@ func TestInsightEval(t *testing.T) {
 	if runs <= 0 {
 		runs = 2
 	}
+	// 호출 사이 간격: 연속으로 부르면 요청 한도(429)에 걸려 평가가 아니라 한도를 재게 된다
+	delayMs, err := strconv.Atoi(os.Getenv("EVAL_DELAY_MS"))
+	if err != nil || delayMs < 0 {
+		delayMs = 4000
+	}
 
 	raw, err := os.ReadFile("testdata/insight_eval.json")
 	if err != nil {
@@ -107,6 +113,9 @@ func TestInsightEval(t *testing.T) {
 		}
 
 		for run := 1; run <= runs; run++ {
+			if len(results) > 0 {
+				time.Sleep(time.Duration(delayMs) * time.Millisecond)
+			}
 			started := time.Now()
 			text, err := callGemini(context.Background(), apiKey, model, system, prompt)
 			r := evalRun{caseName: c.Name, run: run, millis: time.Since(started).Milliseconds(), err: err}

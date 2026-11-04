@@ -27,7 +27,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  * 자동 지표와 사람 평가용 원문을 build/reports/ai-eval에 남긴다.
  * 프롬프트·모델을 바꿀 때마다 같은 입력으로 돌려 보고서를 비교한다.
  *
- * <p>일반 테스트에서는 빠진다 (@Tag("eval")). 실행: {@code ./gradlew aiEval [-PevalRuns=3]}
+ * <p>일반 테스트에서는 빠진다 (@Tag("eval")). 실행: {@code ./gradlew aiEval [-PevalRuns=3] [-PevalDelayMs=4000]}
  * GEMINI_API_KEY·GEMINI_MODEL은 환경변수 또는 backend/.env에서 읽는다.
  *
  * <p>지표
@@ -62,6 +62,8 @@ class SeasonReviewEval {
         String model = env.getOrDefault("GEMINI_MODEL", "gemini-3.5-flash-lite");
         assumeTrue(apiKey != null && !apiKey.isBlank(), "GEMINI_API_KEY가 없어 평가를 건너뜀");
         int runs = Integer.parseInt(System.getProperty("eval.runs", "2"));
+        // 호출 사이 간격: 연속으로 부르면 요청 한도(429)에 걸려 평가가 아니라 한도를 재게 된다
+        long delayMs = Long.parseLong(System.getProperty("eval.delayMs", "4000"));
 
         ObjectMapper mapper = new ObjectMapper().findAndRegisterModules();
         List<EvalCase> cases;
@@ -82,6 +84,7 @@ class SeasonReviewEval {
             String prompt = GeminiService.buildPrompt(s, score);
 
             for (int run = 1; run <= runs; run++) {
+                if (!results.isEmpty()) Thread.sleep(delayMs);
                 long started = System.currentTimeMillis();
                 try {
                     SeasonReviewContent content = gemini.requestReview(prompt);
@@ -104,7 +107,7 @@ class SeasonReviewEval {
     }
 
     static RunResult evaluate(String name, int run, long millis, SeasonReviewContent c, String prompt, SeasonReviewScorer.Score score) {
-        String validation = GeminiService.validate(c);
+        String validation = GeminiService.validate(c, prompt);
         String text = allText(c);
 
         String normalizedPrompt = prompt.replace(",", "");

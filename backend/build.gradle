@@ -82,7 +82,7 @@ tasks.named('test') {
     systemProperty 'api.version', '1.44'
 }
 
-// AI 평가셋 실행: ./gradlew aiEval [-PevalRuns=3]
+// AI 평가셋 실행: ./gradlew aiEval [-PevalRuns=3] [-PevalDelayMs=4000]
 // 고정 입력(src/test/resources/eval)을 실제 Gemini로 돌려 build/reports/ai-eval에 보고서를 남긴다 (GEMINI_API_KEY 필요, backend/.env도 읽음)
 tasks.register('aiEval', Test) {
     description = 'AI 시즌 리뷰 평가셋을 실제 Gemini로 실행'
@@ -94,6 +94,8 @@ tasks.register('aiEval', Test) {
     }
     outputs.upToDateWhen { false }
     systemProperty 'eval.runs', findProperty('evalRuns') ?: '2'
+    // 호출 사이 간격(ms). 요청 한도(429)에 걸리지 않게
+    systemProperty 'eval.delayMs', findProperty('evalDelayMs') ?: '4000'
     testLogging {
         events 'passed', 'failed'
         showStandardStreams = true

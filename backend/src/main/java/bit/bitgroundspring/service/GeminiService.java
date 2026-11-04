@@ -20,9 +20,12 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
@@ -113,7 +116,7 @@ public class GeminiService {
         String problem = null;
         for (int i = 0; i < MAX_GENERATIONS; i++) {
             SeasonReviewContent content = requestReview(userPrompt);
-            problem = validate(content);
+            problem = validate(content, userPrompt);
             if (problem == null) return content;
             log.warn("[GeminiService] 시즌 리뷰 응답 거절({}/{}): {}", i + 1, MAX_GENERATIONS, problem);
         }
@@ -165,7 +168,60 @@ public class GeminiService {
         throw new IOException("AI response missing content parts.");
     }
 
-    /** 쓸 수 있는 응답이면 null, 아니면 이유 */
+    /** 형식·금지 표현에 더해, 숫자는 맞게 옮겼어도 단어를 틀린 실수(순위, 수치의 방향)를 입력과 대조한다 */
+    static String validate(SeasonReviewContent c, String prompt) {
+        String problem = validate(c);
+        if (problem != null || prompt == null) return problem;
+        return checkWordConsistency(allText(c), prompt);
+    }
+
+    // 수치 바로 뒤의 방향 단어 ('+3.59%의 수익', '-120,000원 손실', '2.84% 하락')
+    private static final Pattern DIRECTION_CLAIM = Pattern.compile(
+            "([+-]?)(\\d[\\d,]*(?:\\.\\d+)?)(%p|%|원)\\s?(?:의|로|가|이|만큼|가량|정도)?\\s?"
+                    + "(상승|올랐|올라|오른|반등|급등|증가|늘었|늘어|수익|이익|흑자|하락|내렸|내려|내린|떨어|급락|감소|줄었|줄어|손실|적자)");
+    private static final Set<String> UP_WORDS = Set.of("상승", "올랐", "올라", "오른", "반등", "급등", "증가", "늘었", "늘어", "수익", "이익", "흑자");
+    // 입력의 부호 있는 수치
+    private static final Pattern SIGNED_VALUE = Pattern.compile("([+-])(\\d[\\d,]*(?:\\.\\d+)?)(%p|%|원)");
+    private static final Pattern RANK_CLAIM = Pattern.compile("(\\d+)위");
+
+    /** 순위(N위)가 입력에 있는지, 부호 있는 수치의 방향 단어·부호가 입력과 맞는지. 맞으면 null */
+    static String checkWordConsistency(String text, String prompt) {
+        Matcher rank = RANK_CLAIM.matcher(text);
+        while (rank.find()) {
+            if (!Pattern.compile("(?<!\\d)" + rank.group(1) + "위").matcher(prompt).find()) {
+                return "입력과 다른 순위: " + rank.group();
+            }
+        }
+
+        // 수치별 입력 부호 (같은 값이 +와 -로 모두 나오면 판단하지 않는다)
+        Map<String, Set<String>> signs = new HashMap<>();
+        Matcher signed = SIGNED_VALUE.matcher(prompt);
+        while (signed.find()) {
+            if (signed.group(3).equals("%p")) continue;
+            signs.computeIfAbsent(signed.group(2).replace(",", "") + signed.group(3), k -> new HashSet<>()).add(signed.group(1));
+        }
+        Matcher claim = DIRECTION_CLAIM.matcher(text);
+        while (claim.find()) {
+            // '수익률'·'상승률'처럼 '률'이 붙으면 방향이 아니라 지표 이름이다 ('-27.35% 수익률')
+            if (claim.group(3).equals("%p") || (claim.end() < text.length() && text.charAt(claim.end()) == '률')) continue;
+            Set<String> seen = signs.get(claim.group(2).replace(",", "") + claim.group(3));
+            if (seen == null || seen.size() != 1) continue;
+            String actual = seen.iterator().next();
+            if (!claim.group(1).isEmpty() && !claim.group(1).equals(actual)) return "입력과 부호가 다른 수치: " + claim.group();
+            if (UP_WORDS.contains(claim.group(4)) != actual.equals("+")) return "수치와 방향이 맞지 않음: " + claim.group();
+        }
+        return null;
+    }
+
+    static String allText(SeasonReviewContent c) {
+        StringBuilder all = new StringBuilder(c.headline()).append(' ').append(c.scoreReason());
+        c.strengths().forEach(s -> all.append(' ').append(s));
+        c.weaknesses().forEach(s -> all.append(' ').append(s));
+        c.nextSeason().forEach(a -> all.append(' ').append(a.action()).append(' ').append(a.reason()));
+        return all.toString();
+    }
+
+    /** 쓸 수 있는 응답이면 null, 아니면 이유 (형식·금지 표현·길이) */
     static String validate(SeasonReviewContent c) {
         if (c == null || isBlank(c.headline()) || isBlank(c.scoreReason())) return "빈 항목";
         if (c.strengths() == null || c.strengths().isEmpty() || c.strengths().stream().anyMatch(GeminiService::isBlank)) return "잘한 점 없음";
@@ -174,10 +230,7 @@ public class GeminiService {
                 || c.nextSeason().stream().anyMatch(a -> a == null || isBlank(a.action()) || isBlank(a.reason()))) return "다음 시즌 제안 없음";
         if (c.strengths().size() > 5 || c.weaknesses().size() > 5 || c.nextSeason().size() > 5) return "항목이 너무 많음";
 
-        StringBuilder all = new StringBuilder(c.headline()).append(' ').append(c.scoreReason());
-        c.strengths().forEach(s -> all.append(' ').append(s));
-        c.weaknesses().forEach(s -> all.append(' ').append(s));
-        c.nextSeason().forEach(a -> all.append(' ').append(a.action()).append(' ').append(a.reason()));
+        String all = allText(c);
         var forbidden = FORBIDDEN.matcher(all);
         if (forbidden.find()) return "투자 권유 표현: " + forbidden.group();
         if (all.length() > 2500) return "너무 김";

@@ -91,6 +91,28 @@ class GeminiPromptTest {
     }
 
     @Test
+    @DisplayName("단어 검증: 숫자는 맞아도 순위·수치의 방향·부호를 입력과 다르게 쓰면 거절한다")
+    void wordConsistency() {
+        String prompt = "총 손익: +400,000원 / 수익률: +2.00%\n순위: 2위 / 15명 (상위 14%)\n최대 낙폭: -5.0%\n  - KRW-XRP: -100,000원, 거래 2회\n";
+
+        for (String ok : List.of(
+                "15명 중 2위로 +2.00%의 수익을 냈습니다.",
+                "KRW-XRP에서 100,000원 손실이 났습니다.",
+                "최대 낙폭은 -5.0%로 하락했습니다.",
+                "400,000원 수익과 상위 14%를 기록했습니다.",
+                "-5.0% 수익률이라는 표현은 지표 이름이므로 방향으로 보지 않습니다.")) { // 평가셋에서 나온 오탐
+            assertThat(GeminiService.checkWordConsistency(ok, prompt)).as(ok).isNull();
+        }
+        for (String bad : List.of(
+                "15명 중 3위를 기록했습니다.",               // 순위 오기
+                "2.00%의 손실을 기록했습니다.",              // 수익을 손실로
+                "KRW-XRP에서 100,000원 수익을 냈습니다.",    // 손실을 수익으로
+                "-2.00%를 기록했지만 -2.00% 하락은 아닙니다.")) { // 부호 오기
+            assertThat(GeminiService.checkWordConsistency(bad, prompt)).as(bad).isNotNull();
+        }
+    }
+
+    @Test
     @DisplayName("응답 검증: 빈 항목이나 투자 권유 표현이 있으면 거절한다")
     void validate() {
         SeasonReviewContent ok = new SeasonReviewContent("시장보다 6%p 앞선 시즌",

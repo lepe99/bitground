@@ -99,10 +99,50 @@ func TestValidateInsight(t *testing.T) {
 	}
 }
 
+func TestCheckWordConsistency(t *testing.T) {
+	prompt := "상승 0종 / 하락 6종 / 보합 0종\n등락률: -2.84%\n7일 등락률: +4.91%\n24시간 거래대금: 100억원\n"
+
+	ok := []string{
+		"상장 코인 중 상승 0종, 하락 6종으로 모두 내렸습니다.",
+		"전일 대비 -2.84% 하락했고, 7일 기준으로는 4.91% 상승했습니다.",
+		"2.84%의 하락세를 보였습니다.",
+		"거래대금은 100억원으로 감소했습니다.",       // 부호 없는 값은 판단하지 않음
+		"-2.84% 상승률 상위라는 말은 지표 이름이다.", // '률'이 붙으면 방향이 아님
+	}
+	for _, text := range ok {
+		if err := checkWordConsistency(text, prompt); err != nil {
+			t.Errorf("%q: 정상인데 거절함: %v", text, err)
+		}
+	}
+
+	bad := []string{
+		"하락 0종, 하락 6종으로 전부 내림세였습니다.", // 실제 사례
+		"상승 종목 6종을 기록했습니다.",
+		"전일 대비 2.84% 상승했습니다.",
+		"7일 기준 4.91% 하락했습니다.",
+		"+2.84%를 기록했습니다만 -2.84% 상승은 아닙니다.",
+		"전일 대비 +2.84% 변동했습니다. 그리고 +2.84% 하락",
+	}
+	for _, text := range bad {
+		if checkWordConsistency(text, prompt) == nil {
+			t.Errorf("%q: 거절해야 함", text)
+		}
+	}
+}
+
 func TestNormalizeNumbers(t *testing.T) {
 	got := normalizeNumbers("중앙값 마이너스 1.78퍼센트, 비트코인 플러스 2퍼센트, 이더리움 3.5 퍼센트, 도지 마이너스 9.65%")
 	if got != "중앙값 -1.78%, 비트코인 +2%, 이더리움 3.5%, 도지 -9.65%" {
 		t.Errorf("normalizeNumbers() = %q", got)
+	}
+}
+
+func TestCryptoContextFilter(t *testing.T) {
+	if containsAny("디자인 스튜디오 소폰이 공모전 수상작을 공개했다", cryptoContext) {
+		t.Error("가상자산과 관계없는 기사를 걸러야 함")
+	}
+	if !containsAny("소폰(SOPH) 업비트 유의 종목 지정", cryptoContext) {
+		t.Error("가상자산 기사는 남겨야 함")
 	}
 }
 

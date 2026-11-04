@@ -20,14 +20,14 @@ import (
 // 일일 인사이트 생성 (Gemini). 숫자·분위기 라벨·대상 선정은 코드가 하고, 모델은 받은 자료로 해설만 쓴다.
 // 프롬프트나 출력 형식을 바꾸면 insightPromptVersion을 올린다 (저장된 행에 남음)
 
-const insightPromptVersion = "daily-insight-v2"
+const insightPromptVersion = "daily-insight-v3"
 
 const coinSystemInstruction = `너는 모의투자 서비스 Bitground의 시장 요약 작성자다. <data>와 <news>로 코인 하나의 최근 24시간 움직임을 정리한다.
 규칙:
 1. <data>와 <news>에 있는 내용만 근거로 쓴다. 거기 없는 사실(ETF 자금 흐름, 파트너십, 업그레이드, 거시 지표, 지지선·저항선 등)은 쓰지 않는다.
 2. 숫자는 <data>의 표기 그대로 옮긴다 (예: -4.82%, 1.9배, 3,120억원). 새로 계산하거나 반올림을 바꾸지 않고, '마이너스', '퍼센트'처럼 말로 풀어 쓰지 않는다.
 3. 분위기 라벨은 이미 정해져 있다. 바꾸지 말고 그 라벨이 나온 이유를 데이터로 설명한다.
-4. 뉴스를 근거로 쓴 문장이 있으면 그 기사 id를 sources에 넣는다. 관련 기사가 없으면 가격·거래대금만으로 쓰고 sources는 비운다.
+4. 뉴스를 근거로 쓴 문장이 있으면 그 기사 id를 sources에 넣는다. 이름만 같고 이 코인(가상자산)과 관계없는 기사는 쓰지도 인용하지도 않는다. 관련 기사가 없으면 가격·거래대금만으로 쓰고 sources는 비운다.
 5. 매수·매도 권유, 목표가, 가격 예측("오를 것이다", "떨어질 것이다")은 쓰지 않는다. 앞으로에 대해서는 지켜볼 점으로만 쓴다.
 6. 한국어 존댓말 평서문. summary는 2~3문장 200자 이내, drivers는 2~3개, risks는 1~2개이며 각각 한 문장. 마크다운 기호를 쓰지 않는다.`
 
@@ -153,6 +153,72 @@ func validateInsight(out insightOutput, prompt string, newsIDs map[string]bool) 
 	for _, p := range percentToken.FindAllString(all, -1) {
 		if !allowed[p] {
 			return fmt.Errorf("입력에 없는 수치: %s", p)
+		}
+	}
+	if err := checkWordConsistency(all, prompt); err != nil {
+		return err
+	}
+	return nil
+}
+
+// 숫자는 맞게 옮겼어도 단어를 틀리는 실수('상승 0종'을 '하락 0종'으로, '-2.84% 상승')를 잡는다
+
+// '상승 0종', '하락 종목 6종' 같은 종목 수 표현
+var breadthClaim = regexp.MustCompile(`(상승|하락|보합)\s?(?:종목\s?)?(\d+)\s?종`)
+
+// 입력의 부호 있는 수치 ('-2.84%', '+980,000원')
+var signedValue = regexp.MustCompile(`([+-])(\d[\d,]*(?:\.\d+)?)(%p|%|원)`)
+
+// 수치 바로 뒤에 오는 방향 단어 ('2.84% 하락', '+3.59%의 수익', '120,000원 손실')
+var directionClaim = regexp.MustCompile(`([+-]?)(\d[\d,]*(?:\.\d+)?)(%p|%|원)\s?(?:의|로|가|이|만큼|가량|정도)?\s?(상승|올랐|올라|오른|반등|급등|증가|늘었|늘어|수익|이익|하락|내렸|내려|내린|떨어|급락|감소|줄었|줄어|손실)`)
+
+var upWords = map[string]bool{"상승": true, "올랐": true, "올라": true, "오른": true, "반등": true, "급등": true, "증가": true, "늘었": true, "늘어": true, "수익": true, "이익": true}
+
+// checkWordConsistency 종목 수 표현이 입력과 같은지, 수치의 방향 단어·부호가 입력의 부호와 맞는지 확인한다
+func checkWordConsistency(text, prompt string) error {
+	compactPrompt := strings.ReplaceAll(prompt, " ", "")
+	for _, m := range breadthClaim.FindAllStringSubmatch(text, -1) {
+		if !strings.Contains(compactPrompt, m[1]+m[2]+"종") {
+			return fmt.Errorf("입력과 다른 종목 수 표현: %s", m[0])
+		}
+	}
+
+	// 입력에서 수치별 부호 (같은 값이 +와 -로 모두 나오면 판단하지 않는다)
+	signs := map[string]map[string]bool{}
+	for _, m := range signedValue.FindAllStringSubmatch(prompt, -1) {
+		if m[3] == "%p" {
+			continue
+		}
+		key := strings.ReplaceAll(m[2], ",", "") + m[3]
+		if signs[key] == nil {
+			signs[key] = map[string]bool{}
+		}
+		signs[key][m[1]] = true
+	}
+	for _, idx := range directionClaim.FindAllStringSubmatchIndex(text, -1) {
+		m := make([]string, 5)
+		for g := range m {
+			if idx[2*g] >= 0 {
+				m[g] = text[idx[2*g]:idx[2*g+1]]
+			}
+		}
+		// '상승률'·'수익률'처럼 '률'이 붙으면 방향이 아니라 지표 이름이다
+		if m[3] == "%p" || strings.HasPrefix(text[idx[1]:], "률") {
+			continue
+		}
+		seen := signs[strings.ReplaceAll(m[2], ",", "")+m[3]]
+		if len(seen) != 1 {
+			continue
+		}
+		actual := "+"
+		if seen["-"] {
+			actual = "-"
+		}
+		if m[1] != "" && m[1] != actual {
+			return fmt.Errorf("입력과 부호가 다른 수치: %s", m[0])
+		}
+		if claimedUp := upWords[m[4]]; claimedUp != (actual == "+") {
+			return fmt.Errorf("수치와 방향이 맞지 않음: %s", m[0])
 		}
 	}
 	return nil
