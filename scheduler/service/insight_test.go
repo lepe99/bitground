@@ -222,6 +222,13 @@ func TestAttachBackgroundSources(t *testing.T) {
 	}
 }
 
+func TestFinalizeOutputDropsUnsupportedBackground(t *testing.T) {
+	out := finalizeOutput(insightOutput{Summary: "요약", Background: "지난주에는 호재가 있었습니다."}, "<data>등락률: -1.00%</data>")
+	if out.Background != "" || checkBackground(out, "<data>") != nil {
+		t.Errorf("배경 자료가 없으면 background를 버려 검증을 통과해야 함: %q", out.Background)
+	}
+}
+
 func TestPickContext(t *testing.T) {
 	today := []NewsItem{{Title: "오늘 기사", URL: "https://a.com/today"}}
 	md := func(title, url string) map[string]any {

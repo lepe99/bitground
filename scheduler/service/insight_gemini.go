@@ -48,6 +48,18 @@ func normalizeNumbers(s string) string {
 	return spelledPercent.ReplaceAllString(s, "$1%")
 }
 
+// finalizeOutput 검증 전에 코드가 고치는 것 (운영과 평가가 같은 순서로 쓴다)
+//  1. 숫자 표기 ('마이너스 1.78퍼센트' → '-1.78%')
+//  2. 배경 문장이 날짜로 가리킨 배경 기사를 인용에 붙임
+//  3. 배경 자료가 없는데 채운 background는 버림 (근거가 없고, 실행 중 XRP가 이것으로 두 번 연속 거절돼 빠졌음)
+func finalizeOutput(out insightOutput, prompt string) insightOutput {
+	out = attachBackgroundSources(normalizeOutput(out), prompt)
+	if !strings.Contains(prompt, "<context>") {
+		out.Background = ""
+	}
+	return out
+}
+
 // normalizeOutput 모델 출력의 숫자 표기를 고친다 (검증 전에)
 func normalizeOutput(out insightOutput) insightOutput {
 	out.Summary = normalizeNumbers(out.Summary)
@@ -85,7 +97,7 @@ func generateInsightText(ctx context.Context, apiKey, model string, p insightPro
 		if err := json.Unmarshal([]byte(text), &out); err != nil {
 			lastErr = fmt.Errorf("응답 JSON 파싱 실패: %w", err)
 		} else {
-			out = attachBackgroundSources(normalizeOutput(out), prompt)
+			out = finalizeOutput(out, prompt)
 			if lastErr = validateInsight(out, prompt, newsIDs); lastErr == nil {
 				return out, nil
 			}

@@ -139,7 +139,7 @@ func TestInsightEval(t *testing.T) {
 					r.err = fmt.Errorf("JSON 파싱 실패: %w", err)
 				} else {
 					// 운영과 같은 순서: 숫자 표기 정리 → 검증
-					r.out = attachBackgroundSources(normalizeOutput(r.out), prompt)
+					r.out = finalizeOutput(r.out, prompt)
 					scoreInsight(&r, c, prompt, mood, ids)
 				}
 			}

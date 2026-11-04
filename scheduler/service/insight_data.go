@@ -6,6 +6,7 @@ import (
 	"math"
 	"net/url"
 	"sort"
+	"strings"
 	"time"
 )
 
@@ -180,14 +181,28 @@ func sortedTickers(list []upbitTicker, less func(a, b upbitTicker) bool) []upbit
 	return out
 }
 
-// fetchDayCandles 최근 8개 일봉 (오늘 진행 중인 봉 + 지난 7일)
+// fetchDayCandles 최근 8개 일봉 (오늘 진행 중인 봉 + 지난 7일).
+// 0시에는 랭킹·코인·마켓 인덱스 작업도 같은 때 업비트를 불러 요청 한도(429)에 걸릴 수 있어 잠시 뒤 두 번까지 다시 시도한다
 func fetchDayCandles(ctx context.Context, market string) ([]upbitDayCandle, error) {
-	var candles []upbitDayCandle
 	u := "https://api.upbit.com/v1/candles/days?count=8&market=" + url.QueryEscape(market)
-	if err := getJSON(ctx, u, 10*time.Second, &candles); err != nil {
-		return nil, err
+	var err error
+	for attempt := 0; attempt < 3; attempt++ {
+		if attempt > 0 {
+			select {
+			case <-time.After(time.Duration(attempt) * time.Second):
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			}
+		}
+		var candles []upbitDayCandle
+		if err = getJSON(ctx, u, 10*time.Second, &candles); err == nil {
+			return candles, nil
+		}
+		if !strings.Contains(err.Error(), "429") {
+			return nil, err
+		}
 	}
-	return candles, nil
+	return nil, err
 }
 
 // buildCoinData 현재가와 일봉으로 코인 입력을 만든다. 일봉이 없으면 7일 지표만 비운다
