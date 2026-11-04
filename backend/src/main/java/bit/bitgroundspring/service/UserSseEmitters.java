@@ -223,6 +223,11 @@ public class UserSseEmitters {
     
     // 병렬 처리로 성능 개선
     public Map<String, Integer> sendToAll(NotificationResponse request) {
+        // 시스템 알림 저장 (접속 여부와 무관). 받은 화면이 곧바로 읽지 않은 개수를 다시 읽으므로 보내기 전에 저장한다
+        if (request.getMessage() == Message.SEASON_UPDATE || request.getMessage() == Message.NOTICE) {
+            saveSystemNotification(request);
+        }
+
         Set<Integer> userIds = getOnlineUsers();
         
         Map<Boolean, List<Integer>> results = userIds.parallelStream()
@@ -236,11 +241,6 @@ public class UserSseEmitters {
         result.put("failure", failureCount);
         
         log.info("모든 사용자에게 알림 전송 완료. 성공: {}, 실패: {}", successCount, failureCount);
-        
-        // 시스템 알림 저장 (접속 여부와 무관)
-        if (request.getMessage() == Message.SEASON_UPDATE || request.getMessage() == Message.NOTICE) {
-            saveSystemNotification(request);
-        }
         
         return result;
     }
@@ -260,12 +260,10 @@ public class UserSseEmitters {
                 message = String.format("🔔 새로운 공지사항이 등록되었습니다.\n공지사항 탭에서 확인해보세요.\n[%s]", title);
             }
             
-            Notification notification = Notification.builder()
-                    .user(User.builder().id(1).build())
-                    .messageType(request.getMessage())
-                    .message(message)
-                    .build();
-            notificationService.saveNotification(notification);
+            // 예전에는 1번 사용자 행 하나에 저장해 모두가 같이 읽었는데, 1번은 실제 사용자라
+            // 그 사람의 주문 알림까지 모두에게 보이고 읽지 않은 개수도 셀 수 없었다
+            int saved = notificationService.saveForAllUsers(request.getMessage(), message);
+            log.info("시스템 알림 {}건 저장 ({})", saved, request.getMessage());
             
         } catch (Exception e) {
             log.error("시스템 알림 저장 실패: {}", e.getMessage());

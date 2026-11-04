@@ -30,6 +30,7 @@ public class CustomOidcUserService extends OidcUserService {
     private final UserRepository userRepository;
     private final InitialCashPolicy initialCashPolicy;
     private final RestTemplate restTemplate;
+    private final DefaultProfileImageDetector defaultProfileImageDetector;
     
     @Override
     public OidcUser loadUser(OidcUserRequest userRequest) throws OAuth2AuthenticationException {
@@ -54,7 +55,7 @@ public class CustomOidcUserService extends OidcUserService {
         Map<String, Object> attributes = oidcUser.getAttributes();
         
         // 사용자 정보 저장
-        User user = saveUserInfo(provider, attributes, providerId);
+        User user = saveUserInfo(provider, attributes, providerId, userRequest.getAccessToken());
         
         
         // OidcUser 객체 반환 (인증 정보 포함)
@@ -80,7 +81,7 @@ public class CustomOidcUserService extends OidcUserService {
         Map<String, Object> attributes = (Map<String, Object>) userAttributes.get("response");
         
         // 사용자 정보 저장
-        User user = saveUserInfo(provider, attributes, providerId);
+        User user = saveUserInfo(provider, attributes, providerId, accessToken);
         
         // OidcUser 객체 반환 (인증 정보 포함)
         OidcUserInfo userInfo = new OidcUserInfo(Collections.singletonMap("sub", providerId));
@@ -110,10 +111,9 @@ public class CustomOidcUserService extends OidcUserService {
     }
     
     // 사용자 정보 처리 메서드
-    private User saveUserInfo(String provider, Map<String, Object> attributes, String providerId) {
+    private User saveUserInfo(String provider, Map<String, Object> attributes, String providerId, OAuth2AccessToken accessToken) {
         String email = extractEmail(provider, attributes);
         String name = extractName(provider, attributes);
-        String profileImage = extractProfileImage(provider, attributes);
         
         // 사용자 존재 여부 확인
         Optional<User> existingUser = userRepository.findByProviderAndProviderId(provider, providerId);
@@ -123,7 +123,9 @@ public class CustomOidcUserService extends OidcUserService {
             // 기존 사용자 정보 업데이트
             user = existingUser.get();
         } else {
-            // 새로운 사용자 생성
+            // 새로운 사용자 생성. 소셜 서비스의 기본 프로필 사진이면 저장하지 않아 우리 기본 프로필 사진이 보이게 한다
+            String profileImage = defaultProfileImageDetector.keepIfCustom(
+                    provider, extractProfileImage(provider, attributes), accessToken.getTokenValue());
             user = User.builder()
                     .provider(provider)
                     .providerId(providerId)
