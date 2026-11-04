@@ -34,17 +34,18 @@ public class UserController {
         return toDto(userService.getActiveUser(authUser.id()));
     }
 
-    // 내 정보 수정 (닉네임, 이메일, 프로필 이미지)
+    // 내 정보 수정 (닉네임, 이메일, 프로필 이미지). 처음 가입 후 확인 화면(/welcome)도 이걸로 마친다
     @PutMapping("/me")
     public UserDto updateCurrentUser(
             @AuthenticationPrincipal AuthUser authUser,
             @RequestParam("name") String name,
-            @RequestParam("email") String email,
-            @RequestParam(value = "image", required = false) MultipartFile image
+            @RequestParam(value = "email", required = false) String email, // 비우면 이메일 없음 (카카오 로그인 등)
+            @RequestParam(value = "image", required = false) MultipartFile image,
+            @RequestParam(value = "removeImage", defaultValue = "false") boolean removeImage // 기본 프로필 사진으로
     ) {
         User user = userService.getActiveUser(authUser.id());
         String imageUrl = (image != null && !image.isEmpty()) ? userService.uploadProfileImage(image) : null;
-        return toDto(userService.updateUser(user.getId(), name, email, imageUrl));
+        return toDto(userService.updateUser(user.getId(), name, email, imageUrl, removeImage));
     }
 
     // 회원 탈퇴 (is_deleted = 1) + 모든 세션 폐기, 로그인 쿠키 삭제
@@ -82,6 +83,7 @@ public class UserController {
                 .role(user.getRole())
                 .cash(user.getCash())
                 .tier(user.getTier())
+                .onboarded(Boolean.TRUE.equals(user.getIsOnboarded()))
                 .build();
     }
 }

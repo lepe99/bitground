@@ -26,5 +26,7 @@ public class UserDto {
     private Long cash; // 사용자의 현금 자산
     
     private Integer tier; // 사용자의 티어 (0~7)
-    
+
+    private boolean onboarded; // 처음 가입 후 프로필 확인 화면을 마쳤는지 (false면 /welcome으로 보냄)
+
 }

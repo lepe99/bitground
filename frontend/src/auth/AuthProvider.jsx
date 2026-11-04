@@ -21,10 +21,12 @@ export const AuthProvider = ({children}) => {
                 setUser(me);
                 setIsLoggedIn(true);
             }
+            return me;
         } catch (error) {
             console.warn('Not authenticated or error fetching user info:', error.response?.data?.detail || error.message);
             setUser(null);
             setIsLoggedIn(false);
+            return null;
             // 401이 아닌 다른 네트워크 오류일 수도 있으므로, 무조건 로그아웃 시키기보다는 상태만 업데이트
         } finally {
             checkedRef.current = true;

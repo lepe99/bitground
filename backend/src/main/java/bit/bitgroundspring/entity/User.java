@@ -62,6 +62,11 @@ public class User {
     @Column(name = "is_deleted", nullable = false, columnDefinition = "tinyint(1) default 0")
     @Builder.Default
     private Boolean isDeleted = false;
+
+    // 처음 가입해 프로필 확인 화면(/welcome)을 마쳤는지. 새로 만드는 사용자는 아직 안 마친 상태로 시작한다
+    @Column(name = "is_onboarded", nullable = false, columnDefinition = "tinyint(1) default 1")
+    @Builder.Default
+    private Boolean isOnboarded = false;
     
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, columnDefinition = "datetime(6) DEFAULT CURRENT_TIMESTAMP(6)")

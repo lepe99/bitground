@@ -17,6 +17,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.regex.Pattern;
+
 
 @Slf4j
 @Service
@@ -37,22 +39,42 @@ public class UserService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
     }
 
-    // 유저 업데이트
+    private static final Pattern EMAIL = Pattern.compile("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$");
+
+    /**
+     * 프로필 수정 (처음 가입 후 확인 화면 /welcome 과 마이페이지가 함께 쓴다). 저장하면 첫 화면을 마친 것으로 본다
+     * @param email     비우면 이메일 없음 (카카오처럼 이메일을 주지 않는 로그인)
+     * @param imageUrl  새로 올린 사진 주소. null이면 사진은 그대로
+     * @param removeImage true면 사진을 지워 기본 프로필 사진으로 (새 사진이 함께 오면 새 사진이 우선)
+     */
     @Transactional
     @Loggable("회원 정보 수정")
-    public User updateUser(Integer userId, String name, String email, String imageUrl) {
+    public User updateUser(Integer userId, String name, String email, String imageUrl, boolean removeImage) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
-        user.setName(name);
-        user.setEmail(email);
+        String trimmedName = name == null ? "" : name.trim();
+        if (trimmedName.length() < 2 || trimmedName.length() > 8) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT, "닉네임은 2자 이상 8자 이하로 입력해주세요.");
+        }
+        String trimmedEmail = email == null ? "" : email.trim();
+        if (!trimmedEmail.isEmpty() && !EMAIL.matcher(trimmedEmail).matches()) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT, "올바른 이메일 형식이 아닙니다.");
+        }
 
-        if (imageUrl != null && !imageUrl.equals(user.getProfileImage())) {
-            // 이전 이미지 삭제 (직접 업로드한 이미지만, 소셜 프로필 URL은 그대로 둠)
-            storageService.deleteByUrl(user.getProfileImage());
+        user.setName(trimmedName);
+        user.setEmail(trimmedEmail.isEmpty() ? null : trimmedEmail);
+        user.setIsOnboarded(true);
 
-            // 새 이미지 저장
+        String previousImage = user.getProfileImage();
+        if (imageUrl != null && !imageUrl.equals(previousImage)) {
             user.setProfileImage(imageUrl);
+        } else if (removeImage) {
+            user.setProfileImage(null); // 화면에서는 기본 프로필 사진으로 보인다
+        }
+        // 바뀐 경우 이전 사진 파일 삭제 (직접 업로드한 이미지만, 소셜 프로필 URL은 무시됨)
+        if (previousImage != null && !previousImage.equals(user.getProfileImage())) {
+            storageService.deleteByUrl(previousImage);
         }
 
         return userRepository.save(user);
