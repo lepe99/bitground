@@ -17,7 +17,7 @@ import (
 // 코인·시장 데이터(<data>, <news>)는 코드가 만든다.
 
 // DefaultInsightPromptVersion 운영 기본 프롬프트 버전
-const DefaultInsightPromptVersion = "daily-insight-v3"
+const DefaultInsightPromptVersion = "daily-insight-v4"
 
 //go:embed prompts
 var promptFS embed.FS

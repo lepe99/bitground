@@ -39,7 +39,10 @@ type evalCase struct {
 	Coin          coinData   `json:"coin"`
 	Market        marketData `json:"market"`
 	News          []evalNews `json:"news"`
-	ExpectSources string     `json:"expectSources"` // some: 기사를 인용해야 함 / none: 인용하면 안 됨
+	Context       []evalNews `json:"context"`       // 뉴스 아카이브에서 찾았다고 가정한 최근 30일 배경 기사
+	ExpectSources string     `json:"expectSources"` // some: 기사를 인용해야 함 / none: 인용하면 안 됨 / any: 보지 않음
+	// some: 배경(background)을 써야 함 / none: 쓰면 안 됨 / 비우면 보지 않음
+	ExpectBackground string `json:"expectBackground"`
 }
 
 type evalRun struct {
@@ -55,6 +58,7 @@ type evalRun struct {
 	countsOk     bool
 	moodOk       bool
 	sourcesOk    bool
+	backgroundOk bool
 	breadthSlips []string
 }
 
@@ -106,16 +110,21 @@ func TestInsightEval(t *testing.T) {
 	var results []evalRun
 	for _, c := range cases {
 		news := make([]NewsItem, len(c.News))
+		related := make([]NewsItem, len(c.Context))
 		ids := map[string]bool{}
 		for i, n := range c.News {
 			news[i] = NewsItem{ID: n.ID, Title: n.Title, PublishedAt: n.PublishedAt, Description: n.Description}
 			ids[n.ID] = true
 		}
+		for i, n := range c.Context {
+			related[i] = NewsItem{ID: n.ID, Title: n.Title, PublishedAt: n.PublishedAt, Description: n.Description}
+			ids[n.ID] = true
+		}
 		system, prompt, mood := p.CoinSystem, "", c.Coin.Mood
 		if c.Kind == "market" {
-			system, prompt, mood = p.MarketSystem, buildMarketPrompt(c.Market, news, now), c.Market.Mood
+			system, prompt, mood = p.MarketSystem, buildMarketPrompt(c.Market, news, related, now), c.Market.Mood
 		} else {
-			prompt = buildCoinPrompt(c.Coin, news, now)
+			prompt = buildCoinPrompt(c.Coin, news, related, now)
 		}
 
 		for run := 1; run <= runs; run++ {
@@ -130,7 +139,7 @@ func TestInsightEval(t *testing.T) {
 					r.err = fmt.Errorf("JSON 파싱 실패: %w", err)
 				} else {
 					// 운영과 같은 순서: 숫자 표기 정리 → 검증
-					r.out = normalizeOutput(r.out)
+					r.out = attachBackgroundSources(normalizeOutput(r.out), prompt)
 					scoreInsight(&r, c, prompt, mood, ids)
 				}
 			}
@@ -177,8 +186,18 @@ func scoreInsight(r *evalRun, c evalCase, prompt, mood string, ids map[string]bo
 	switch c.ExpectSources {
 	case "some":
 		r.sourcesOk = len(r.out.Sources) > 0
+	case "any": // 인용 여부는 보지 않고 원문으로 판단 (배경 기사를 쓰는 방식이 관심사)
+		r.sourcesOk = true
 	default:
 		r.sourcesOk = len(r.out.Sources) == 0
+	}
+	switch c.ExpectBackground {
+	case "some":
+		r.backgroundOk = strings.TrimSpace(r.out.Background) != ""
+	case "none":
+		r.backgroundOk = strings.TrimSpace(r.out.Background) == ""
+	default:
+		r.backgroundOk = true
 	}
 
 	if c.Kind == "market" {
@@ -233,6 +252,7 @@ func insightReport(model, promptVersion string, runs int, cases []evalCase, resu
 	fmt.Fprintf(&b, "| 항목 수·요약 길이 준수 | %s |\n", pct(count(func(r evalRun) bool { return r.countsOk }), len(ok)))
 	fmt.Fprintf(&b, "| 분위기 라벨 그대로 언급 | %s |\n", pct(count(func(r evalRun) bool { return r.moodOk }), len(ok)))
 	fmt.Fprintf(&b, "| 기사 인용 기대와 일치 | %s |\n", pct(count(func(r evalRun) bool { return r.sourcesOk }), len(ok)))
+	fmt.Fprintf(&b, "| 배경(background) 기대와 일치 | %s |\n", pct(count(func(r evalRun) bool { return r.backgroundOk }), len(ok)))
 	fmt.Fprintf(&b, "| 종목 수 표현 오류 (낮을수록 좋음) | %s |\n", pct(count(func(r evalRun) bool { return len(r.breadthSlips) > 0 }), len(ok)))
 	if len(times) > 0 {
 		fmt.Fprintf(&b, "| 응답 시간 중앙값 / 최대 | %dms / %dms |\n", times[len(times)/2], times[len(times)-1])

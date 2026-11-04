@@ -52,6 +52,9 @@ public class AiInsight {
     @Column(name = "sources", columnDefinition = "text")
     private String sources; // 인용한 기사 (JSON 배열)
 
+    @Column(name = "background", columnDefinition = "text")
+    private String background; // 최근 30일 배경 (daily-insight-v4부터, 배경 기사가 없으면 null)
+
     @Column(name = "pick_reason", length = 40)
     private String pickReason; // 분석 대상으로 고른 이유
 

@@ -31,7 +31,8 @@
         "Description": "비트코인이 보합권에 머문 가운데 일부 알트코인이 반등했다."
       }
     ],
-    "expectSources": "some"
+    "expectSources": "some",
+    "expectBackground": "none"
   },
   {
     "name": "coin-drop-caution-numbers-in-news",
@@ -66,7 +67,8 @@
         "Description": "도지코인과 시바이누 등 밈코인이 1~2% 넘게 하락했다."
       }
     ],
-    "expectSources": "some"
+    "expectSources": "some",
+    "expectBackground": "none"
   },
   {
     "name": "coin-flat-no-news",
@@ -87,7 +89,8 @@
       "Mood": "중립"
     },
     "news": [],
-    "expectSources": "none"
+    "expectSources": "none",
+    "expectBackground": "none"
   },
   {
     "name": "coin-warning-irrelevant-news",
@@ -117,7 +120,8 @@
         "Description": "디자인 스튜디오 소폰이 올해 공모전 수상작을 공개했다."
       }
     ],
-    "expectSources": "none"
+    "expectSources": "none",
+    "expectBackground": "none"
   },
   {
     "name": "coin-no-7d-data",
@@ -135,7 +139,8 @@
       "Mood": "약간 강세"
     },
     "news": [],
-    "expectSources": "none"
+    "expectSources": "none",
+    "expectBackground": "none"
   },
   {
     "name": "coin-tiny-price",
@@ -156,7 +161,8 @@
       "Mood": "강세"
     },
     "news": [],
-    "expectSources": "none"
+    "expectSources": "none",
+    "expectBackground": "none"
   },
   {
     "name": "market-broad-rise",
@@ -213,7 +219,8 @@
         "Description": "비트코인과 주요 알트코인이 동반 상승하며 투자 심리가 개선됐다."
       }
     ],
-    "expectSources": "some"
+    "expectSources": "some",
+    "expectBackground": "none"
   },
   {
     "name": "market-all-down",
@@ -245,6 +252,114 @@
       ]
     },
     "news": [],
-    "expectSources": "none"
+    "expectSources": "none",
+    "expectBackground": "none"
+  },
+  {
+    "name": "coin-drop-with-past-context",
+    "note": "오늘 기사 없이 하락, 배경 기사는 열흘 전 호재. 과거 호재를 오늘 움직임의 원인처럼 쓰지 않고 시점을 밝히는지",
+    "kind": "coin",
+    "expectSources": "any",
+    "coin": {
+      "Symbol": "KRW-XRP",
+      "Name": "리플",
+      "Reason": "주요 코인",
+      "Price": 1681,
+      "Change": -3.1,
+      "High": 1745,
+      "Low": 1672,
+      "Volume24h": 152000000000,
+      "VolumeRatio": 1.4,
+      "Change7d": 6.2,
+      "Has7d": true,
+      "Mood": "약간 약세"
+    },
+    "news": [],
+    "context": [
+      {
+        "ID": "k1-1",
+        "PublishedAt": "2026-10-25 10:20",
+        "Title": "리플, SEC 소송 최종 종결…불확실성 해소에 거래량 급증",
+        "Description": "리플과 미국 증권거래위원회의 소송이 마무리되며 리플 거래량이 크게 늘었다."
+      },
+      {
+        "ID": "k1-2",
+        "PublishedAt": "2026-10-30 15:05",
+        "Title": "리플 기반 송금망 아시아 은행 3곳 추가 도입",
+        "Description": "리플넷을 도입하는 은행이 늘며 리플 가상자산 활용 사례가 확대됐다."
+      }
+    ],
+    "expectBackground": "some"
+  },
+  {
+    "name": "market-drop-with-hack-context",
+    "note": "시장 하락 + 사흘 전 거래소 해킹 배경 기사. 해킹을 오늘 하락의 원인으로 단정하지 않는지",
+    "kind": "market",
+    "expectSources": "any",
+    "market": {
+      "Listed": 182,
+      "Up": 31,
+      "Down": 140,
+      "MedianChange": -2.6,
+      "BTC": -1.9,
+      "ETH": -2.7,
+      "Warnings": 4,
+      "Cautions": 9,
+      "Mood": "약간 약세",
+      "TopVolume": [
+        {
+          "Symbol": "KRW-BTC",
+          "Name": "비트코인",
+          "Change": -1.9,
+          "Volume24h": 690000000000
+        },
+        {
+          "Symbol": "KRW-ETH",
+          "Name": "이더리움",
+          "Change": -2.7,
+          "Volume24h": 350000000000
+        }
+      ]
+    },
+    "news": [],
+    "context": [
+      {
+        "ID": "km1",
+        "PublishedAt": "2026-11-01 09:40",
+        "Title": "바이낸스 63억 달러 해킹…가상자산 시장 투자심리 위축",
+        "Description": "대형 거래소 해킹 소식에 가상자산 투자자들이 테더로 자금을 옮겼다."
+      }
+    ],
+    "expectBackground": "some"
+  },
+  {
+    "name": "coin-weak-context",
+    "note": "배경 기사가 다른 코인 이야기라 관련이 약함. 억지로 끌어다 쓰지 않는지",
+    "kind": "coin",
+    "expectSources": "none",
+    "coin": {
+      "Symbol": "KRW-ADA",
+      "Name": "에이다",
+      "Reason": "거래대금 상위",
+      "Price": 812,
+      "Change": 0.4,
+      "High": 820,
+      "Low": 805,
+      "Volume24h": 59000000000,
+      "VolumeRatio": 0.9,
+      "Change7d": -1.2,
+      "Has7d": true,
+      "Mood": "중립"
+    },
+    "news": [],
+    "context": [
+      {
+        "ID": "k2-1",
+        "PublishedAt": "2026-10-29 11:00",
+        "Title": "솔라나 밈코인 열풍, 하루 거래량 사상 최대",
+        "Description": "솔라나 기반 밈코인 거래가 급증하며 가상자산 시장의 관심이 몰렸다."
+      }
+    ],
+    "expectBackground": "none"
   }
 ]

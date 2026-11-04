@@ -135,6 +135,10 @@ func run(ctx context.Context, db *sql.DB, cfg config.Config, now time.Time) erro
 					NaverClientID:     cfg.NaverClientID,
 					NaverClientSecret: cfg.NaverClientSecret,
 					PromptVersion:     cfg.InsightPromptVersion,
+					PineconeAPIKey:    cfg.PineconeAPIKey,
+					PineconeIndex:     cfg.PineconeIndex,
+					EmbedModel:        cfg.NewsEmbedModel,
+					EmbedDimension:    cfg.NewsEmbedDimension,
 				}, symbolMap, now)
 			})
 		})

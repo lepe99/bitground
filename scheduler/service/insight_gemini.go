@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -50,6 +51,7 @@ func normalizeNumbers(s string) string {
 // normalizeOutput 모델 출력의 숫자 표기를 고친다 (검증 전에)
 func normalizeOutput(out insightOutput) insightOutput {
 	out.Summary = normalizeNumbers(out.Summary)
+	out.Background = normalizeNumbers(out.Background)
 	for i := range out.Drivers {
 		out.Drivers[i] = normalizeNumbers(out.Drivers[i])
 	}
@@ -61,10 +63,11 @@ func normalizeOutput(out insightOutput) insightOutput {
 
 // insightOutput 모델 출력
 type insightOutput struct {
-	Summary string   `json:"summary"`
-	Drivers []string `json:"drivers"`
-	Risks   []string `json:"risks"`
-	Sources []string `json:"sources"`
+	Summary    string   `json:"summary"`
+	Drivers    []string `json:"drivers"`
+	Risks      []string `json:"risks"`
+	Sources    []string `json:"sources"`
+	Background string   `json:"background"` // 최근 30일 배경 (daily-insight-v4부터, <context>가 있을 때만)
 }
 
 // Gemini 재시도: 요청 한도 초과·서버 오류는 잠시 뒤 다시 보낸다
@@ -82,7 +85,7 @@ func generateInsightText(ctx context.Context, apiKey, model string, p insightPro
 		if err := json.Unmarshal([]byte(text), &out); err != nil {
 			lastErr = fmt.Errorf("응답 JSON 파싱 실패: %w", err)
 		} else {
-			out = normalizeOutput(out)
+			out = attachBackgroundSources(normalizeOutput(out), prompt)
 			if lastErr = validateInsight(out, prompt, newsIDs); lastErr == nil {
 				return out, nil
 			}
@@ -108,12 +111,15 @@ func validateInsight(out insightOutput, prompt string, newsIDs map[string]bool) 
 			return fmt.Errorf("없는 기사 인용: %s", id)
 		}
 	}
-	all := strings.Join(append(append([]string{out.Summary}, out.Drivers...), out.Risks...), " ")
+	all := strings.Join(append(append([]string{out.Summary, out.Background}, out.Drivers...), out.Risks...), " ")
 	if m := forbiddenInsight.FindString(all); m != "" {
 		return fmt.Errorf("투자 권유·예측 표현: %s", m)
 	}
 	if m := spelledNumber.FindString(all); m != "" {
 		return fmt.Errorf("숫자를 말로 풀어 씀: %s", m)
+	}
+	if err := checkBackground(out, prompt); err != nil {
+		return err
 	}
 	allowed := map[string]bool{}
 	for _, p := range percentToken.FindAllString(prompt, -1) {
@@ -193,6 +199,65 @@ func checkWordConsistency(text, prompt string) error {
 	return nil
 }
 
+// <context> 줄: '[k1-1] 2026-10-25 10:20 | 제목 | 요약'
+var contextLine = regexp.MustCompile(`(?m)^\[(k[^\]]*)\] (\d{4})-(\d{2})-(\d{2})`)
+
+var isoDate = regexp.MustCompile(`(\d{4})-(\d{2})-(\d{2})`)
+
+// attachBackgroundSources 배경 문장이 날짜('10월 25일')로 가리키는 배경 기사를 sources에 채운다.
+// 모델이 배경은 잘 쓰면서 인용 id를 자주 빠뜨려서(평가 6건 중 4건), 날짜가 맞는 기사만 코드가 붙인다
+func attachBackgroundSources(out insightOutput, prompt string) insightOutput {
+	if strings.TrimSpace(out.Background) == "" {
+		return out
+	}
+	// '2026-11-01' 같은 표기를 화면용 '11월 1일'로 맞춘다 (배경 기사 줄의 날짜를 그대로 옮기는 경우)
+	out.Background = isoDate.ReplaceAllStringFunc(out.Background, func(d string) string {
+		g := isoDate.FindStringSubmatch(d)
+		month, _ := strconv.Atoi(g[2])
+		day, _ := strconv.Atoi(g[3])
+		return fmt.Sprintf("%d월 %d일", month, day)
+	})
+	cited := map[string]bool{}
+	for _, id := range out.Sources {
+		cited[id] = true
+	}
+	for _, m := range contextLine.FindAllStringSubmatch(prompt, -1) {
+		month, _ := strconv.Atoi(m[3])
+		day, _ := strconv.Atoi(m[4])
+		if !cited[m[1]] && strings.Contains(out.Background, fmt.Sprintf("%d월 %d일", month, day)) {
+			out.Sources = append(out.Sources, m[1])
+			cited[m[1]] = true
+		}
+	}
+	return out
+}
+
+// 배경 문장에 쓰면 안 되는 인과 표현 (과거 기사를 오늘 움직임의 원인처럼 엮지 않도록)
+var causalWord = regexp.MustCompile(`때문|영향으로|영향을|원인|탓`)
+
+// checkBackground 배경(background)은 <context>가 있을 때만, 배경 기사(k…)를 인용하고, 인과 표현 없이, 짧게
+func checkBackground(out insightOutput, prompt string) error {
+	bg := strings.TrimSpace(out.Background)
+	if bg == "" {
+		return nil
+	}
+	if !strings.Contains(prompt, "<context>") {
+		return errors.New("배경 자료가 없는데 background를 씀")
+	}
+	if utf8.RuneCountInString(bg) > 200 {
+		return errors.New("background가 너무 김")
+	}
+	if m := causalWord.FindString(bg); m != "" {
+		return fmt.Errorf("background에 인과 표현: %s", m)
+	}
+	for _, id := range out.Sources {
+		if strings.HasPrefix(id, "k") {
+			return nil
+		}
+	}
+	return errors.New("background가 배경 기사를 인용하지 않음")
+}
+
 // callGemini generateContent 한 번 호출 (429·5xx·네트워크 오류는 재시도). 모델 출력 텍스트(JSON 문자열)를 돌려준다
 func callGemini(ctx context.Context, apiKey, model string, p insightPrompt, system, prompt string) (string, error) {
 	body, err := json.Marshal(map[string]any{
@@ -270,7 +335,7 @@ func extractGeminiText(body []byte) (string, error) {
 }
 
 // buildCoinPrompt 코인 하나의 입력. 숫자는 화면 표기와 같은 형식으로 넣는다
-func buildCoinPrompt(d coinData, news []NewsItem, now time.Time) string {
+func buildCoinPrompt(d coinData, news, related []NewsItem, now time.Time) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "<window>최근 24시간, 기준 시각 %s (KST)</window>\n<data>\n", now.Format("2006-01-02 15:04"))
 	fmt.Fprintf(&b, "코인: %s (%s)\n", d.Name, d.Symbol)
@@ -291,11 +356,12 @@ func buildCoinPrompt(d coinData, news []NewsItem, now time.Time) string {
 	fmt.Fprintf(&b, "유의/주의 지정: %s\n", designation(d.Warning, d.Caution))
 	fmt.Fprintf(&b, "분위기 라벨(규칙으로 정함): %s\n</data>\n", d.Mood)
 	writeNews(&b, news)
+	writeContext(&b, related)
 	return b.String()
 }
 
 // buildMarketPrompt 시장 전체 입력
-func buildMarketPrompt(m marketData, news []NewsItem, now time.Time) string {
+func buildMarketPrompt(m marketData, news, related []NewsItem, now time.Time) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "<window>최근 24시간, 기준 시각 %s (KST)</window>\n<data>\n", now.Format("2006-01-02 15:04"))
 	fmt.Fprintf(&b, "대상: 원화 마켓 상장 코인 %d종\n", m.Listed)
@@ -309,6 +375,7 @@ func buildMarketPrompt(m marketData, news []NewsItem, now time.Time) string {
 	fmt.Fprintf(&b, "유의 지정 %d종 / 주의 지정 %d종\n", m.Warnings, m.Cautions)
 	fmt.Fprintf(&b, "분위기 라벨(규칙으로 정함, 등락률 중앙값 기준): %s\n</data>\n", m.Mood)
 	writeNews(&b, news)
+	writeContext(&b, related)
 	return b.String()
 }
 
@@ -322,6 +389,18 @@ func writeNews(b *strings.Builder, news []NewsItem) {
 		fmt.Fprintf(b, "[%s] %s | %s | %s\n", n.ID, n.PublishedAt, n.Title, n.Description)
 	}
 	b.WriteString("</news>\n")
+}
+
+// writeContext 뉴스 아카이브에서 찾은 최근 30일 관련 기사 (없으면 블록을 넣지 않는다)
+func writeContext(b *strings.Builder, related []NewsItem) {
+	if len(related) == 0 {
+		return
+	}
+	b.WriteString("<context>\n")
+	for _, n := range related {
+		fmt.Fprintf(b, "[%s] %s | %s | %s\n", n.ID, n.PublishedAt, n.Title, n.Description)
+	}
+	b.WriteString("</context>\n")
 }
 
 func designation(warning, caution bool) string {

@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"strings"
 	"testing"
 	"time"
@@ -62,7 +63,7 @@ func TestBuildCoinDataAndMood(t *testing.T) {
 	if d.Change != -4.82 || d.VolumeRatio != 2.0 || d.Change7d != 4.91 || d.Mood != "약간 약세" {
 		t.Errorf("buildCoinData() = %+v", d)
 	}
-	prompt := buildCoinPrompt(d, nil, time.Date(2026, 11, 4, 0, 0, 0, 0, time.UTC))
+	prompt := buildCoinPrompt(d, nil, nil, time.Date(2026, 11, 4, 0, 0, 0, 0, time.UTC))
 	for _, want := range []string{"현재가: 241,300원", "등락률(전일 종가 대비): -4.82%", "3,120억원 (최근 7일 평균의 2.0배)",
 		"7일 등락률: +4.91%", "유의/주의 지정: 투자 주의", "분위기 라벨(규칙으로 정함): 약간 약세", "<news>관련 기사 없음</news>"} {
 		if !strings.Contains(prompt, want) {
@@ -177,5 +178,78 @@ func TestCleanNewsAndCited(t *testing.T) {
 func TestFormatting(t *testing.T) {
 	if formatWon(102990000) != "102,990,000원" || formatWon(3.36) != "3.36원" || formatEok(312e9) != "3,120억원" || formatEok(1e7) != "1억원 미만" {
 		t.Errorf("formatting: %s %s %s %s", formatWon(102990000), formatWon(3.36), formatEok(312e9), formatEok(1e7))
+	}
+}
+
+func TestCheckBackground(t *testing.T) {
+	withContext := "<data>…</data>\n<context>\n[k1-1] 2026-10-25 | 소송 종결 | …\n</context>\n"
+	ok := insightOutput{Background: "지난 10월 25일에는 SEC 소송이 종결되며 거래량이 늘었습니다.", Sources: []string{"k1-1"}}
+	if err := checkBackground(ok, withContext); err != nil {
+		t.Errorf("정상 배경을 거절함: %v", err)
+	}
+	if err := checkBackground(insightOutput{}, "<data>…</data>"); err != nil {
+		t.Errorf("배경이 비어 있으면 통과해야 함: %v", err)
+	}
+	bad := map[string]struct {
+		out    insightOutput
+		prompt string
+	}{
+		"배경 기사 없는데 씀":  {insightOutput{Background: "지난주 호재가 있었습니다.", Sources: []string{"k1-1"}}, "<data>…</data>"},
+		"인과 표현":        {insightOutput{Background: "지난 소송 종결 때문에 오늘 하락했습니다.", Sources: []string{"k1-1"}}, withContext},
+		"배경 기사 인용 안 함": {insightOutput{Background: "지난 10월 25일 소송이 종결됐습니다."}, withContext},
+	}
+	for name, c := range bad {
+		if checkBackground(c.out, c.prompt) == nil {
+			t.Errorf("%s: 거절해야 함", name)
+		}
+	}
+}
+
+func TestAttachBackgroundSources(t *testing.T) {
+	prompt := "<context>\n[k1-1] 2026-10-25 10:20 | 소송 종결 | …\n[k1-2] 2026-10-30 15:05 | 송금망 | …\n</context>\n"
+	out := attachBackgroundSources(insightOutput{Background: "지난 10월 25일에는 소송이 종결됐습니다."}, prompt)
+	if strings.Join(out.Sources, ",") != "k1-1" {
+		t.Errorf("날짜가 맞는 배경 기사만 붙여야 함: %v", out.Sources)
+	}
+	// 배경 기사 줄의 날짜 표기를 그대로 옮긴 경우: 화면용 표기로 바꾸고 인용도 붙인다 (평가셋에서 나온 사례)
+	out = attachBackgroundSources(insightOutput{Background: "지난 2026-10-30에는 송금망이 늘었습니다."}, prompt)
+	if out.Background != "지난 10월 30일에는 송금망이 늘었습니다." || strings.Join(out.Sources, ",") != "k1-2" {
+		t.Errorf("ISO 날짜 정리·인용: %q %v", out.Background, out.Sources)
+	}
+	out = attachBackgroundSources(insightOutput{Background: "지난달 소식이 있었습니다."}, prompt)
+	if len(out.Sources) != 0 || checkBackground(out, prompt) == nil {
+		t.Errorf("날짜가 없으면 붙이지 않고 검증에서 거절해야 함: %v", out.Sources)
+	}
+}
+
+func TestPickContext(t *testing.T) {
+	today := []NewsItem{{Title: "오늘 기사", URL: "https://a.com/today"}}
+	md := func(title, url string) map[string]any {
+		return map[string]any{"title": title, "url": url, "published": "2026-10-28 09:00", "snippet": "요약"}
+	}
+	matches := []pineconeMatch{
+		{Score: 0.81, Metadata: md("오늘 기사", "https://a.com/today")}, // 오늘 기사와 같음 → 제외
+		{Score: 0.79, Metadata: md("과거 기사 1", "https://a.com/1")},
+		{Score: 0.78, Metadata: md("과거 기사 1", "https://b.com/copy")}, // 같은 제목(다른 언론사 재전송) → 제외
+		{Score: 0.72, Metadata: md("과거 기사 2", "https://a.com/2")},
+		{Score: 0.50, Metadata: md("관련 약함", "https://a.com/3")}, // 유사도 기준 미달 → 제외
+	}
+	got := pickContext(matches, today, "k1-")
+	if len(got) != 2 || got[0].ID != "k1-1" || got[0].Title != "과거 기사 1" || got[1].Title != "과거 기사 2" || got[0].PublishedAt != "2026-10-28 09:00" {
+		t.Errorf("pickContext() = %+v", got)
+	}
+	var b strings.Builder
+	writeContext(&b, got)
+	if !strings.Contains(b.String(), "<context>\n[k1-1] 2026-10-28 09:00 | 과거 기사 1 | 요약\n") {
+		t.Errorf("writeContext() = %q", b.String())
+	}
+	b.Reset()
+	writeContext(&b, nil)
+	if b.Len() != 0 {
+		t.Error("배경 기사가 없으면 블록을 넣지 않아야 함")
+	}
+	var nilRetriever *contextRetriever
+	if nilRetriever.related(context.Background(), "q", "KRW-BTC", nil, time.Now(), "k") != nil {
+		t.Error("아카이브 설정이 없으면 배경 기사 없이 진행해야 함")
 	}
 }

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"strings"
 	"sync"
 	"time"
 )
@@ -26,9 +27,14 @@ const insightConcurrency = 3
 
 // InsightConfig 인사이트 생성에 필요한 외부 API 설정. 네이버 키가 없으면 뉴스 없이 시세만으로 쓴다
 type InsightConfig struct {
-	GeminiAPIKey      string
-	GeminiModel       string
-	PromptVersion     string // 비우면 DefaultInsightPromptVersion
+	GeminiAPIKey  string
+	GeminiModel   string
+	PromptVersion string // 비우면 DefaultInsightPromptVersion
+	// 배경 자료(뉴스 아카이브) 검색. 비어 있으면 배경 자료 없이 쓴다
+	PineconeAPIKey    string
+	PineconeIndex     string
+	EmbedModel        string
+	EmbedDimension    int
 	NaverClientID     string
 	NaverClientSecret string
 }
@@ -41,14 +47,17 @@ type Insight struct {
 	Summary string
 	Drivers []string
 	Risks   []string
-	Sources []NewsItem // 모델이 실제로 인용한 기사만
-	Reason  string     // 분석 대상으로 고른 이유 (시장 전체는 빈 값)
+	Sources []NewsItem // 모델이 실제로 인용한 기사만 (오늘 기사 + 배경 기사)
+	// Background 최근 30일 배경 (뉴스 아카이브 기사로, 오늘 움직임과 인과로 잇지 않음)
+	Background string
+	Reason     string // 분석 대상으로 고른 이유 (시장 전체는 빈 값)
 }
 
 type insightJob struct {
 	symbol, system, prompt, mood, reason string
 	score                                int
-	news                                 []NewsItem
+	news                                 []NewsItem // 오늘 기사
+	related                              []NewsItem // 최근 30일 배경 기사 (뉴스 아카이브)
 }
 
 func UpdateInsight(ctx context.Context, db *sql.DB, ic InsightConfig, symbolMap map[string]int, now time.Time) error {
@@ -73,20 +82,28 @@ func UpdateInsight(ctx context.Context, db *sql.DB, ic InsightConfig, symbolMap 
 		time.Sleep(120 * time.Millisecond) // 업비트 시세 API 초당 요청 제한 여유
 	}
 	market := buildMarketData(snap)
+	retriever := newContextRetriever(ctx, ic)
 
+	marketNews := collectNews(ctx, ic, "가상자산", []string{"가상자산", "비트코인", "코인", "암호화폐"}, now, "m")
+	marketRelated := retriever.related(ctx, contextQuery("가상자산 시장 전반", marketNews), "", marketNews, now, "km")
 	jobs := []insightJob{{
 		symbol: marketOverallSymbol, system: prompt.MarketSystem, mood: market.Mood, score: moodScore(market.MedianChange),
-		news: collectNews(ctx, ic, "가상자산", []string{"가상자산", "비트코인", "코인", "암호화폐"}, now, "m"),
+		news: marketNews, related: marketRelated, prompt: buildMarketPrompt(market, marketNews, marketRelated, now),
 	}}
-	jobs[0].prompt = buildMarketPrompt(market, jobs[0].news, now)
 	for i, d := range coins {
 		query, must := newsKeywords(d)
 		news := collectNews(ctx, ic, query, must, now, fmt.Sprintf("c%d-", i+1))
+		related := retriever.related(ctx, contextQuery(d.Name+"("+strings.TrimPrefix(d.Symbol, "KRW-")+")", news), d.Symbol, news, now, fmt.Sprintf("k%d-", i+1))
 		jobs = append(jobs, insightJob{
-			symbol: d.Symbol, system: prompt.CoinSystem, prompt: buildCoinPrompt(d, news, now),
-			mood: d.Mood, score: moodScore(d.Change), reason: d.Reason, news: news,
+			symbol: d.Symbol, system: prompt.CoinSystem, prompt: buildCoinPrompt(d, news, related, now),
+			mood: d.Mood, score: moodScore(d.Change), reason: d.Reason, news: news, related: related,
 		})
 	}
+	related := 0
+	for _, j := range jobs {
+		related += len(j.related)
+	}
+	log.Printf("인사이트 배경 기사(뉴스 아카이브) %d건\n", related)
 
 	results := make([]*Insight, len(jobs))
 	sem := make(chan struct{}, insightConcurrency)
@@ -95,8 +112,9 @@ func UpdateInsight(ctx context.Context, db *sql.DB, ic InsightConfig, symbolMap 
 		wg.Go(func() {
 			sem <- struct{}{}
 			defer func() { <-sem }()
+			sources := append(append([]NewsItem{}, job.news...), job.related...)
 			ids := map[string]bool{}
-			for _, n := range job.news {
+			for _, n := range sources {
 				ids[n.ID] = true
 			}
 			out, err := generateInsightText(ctx, ic.GeminiAPIKey, ic.GeminiModel, prompt, job.system, job.prompt, ids)
@@ -106,7 +124,8 @@ func UpdateInsight(ctx context.Context, db *sql.DB, ic InsightConfig, symbolMap 
 			}
 			results[i] = &Insight{
 				Symbol: job.symbol, Mood: job.mood, Score: job.score, Reason: job.reason,
-				Summary: out.Summary, Drivers: out.Drivers, Risks: out.Risks, Sources: citedNews(job.news, out.Sources),
+				Summary: out.Summary, Drivers: out.Drivers, Risks: out.Risks, Sources: citedNews(sources, out.Sources),
+				Background: strings.TrimSpace(out.Background),
 			}
 		})
 	}
@@ -160,11 +179,11 @@ func insertInsights(ctx context.Context, db *sql.DB, insights []Insight, model, 
 
 	return withTx(queryCtx, db, func(tx *sql.Tx) error {
 		stmt, err := tx.PrepareContext(queryCtx, `
-			INSERT INTO ai_insights (symbol, insight, score, date, mood, drivers, risks, sources, pick_reason, prompt_version, model)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			INSERT INTO ai_insights (symbol, insight, score, date, mood, drivers, risks, sources, background, pick_reason, prompt_version, model)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 			ON DUPLICATE KEY UPDATE
 				insight = VALUES(insight), score = VALUES(score), mood = VALUES(mood),
-				drivers = VALUES(drivers), risks = VALUES(risks), sources = VALUES(sources),
+				drivers = VALUES(drivers), risks = VALUES(risks), sources = VALUES(sources), background = VALUES(background),
 				pick_reason = VALUES(pick_reason), prompt_version = VALUES(prompt_version), model = VALUES(model)`)
 		if err != nil {
 			return fmt.Errorf("쿼리 준비 에러: %w", err)
@@ -180,7 +199,7 @@ func insertInsights(ctx context.Context, db *sql.DB, insights []Insight, model, 
 				sources = []byte("[]")
 			}
 			if _, err := stmt.ExecContext(queryCtx, in.Symbol, in.Summary, in.Score, date, in.Mood,
-				string(drivers), string(risks), string(sources), nullable(in.Reason), promptVersion, model); err != nil {
+				string(drivers), string(risks), string(sources), nullable(in.Background), nullable(in.Reason), promptVersion, model); err != nil {
 				return fmt.Errorf("데이터베이스 삽입 에러(%s): %w", in.Symbol, err)
 			}
 		}

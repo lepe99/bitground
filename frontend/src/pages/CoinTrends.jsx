@@ -89,6 +89,19 @@ function InsightBody({insight, title}) {
                 </div>
             )}
 
+            {insight.background && (
+                // 뉴스 아카이브에서 찾은 최근 30일 기사로 쓴 배경. 오늘 움직임의 원인이 아니라 지난 흐름이다
+                <section className="flex gap-3 rounded-2xl border border-line px-4 py-3.5">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 shrink-0 text-fg-3" aria-hidden="true">
+                        <circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>
+                    </svg>
+                    <div className="flex flex-col gap-1">
+                        <h3 className="text-[13px] font-bold text-fg-2">지난 흐름 <span className="font-normal text-fg-3">· 최근 30일 기사</span></h3>
+                        <p className="text-sm leading-relaxed text-fg-2">{insight.background}</p>
+                    </div>
+                </section>
+            )}
+
             {insight.sources?.length > 0 && (
                 <section className="flex flex-col gap-2">
                     <h3 className="text-[13px] font-bold text-fg-3">참고 기사</h3>
@@ -99,6 +112,8 @@ function InsightBody({insight, title}) {
                                    className="group flex h-full flex-col gap-1 rounded-xl border border-line px-3.5 py-3 hover:bg-surface-2">
                                     <span className="line-clamp-2 text-sm font-semibold leading-snug group-hover:underline">{s.title}</span>
                                     <span className="num flex items-center gap-1 text-xs text-fg-3">
+                                        {/* k…: 뉴스 아카이브에서 찾은 지난 기사 */}
+                                        {s.id?.startsWith("k") && <span className="rounded bg-surface-2 px-1.5 py-0.5 text-[11px] font-semibold text-fg-2">지난 흐름</span>}
                                         {hostOf(s.url)} · {s.publishedAt}
                                         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg>
                                     </span>
@@ -110,7 +125,7 @@ function InsightBody({insight, title}) {
             )}
 
             <p className="text-xs leading-relaxed text-fg-3">
-                업비트 시세{insight.sources?.length > 0 ? "와 뉴스" : ""}를 바탕으로 AI가 정리한 참고용 요약이에요. 분위기 라벨은 등락률 규칙으로 정했고, 투자 권유가 아니에요.
+                업비트 시세{insight.sources?.length > 0 ? "와 뉴스" : ""}를 바탕으로 AI가 정리한 참고용 요약이에요.{insight.background ? " 지난 흐름은 오늘 움직임의 원인이 아니라 참고할 배경이에요." : ""} 분위기 라벨은 등락률 규칙으로 정했고, 투자 권유가 아니에요.
             </p>
         </article>
     );

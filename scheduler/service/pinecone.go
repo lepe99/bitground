@@ -92,6 +92,27 @@ func (c *pineconeClient) existingIDs(ctx context.Context, namespace string, ids 
 	return found, nil
 }
 
+type pineconeMatch struct {
+	ID       string         `json:"id"`
+	Score    float64        `json:"score"`
+	Metadata map[string]any `json:"metadata"`
+}
+
+// query 가까운 벡터 topK개 (메타데이터 필터 적용, 유사도 높은 순)
+func (c *pineconeClient) query(ctx context.Context, namespace string, vector []float32, topK int, filter map[string]any) ([]pineconeMatch, error) {
+	body := map[string]any{"namespace": namespace, "vector": vector, "topK": topK, "includeMetadata": true}
+	if len(filter) > 0 {
+		body["filter"] = filter
+	}
+	var res struct {
+		Matches []pineconeMatch `json:"matches"`
+	}
+	if err := c.call(ctx, http.MethodPost, "/query", body, &res); err != nil {
+		return nil, err
+	}
+	return res.Matches, nil
+}
+
 func (c *pineconeClient) upsert(ctx context.Context, namespace string, vectors []pineconeVector) error {
 	for start := 0; start < len(vectors); start += pineconeBatch {
 		end := min(start+pineconeBatch, len(vectors))

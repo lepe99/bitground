@@ -4,7 +4,7 @@
 
 | | 시즌 AI 리뷰 (백엔드) | 일일 AI 인사이트 (스케줄러) |
 |---|---|---|
-| 입력 | `backend/src/test/resources/eval/season-review.json` (8케이스) | `scheduler/service/testdata/insight_eval.json` (8케이스) |
+| 입력 | `backend/src/test/resources/eval/season-review.json` (8케이스) | `scheduler/service/testdata/insight_eval.json` (11케이스) |
 | 실행기 | `SeasonReviewEval` (`@Tag("eval")`) | `insight_eval_test.go` (빌드 태그 `eval`) |
 | 실행 | `cd backend && ./gradlew aiEval [-PevalRuns=3]` | `cd scheduler && go test -tags eval -run TestInsightEval -v -timeout 10m ./service` (반복 횟수: `EVAL_RUNS=3`) |
 | 호출 간격 | `-PevalDelayMs=4000` (기본 4초) | `EVAL_DELAY_MS=4000` (기본 4초) |
@@ -21,7 +21,7 @@
 |---|---|---|
 | 위치 | `backend/src/main/resources/prompts/{버전}/` | `scheduler/service/prompts/{버전}/` (바이너리에 포함) |
 | 파일 | `system.txt`, `generation.json`(temperature·스키마) | `coin_system.txt`, `market_system.txt`, `generation.json` |
-| 운영 버전 설정 | `GEMINI_SEASON_REVIEW_PROMPT` (기본 `season-review-v2`) | `INSIGHT_PROMPT_VERSION` (기본 `daily-insight-v3`) |
+| 운영 버전 설정 | `GEMINI_SEASON_REVIEW_PROMPT` (기본 `season-review-v2`) | `INSIGHT_PROMPT_VERSION` (기본 `daily-insight-v4`) |
 | 평가 버전 지정 | `./gradlew aiEval -PpromptVersion=…` | `EVAL_PROMPT_VERSION=…` |
 
 바꾸는 순서:
@@ -40,6 +40,21 @@
 | 기사 인용 기대와 일치 | 92% (22/24) | 100% (24/24) |
 | 관계없는 기사('소폰' 디자인 스튜디오) 인용 | 3회 중 2회 | 0회 |
 | 첫 시도 검증 통과 | 100% | 100% |
+
+### 버전 비교 예: `daily-insight-v3` → `v4` (뉴스 아카이브 배경 연결)
+
+v4는 Pinecone 뉴스 아카이브에서 찾은 최근 30일 기사(<context>)를 `background` 필드에 '지난 흐름'으로 쓰게 한다. 평가 케이스 3개 추가(과거 호재 + 오늘 하락, 해킹 배경 + 시장 하락, 관련 약한 배경), 케이스 11개 × 3회.
+
+| | v3 | v4 (1차: 규칙만) | v4 (최종: background 필드) |
+|---|---|---|---|
+| 배경 기사를 쓴 비율 (써야 하는 6건) | 0/6 | 0/6 | 5/6 |
+| 관련 약한 배경을 쓰지 않음 | 3/3 | 3/3 | 3/3 |
+| 첫 시도 검증 통과 | 100% | 97% | 100% (33/33) |
+| 숫자 일치율 | 100% | 100% | 100% |
+
+- 1차 v4(규칙에 '배경으로만 쓰라'만 추가)는 모델이 배경을 아예 쓰지 않았다 → 배경 전용 필드 `background`를 스키마에 추가.
+- 모델이 배경을 쓰고도 인용 id를 자주 빠뜨림(6건 중 4건) → 배경 문장의 날짜('10월 25일', '2026-10-25')와 같은 날짜의 배경 기사를 코드가 인용으로 붙인다.
+- 배경 문장에 인과 표현('때문', '영향으로', '원인', '탓')이 있거나, 배경 기사가 없는데 쓰거나, 인용이 없으면 검증에서 거절한다.
 
 ## 보고서 읽는 법
 

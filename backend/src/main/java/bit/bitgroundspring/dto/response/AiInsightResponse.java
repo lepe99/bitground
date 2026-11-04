@@ -9,7 +9,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 /**
- * 일일 AI 인사이트. daily-insight-v2부터 mood·drivers·risks·sources·pickReason이 채워지고, 기존 행은 비어 있다
+ * 일일 AI 인사이트. daily-insight-v2부터 mood·drivers·risks·sources·pickReason이, v4부터 background(최근 30일 배경)가 채워진다
  *
  * @param score 등락률로 계산한 0~100 값 (50 = 보합). 화면은 mood를 쓴다
  */
@@ -24,6 +24,7 @@ public record AiInsightResponse(
         List<String> drivers,
         List<String> risks,
         List<Source> sources,
+        String background,
         String pickReason,
         String promptVersion
 ) {
@@ -39,6 +40,7 @@ public record AiInsightResponse(
                 parse(insight.getDrivers(), new TypeReference<List<String>>() {}),
                 parse(insight.getRisks(), new TypeReference<List<String>>() {}),
                 parse(insight.getSources(), new TypeReference<List<Source>>() {}),
+                insight.getBackground(),
                 insight.getPickReason(), insight.getPromptVersion());
     }
 
