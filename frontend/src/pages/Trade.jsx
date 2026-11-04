@@ -102,7 +102,7 @@ export default function Trade() {
                         onOrderPlaced={reloadAssets}
                     />
                 ) : (
-                    list("h-[calc(100dvh-56px-72px-env(safe-area-inset-bottom))]")
+                    list("h-[calc(100dvh-56px-56px-env(safe-area-inset-bottom))]")
                 )}
             </div>
         );

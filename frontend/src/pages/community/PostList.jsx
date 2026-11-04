@@ -98,7 +98,7 @@ export default function PostList() {
             <Link
                 to="/community/write"
                 aria-label="글쓰기"
-                className="fixed right-5 bottom-[calc(88px+env(safe-area-inset-bottom))] z-30 flex size-14 items-center justify-center rounded-full bg-brand text-[#111827] shadow-lg md:hidden"
+                className="fixed right-5 bottom-[calc(72px+env(safe-area-inset-bottom))] z-30 flex size-14 items-center justify-center rounded-full bg-brand text-[#111827] shadow-lg md:hidden"
             >
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
             </Link>

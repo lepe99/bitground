@@ -132,6 +132,36 @@ function AdviceView({advice}) {
     );
 }
 
+const STEP = 'flex size-9 shrink-0 items-center justify-center rounded-full border border-line bg-surface text-fg-2 hover:text-fg disabled:opacity-35 disabled:hover:text-fg-2';
+
+/**
+ * 시즌 고르기: 목록(최신순) + 이전·다음 시즌 버튼
+ * 시즌이 수십 개로 늘어도 한 줄을 넘지 않도록 버튼을 늘어놓지 않고 목록으로 고른다
+ */
+function SeasonPicker({seasons, value, onChange}) {
+    const index = seasons.findIndex((s) => s.id === value);
+    const older = seasons[index + 1];
+    const newer = seasons[index - 1];
+    return (
+        <div className="flex min-w-0 items-center gap-1.5">
+            <button type="button" onClick={() => onChange(older.id)} disabled={!older} aria-label="이전 시즌" className={STEP}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+            </button>
+            <select
+                aria-label="시즌 선택"
+                value={value ?? ''}
+                onChange={(e) => onChange(Number(e.target.value))}
+                className="h-9 min-w-0 max-w-[200px] rounded-full border border-line bg-surface px-3.5 text-[13px] font-semibold"
+            >
+                {seasons.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+            <button type="button" onClick={() => onChange(newer.id)} disabled={!newer} aria-label="다음 시즌" className={STEP}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg>
+            </button>
+        </div>
+    );
+}
+
 /** 종료된 시즌 리포트: 요약 · AI 리뷰 · 종목 하이라이트 · 종목별 성과/거래 내역 */
 export default function SeasonReport() {
     const {user} = useAuth();
@@ -223,22 +253,7 @@ export default function SeasonReport() {
         <div className="flex flex-col gap-3 md:gap-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
                 <h2 className="text-lg font-extrabold md:text-[22px]">시즌 리포트</h2>
-                <div role="tablist" aria-label="시즌 선택" className="flex flex-wrap gap-1.5">
-                    {seasons.map((s) => (
-                        <button
-                            key={s.id}
-                            type="button"
-                            role="tab"
-                            aria-selected={s.id === seasonId}
-                            onClick={() => setSeasonId(s.id)}
-                            className={`h-9 whitespace-nowrap rounded-full border px-3.5 text-[13px] font-semibold ${
-                                s.id === seasonId ? 'border-fg bg-fg text-bg' : 'border-line bg-surface text-fg-2 hover:text-fg'
-                            }`}
-                        >
-                            {s.name}
-                        </button>
-                    ))}
-                </div>
+                <SeasonPicker seasons={seasons} value={seasonId} onChange={setSeasonId}/>
             </div>
 
             <div className="grid grid-cols-2 gap-2 md:grid-cols-4 md:gap-3">

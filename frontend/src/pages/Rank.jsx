@@ -109,9 +109,9 @@ export default function Rank() {
                 <p className="py-16 text-center text-sm text-fg-3">아직 순위에 오른 참가자가 없어요.</p>
             ) : (
                 <>
-                    <RankPodium top={rows.slice(0, 3)} onSelect={onSelect} participants={rows.length}/>
+                    <RankPodium top={rows.slice(0, 3)} myUserId={user?.id} onSelect={onSelect} participants={rows.length}/>
                     <section className="grid items-start gap-4 md:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)] md:gap-5">
-                        <RankTable rows={rows.slice(3)} myUserId={view === "current" ? user?.id : null} onSelect={onSelect} participants={rows.length}/>
+                        <RankTable rows={rows.slice(3)} myUserId={user?.id} onSelect={onSelect} participants={rows.length}/>
                         <aside className="flex flex-col gap-4 md:gap-5">
                             {view === "current" && <div className="max-md:hidden"><MyPosition me={me} rankings={current}/></div>}
                             <TierGuide myTier={me?.tier}/>

@@ -18,7 +18,7 @@ export default function RootLayout() {
             </main>
             <Footer className={appLike ? "max-md:hidden" : ""}/>
             {/* 모바일은 하단 탭 높이만큼 아래 여백을 둔다 */}
-            <div className="h-[calc(72px+env(safe-area-inset-bottom))] md:hidden" aria-hidden="true"/>
+            <div className="h-[calc(56px+env(safe-area-inset-bottom))] md:hidden" aria-hidden="true"/>
             <BottomNav/>
         </div>
     );

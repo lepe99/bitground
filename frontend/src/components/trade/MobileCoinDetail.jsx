@@ -69,7 +69,7 @@ export default function MobileCoinDetail({market, name, ticker, isFav, onToggleF
                 )}
             </section>
 
-            <div className="fixed inset-x-0 bottom-[calc(72px+env(safe-area-inset-bottom))] z-30 grid grid-cols-2 gap-2.5 bg-bg px-5 pt-3 pb-3">
+            <div className="fixed inset-x-0 bottom-[calc(56px+env(safe-area-inset-bottom))] z-30 grid grid-cols-2 gap-2.5 bg-bg px-5 pt-3 pb-3">
                 <Button variant="sell" size="lg" onClick={() => setSheetSide('SELL')} disabled={amount <= 0}>판매하기</Button>
                 <Button variant="buy" size="lg" onClick={() => setSheetSide('BUY')}>구매하기</Button>
             </div>
