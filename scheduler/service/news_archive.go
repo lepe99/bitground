@@ -6,7 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/url"
 	"regexp"
 	"sort"
@@ -81,7 +81,7 @@ func ArchiveNews(ctx context.Context, cfg NewsArchiveConfig, symbolMap map[strin
 
 	coins, err := listedCoins(ctx, symbolMap)
 	if err != nil {
-		log.Printf("상장 코인 목록 조회 실패, 코인 태그 없이 진행: %v\n", err)
+		slog.WarnContext(ctx, "상장 코인 목록 조회 실패, 코인 태그 없이 진행", "error", err)
 	}
 
 	candidates, err := collectArchiveCandidates(ctx, cfg, coins, now)
@@ -113,8 +113,8 @@ func ArchiveNews(ctx context.Context, cfg NewsArchiveConfig, symbolMap map[strin
 	if err := pc.upsert(ctx, newsNamespace, vectors); err != nil {
 		return err
 	}
-	log.Printf("뉴스 아카이브: 후보 %d건 중 이미 있음 %d건, 새로 저장 %d/%d건\n",
-		len(candidates), len(existing), len(vectors), len(fresh))
+	slog.InfoContext(ctx, "뉴스 아카이브 저장",
+		"candidates", len(candidates), "existing", len(existing), "saved", len(vectors), "fresh", len(fresh))
 	if len(fresh) > 0 && len(vectors) == 0 {
 		return errors.New("뉴스 아카이브: 새 기사를 하나도 임베딩하지 못했습니다")
 	}
@@ -124,7 +124,7 @@ func ArchiveNews(ctx context.Context, cfg NewsArchiveConfig, symbolMap map[strin
 		if err != nil {
 			return err
 		}
-		log.Printf("뉴스 아카이브: 보관 기간(%d일) 지난 기사 %d건 삭제\n", newsRetentionDays, deleted)
+		slog.InfoContext(ctx, "보관 기간 지난 기사 삭제", "retention_days", newsRetentionDays, "deleted", deleted)
 	}
 	return nil
 }
@@ -151,7 +151,7 @@ func collectArchiveCandidates(ctx context.Context, cfg NewsArchiveConfig, coins 
 	for _, q := range newsArchiveQueries {
 		articles, err := searchNaverNews(ctx, cfg.NaverClientID, cfg.NaverClientSecret, q, newsPerQuery)
 		if err != nil {
-			log.Println(err)
+			slog.WarnContext(ctx, "뉴스 검색 실패", "query", q, "error", err)
 			failed++
 			continue
 		}
@@ -268,7 +268,7 @@ func embedArchiveNews(ctx context.Context, cfg NewsArchiveConfig, news []archive
 			values, err := embedText(ctx, cfg.GeminiAPIKey, cfg.EmbedModel, cfg.EmbedDimension, embedTaskDocument,
 				n.Article.Title+"\n"+n.Article.Description)
 			if err != nil {
-				log.Printf("임베딩 실패(%s): %v\n", n.ID, err)
+				slog.WarnContext(ctx, "기사 임베딩 실패, 건너뜀", "news_id", n.ID, "error", err)
 				return
 			}
 			results[i] = &pineconeVector{ID: n.ID, Values: values, Metadata: newsMetadata(n, now.Location())}

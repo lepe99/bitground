@@ -57,6 +57,15 @@ type insightTarget struct {
 	Reason string
 }
 
+// targetSymbols 로그용 "심볼(고른 이유)" 목록
+func targetSymbols(targets []insightTarget) []string {
+	out := make([]string, len(targets))
+	for i, t := range targets {
+		out[i] = t.Symbol + "(" + t.Reason + ")"
+	}
+	return out
+}
+
 // coinData 코인 하나의 프롬프트 입력
 type coinData struct {
 	Symbol      string

@@ -7,7 +7,7 @@ import (
 	"database/sql"
 	"fmt"
 	"golang.org/x/sync/errgroup"
-	"log"
+	"log/slog"
 	"time"
 )
 
@@ -160,7 +160,7 @@ func updateDeletedVal(ctx context.Context, db *sql.DB, coinDetailList map[string
 	}
 	defer func(rows *sql.Rows) {
 		if err := rows.Close(); err != nil {
-			log.Printf("Rows 닫기 에러: %v\n", err)
+			slog.WarnContext(ctx, "행 닫기 실패", "error", err)
 		}
 	}(rows)
 
@@ -261,7 +261,7 @@ func insertCoinSymbols(ctx context.Context, db *sql.DB, coinSymbols []model.Coin
 	}
 	defer func() {
 		if err := stmt.Close(); err != nil {
-			log.Printf("쿼리 종료 에러: %v\n", err)
+			slog.WarnContext(ctx, "쿼리 닫기 실패", "error", err)
 		}
 	}()
 

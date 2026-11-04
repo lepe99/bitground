@@ -1,12 +1,13 @@
 package service
 
 import (
+	"Bitground-go/applog"
 	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"strings"
 	"sync"
 	"time"
@@ -70,13 +71,13 @@ func UpdateInsight(ctx context.Context, db *sql.DB, ic InsightConfig, symbolMap 
 		return err
 	}
 	targets := selectInsightTargets(snap)
-	log.Printf("인사이트 대상 %d종: %v\n", len(targets), targets)
+	slog.InfoContext(ctx, "인사이트 대상 선정", "count", len(targets), "targets", targetSymbols(targets))
 
 	var coins []coinData
 	for _, t := range targets {
 		candles, err := fetchDayCandles(ctx, t.Symbol)
 		if err != nil {
-			log.Printf("일봉 조회 실패(%s), 7일 지표 없이 진행: %v\n", t.Symbol, err)
+			slog.WarnContext(ctx, "일봉 조회 실패, 7일 지표 없이 진행", "symbol", t.Symbol, "error", err)
 		}
 		coins = append(coins, buildCoinData(t, snap, candles))
 		time.Sleep(120 * time.Millisecond) // 업비트 시세 API 초당 요청 제한 여유
@@ -103,7 +104,7 @@ func UpdateInsight(ctx context.Context, db *sql.DB, ic InsightConfig, symbolMap 
 	for _, j := range jobs {
 		related += len(j.related)
 	}
-	log.Printf("인사이트 배경 기사(뉴스 아카이브) %d건\n", related)
+	slog.InfoContext(ctx, "인사이트 배경 기사 검색", "related", related)
 
 	results := make([]*Insight, len(jobs))
 	sem := make(chan struct{}, insightConcurrency)
@@ -117,9 +118,10 @@ func UpdateInsight(ctx context.Context, db *sql.DB, ic InsightConfig, symbolMap 
 			for _, n := range sources {
 				ids[n.ID] = true
 			}
+			ctx := applog.With(ctx, slog.String("symbol", job.symbol)) // 이 항목의 Gemini 호출·재시도 로그에 심볼을 붙인다
 			out, err := generateInsightText(ctx, ic.GeminiAPIKey, ic.GeminiModel, prompt, job.system, job.prompt, ids)
 			if err != nil {
-				log.Printf("인사이트 생성 실패(%s), 이 항목은 건너뜀: %v\n", job.symbol, err)
+				slog.WarnContext(ctx, "인사이트 생성 실패, 이 항목은 건너뜀", "error", err)
 				return
 			}
 			results[i] = &Insight{
@@ -143,7 +145,7 @@ func UpdateInsight(ctx context.Context, db *sql.DB, ic InsightConfig, symbolMap 
 	if len(insights) == 0 {
 		return errors.New("인사이트를 하나도 만들지 못했습니다")
 	}
-	log.Printf("인사이트 %d/%d건 생성\n", len(insights), len(jobs))
+	slog.InfoContext(ctx, "인사이트 생성", "created", len(insights), "total", len(jobs))
 	return insertInsights(ctx, db, insights, failed, ic.GeminiModel, prompt.Version, now)
 }
 
@@ -154,7 +156,7 @@ func collectNews(ctx context.Context, ic InsightConfig, query string, must []str
 	}
 	items, err := fetchNews(ctx, ic.NaverClientID, ic.NaverClientSecret, query, must, now, idPrefix)
 	if err != nil {
-		log.Println(err)
+		slog.WarnContext(ctx, "뉴스 검색 실패, 뉴스 없이 진행", "query", query, "error", err)
 		return nil
 	}
 	return items

@@ -24,11 +24,11 @@ func TestSelectInsightTargets(t *testing.T) {
 	for _, tk := range []upbitTicker{
 		ticker("KRW-BTC", 1, 900e9), ticker("KRW-ETH", 1, 300e9), ticker("KRW-SOL", 1, 100e9), ticker("KRW-XRP", 1, 200e9),
 		ticker("KRW-USDT", 0.1, 500e9), // 스테이블코인은 제외
-		ticker("KRW-DOGE", 2, 80e9),  // 거래대금 1위(고정 제외)
-		ticker("KRW-ADA", -1, 70e9),  // 거래대금 2위
-		ticker("KRW-PUMP", 30, 5e9),  // 상승률 1위
-		ticker("KRW-DUMP", -20, 3e9), // 하락률 1위
-		ticker("KRW-TINY", 90, 1e8),  // 거래대금이 너무 작아 제외
+		ticker("KRW-DOGE", 2, 80e9),    // 거래대금 1위(고정 제외)
+		ticker("KRW-ADA", -1, 70e9),    // 거래대금 2위
+		ticker("KRW-PUMP", 30, 5e9),    // 상승률 1위
+		ticker("KRW-DUMP", -20, 3e9),   // 하락률 1위
+		ticker("KRW-TINY", 90, 1e8),    // 거래대금이 너무 작아 제외
 		ticker("KRW-LINK", 0.5, 60e9),
 	} {
 		snap.Tickers[tk.Market] = tk

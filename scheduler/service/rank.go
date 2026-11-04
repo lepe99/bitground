@@ -5,7 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 )
 
@@ -58,14 +58,14 @@ func UpdateRank(ctx context.Context, db *sql.DB, symbolMap map[string]int, seaso
 		if err != nil {
 			return err
 		}
-		log.Printf("랭킹 - 시즌 %d 랭킹 갱신 (영향 행 %d)\n", seasonID, n)
+		slog.InfoContext(ctx, "랭킹 갱신", "season_id", seasonID, "rows", n)
 
 		if dailySnapshot {
 			n, err := upsertDailyBalances(txCtx, tx, seasonID, prices, now)
 			if err != nil {
 				return err
 			}
-			log.Printf("랭킹 - 일일 자산 스냅샷 저장 (영향 행 %d)\n", n)
+			slog.InfoContext(ctx, "일일 자산 스냅샷 저장", "rows", n)
 		}
 		return nil
 	})
@@ -211,7 +211,7 @@ func GetActiveCoinsSymbols(ctx context.Context, db *sql.DB) (map[string]int, err
 	}
 	defer func(rows *sql.Rows) {
 		if err := rows.Close(); err != nil {
-			log.Printf("행 닫기 에러: %v\n", err)
+			slog.WarnContext(ctx, "행 닫기 실패", "error", err)
 		}
 	}(rows)
 

@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"time"
@@ -29,10 +29,14 @@ func embedText(ctx context.Context, apiKey, model string, dimension int, taskTyp
 	}
 	apiURL := "https://generativelanguage.googleapis.com/v1beta/models/" + url.PathEscape(model) + ":embedContent"
 
+	started := time.Now()
 	for attempt := 0; ; attempt++ {
 		last := attempt >= len(geminiRetryBackoff)
 		status, respBody, err := postJSON(ctx, apiURL, apiKey, body)
 		if err == nil && status == http.StatusOK {
+			// 한 번 실행에 100번 가까이 불러 기본(INFO)에서는 남기지 않는다 (LOG_LEVEL=debug)
+			slog.DebugContext(ctx, "임베딩 호출", "model", model, "task", taskType, "attempts", attempt+1,
+				"latency_ms", time.Since(started).Milliseconds())
 			var res struct {
 				Embedding struct {
 					Values []float32 `json:"values"`
@@ -55,7 +59,7 @@ func embedText(ctx context.Context, apiKey, model string, dimension int, taskTyp
 			}
 			return nil, fmt.Errorf("임베딩 실패: 상태 코드 %d", status)
 		}
-		log.Printf("임베딩 일시적 실패(상태 %d, 오류 %v), %s 뒤 재시도\n", status, err, geminiRetryBackoff[attempt])
+		slog.WarnContext(ctx, "임베딩 일시적 실패, 재시도", "status", status, "error", err, "backoff", geminiRetryBackoff[attempt].String(), "attempt", attempt+1)
 		select {
 		case <-time.After(geminiRetryBackoff[attempt]):
 		case <-ctx.Done():

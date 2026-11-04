@@ -3,7 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"strings"
 	"time"
 )
@@ -34,7 +34,7 @@ func newContextRetriever(ctx context.Context, ic InsightConfig) *contextRetrieve
 	}
 	pc, err := newPineconeClient(ctx, ic.PineconeAPIKey, ic.PineconeIndex, ic.EmbedDimension)
 	if err != nil {
-		log.Printf("뉴스 아카이브를 쓸 수 없어 배경 자료 없이 진행: %v\n", err)
+		slog.WarnContext(ctx, "뉴스 아카이브를 쓸 수 없어 배경 자료 없이 진행", "error", err)
 		return nil
 	}
 	return &contextRetriever{pc: pc, apiKey: ic.GeminiAPIKey, model: ic.EmbedModel, dimension: ic.EmbedDimension}
@@ -56,7 +56,7 @@ func (r *contextRetriever) related(ctx context.Context, query, symbol string, to
 	}
 	vector, err := embedText(ctx, r.apiKey, r.model, r.dimension, embedTaskQuery, query)
 	if err != nil {
-		log.Printf("배경 자료 검색어 임베딩 실패(%s): %v\n", symbol, err)
+		slog.WarnContext(ctx, "배경 자료 검색어 임베딩 실패", "symbol", symbol, "error", err)
 		return nil
 	}
 	// 인사이트가 다루는 최근 24시간보다 앞선 기사만 (오늘 기사는 <news>로 따로 들어가고, 배경은 '지난' 흐름이어야 한다)
@@ -69,7 +69,7 @@ func (r *contextRetriever) related(ctx context.Context, query, symbol string, to
 	}
 	matches, err := r.pc.query(ctx, newsNamespace, vector, contextTopK*3, filter)
 	if err != nil {
-		log.Printf("배경 자료 검색 실패(%s): %v\n", symbol, err)
+		slog.WarnContext(ctx, "배경 자료 검색 실패", "symbol", symbol, "error", err)
 		return nil
 	}
 	return pickContext(matches, today, idPrefix)

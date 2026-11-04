@@ -5,7 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 )
 
@@ -51,7 +51,7 @@ func UpdateCoinPriceHistory(ctx context.Context, db *sql.DB, coinPriceHistory ma
 	}
 	defer func(stmt *sql.Stmt) {
 		if err := stmt.Close(); err != nil {
-			log.Printf("쿼리 종료 에러: %v\n", err)
+			slog.WarnContext(ctx, "쿼리 닫기 실패", "error", err)
 		}
 	}(stmt)
 

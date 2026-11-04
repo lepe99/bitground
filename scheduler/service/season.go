@@ -6,7 +6,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -41,7 +41,7 @@ func UpdateSeason(ctx context.Context, db *sql.DB, cfg config.Config, now time.T
 			return err
 		}
 		if !claimed {
-			log.Printf("시즌 정산(%s)은 이미 처리되어 건너뜀\n", period)
+			slog.InfoContext(ctx, "시즌 정산은 이미 처리되어 건너뜀", "run_period", period)
 			return nil
 		}
 		return settleSeason(txCtx, tx, cfg, now, seasonID, prices)
@@ -122,11 +122,11 @@ func settleSeason(ctx context.Context, tx *sql.Tx, cfg config.Config, now time.T
 			return fmt.Errorf("%s 실패: %w", st.name, err)
 		}
 		n, _ := res.RowsAffected()
-		log.Printf("시즌 정산 - %s: %d행\n", st.name, n)
+		slog.InfoContext(ctx, "시즌 정산 단계", "step", st.name, "rows", n)
 	}
 
-	log.Printf("시즌 정산 완료: %s → %s (%s ~ %s)\n", ogSeasonName, newSeasonName,
-		startAt.Format(time.DateOnly), endAt.Format(time.DateOnly))
+	slog.InfoContext(ctx, "시즌 정산 완료", "from_season", ogSeasonName, "to_season", newSeasonName,
+		"start_at", startAt.Format(time.DateOnly), "end_at", endAt.Format(time.DateOnly))
 	return nil
 }
 

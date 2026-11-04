@@ -5,7 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 )
 
@@ -24,7 +24,7 @@ func UpdateSplit(ctx context.Context, db *sql.DB, cfg config.Config, now time.Ti
 			return err
 		}
 		if !claimed {
-			log.Printf("스플릿(%s)은 이미 처리되어 건너뜀\n", period)
+			slog.InfoContext(ctx, "스플릿은 이미 처리되어 건너뜀", "run_period", period)
 			return nil
 		}
 
@@ -33,7 +33,7 @@ func UpdateSplit(ctx context.Context, db *sql.DB, cfg config.Config, now time.Ti
 			return fmt.Errorf("현금 지급 실패: %w", err)
 		}
 		n, _ := res.RowsAffected()
-		log.Printf("스플릿 - 현금 지급: %d명\n", n)
+		slog.InfoContext(ctx, "스플릿 현금 지급", "users", n)
 		return nil
 	})
 	if err != nil {

@@ -7,7 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"math"
 	"net/http"
 	"net/url"
@@ -102,7 +102,7 @@ func generateInsightText(ctx context.Context, apiKey, model string, p insightPro
 				return out, nil
 			}
 		}
-		log.Printf("인사이트 응답 거절(%d/2): %v\n", attempt, lastErr)
+		slog.WarnContext(ctx, "인사이트 응답 검증 실패, 다시 생성", "attempt", attempt, "max_attempts", 2, "error", lastErr)
 	}
 	return insightOutput{}, lastErr
 }
@@ -286,11 +286,13 @@ func callGemini(ctx context.Context, apiKey, model string, p insightPrompt, syst
 	}
 	apiURL := "https://generativelanguage.googleapis.com/v1beta/models/" + url.PathEscape(model) + ":generateContent"
 
+	started := time.Now()
 	for attempt := 0; ; attempt++ {
 		last := attempt >= len(geminiRetryBackoff)
 		status, respBody, err := postJSON(ctx, apiURL, apiKey, body)
 		switch {
 		case err == nil && status == http.StatusOK:
+			logGeminiUsage(ctx, model, p.Version, respBody, attempt+1, time.Since(started))
 			return extractGeminiText(respBody)
 		case err == nil && status != http.StatusTooManyRequests && status < 500:
 			return "", fmt.Errorf("Gemini 호출 실패: 상태 코드 %d, 응답: %.300s", status, respBody)
@@ -300,7 +302,7 @@ func callGemini(ctx context.Context, apiKey, model string, p insightPrompt, syst
 			}
 			return "", fmt.Errorf("Gemini 호출 실패: 상태 코드 %d", status)
 		}
-		log.Printf("Gemini 일시적 실패(상태 %d, 오류 %v), %s 뒤 재시도\n", status, err, geminiRetryBackoff[attempt])
+		slog.WarnContext(ctx, "Gemini 일시적 실패, 재시도", "status", status, "error", err, "backoff", geminiRetryBackoff[attempt].String(), "attempt", attempt+1)
 		select {
 		case <-time.After(geminiRetryBackoff[attempt]):
 		case <-ctx.Done():
@@ -325,6 +327,23 @@ func postJSON(ctx context.Context, apiURL, apiKey string, body []byte) (int, []b
 	defer resp.Body.Close()
 	b, err := io.ReadAll(resp.Body)
 	return resp.StatusCode, b, err
+}
+
+// logGeminiUsage 호출 한 번의 모델·프롬프트 버전·토큰·재시도·지연 시간 (비용과 프롬프트 변경 효과를 숫자로 보기 위해)
+func logGeminiUsage(ctx context.Context, model, promptVersion string, body []byte, attempts int, elapsed time.Duration) {
+	var res struct {
+		UsageMetadata struct {
+			PromptTokenCount     int `json:"promptTokenCount"`
+			CandidatesTokenCount int `json:"candidatesTokenCount"`
+			ThoughtsTokenCount   int `json:"thoughtsTokenCount"`
+			TotalTokenCount      int `json:"totalTokenCount"`
+		} `json:"usageMetadata"`
+	}
+	_ = json.Unmarshal(body, &res) // 사용량을 못 읽어도 응답 처리는 계속한다
+	u := res.UsageMetadata
+	slog.InfoContext(ctx, "Gemini 호출", "model", model, "prompt_version", promptVersion,
+		"input_tokens", u.PromptTokenCount, "output_tokens", u.CandidatesTokenCount, "thinking_tokens", u.ThoughtsTokenCount,
+		"total_tokens", u.TotalTokenCount, "attempts", attempts, "latency_ms", elapsed.Milliseconds())
 }
 
 func extractGeminiText(body []byte) (string, error) {
