@@ -28,6 +28,7 @@ const insightConcurrency = 3
 type InsightConfig struct {
 	GeminiAPIKey      string
 	GeminiModel       string
+	PromptVersion     string // 비우면 DefaultInsightPromptVersion
 	NaverClientID     string
 	NaverClientSecret string
 }
@@ -51,6 +52,10 @@ type insightJob struct {
 }
 
 func UpdateInsight(ctx context.Context, db *sql.DB, ic InsightConfig, symbolMap map[string]int, now time.Time) error {
+	prompt, err := loadInsightPrompt(ic.PromptVersion)
+	if err != nil {
+		return err
+	}
 	snap, err := collectMarketSnapshot(ctx, symbolMap)
 	if err != nil {
 		return err
@@ -70,7 +75,7 @@ func UpdateInsight(ctx context.Context, db *sql.DB, ic InsightConfig, symbolMap 
 	market := buildMarketData(snap)
 
 	jobs := []insightJob{{
-		symbol: marketOverallSymbol, system: marketSystemInstruction, mood: market.Mood, score: moodScore(market.MedianChange),
+		symbol: marketOverallSymbol, system: prompt.MarketSystem, mood: market.Mood, score: moodScore(market.MedianChange),
 		news: collectNews(ctx, ic, "가상자산", []string{"가상자산", "비트코인", "코인", "암호화폐"}, now, "m"),
 	}}
 	jobs[0].prompt = buildMarketPrompt(market, jobs[0].news, now)
@@ -78,7 +83,7 @@ func UpdateInsight(ctx context.Context, db *sql.DB, ic InsightConfig, symbolMap 
 		query, must := newsKeywords(d)
 		news := collectNews(ctx, ic, query, must, now, fmt.Sprintf("c%d-", i+1))
 		jobs = append(jobs, insightJob{
-			symbol: d.Symbol, system: coinSystemInstruction, prompt: buildCoinPrompt(d, news, now),
+			symbol: d.Symbol, system: prompt.CoinSystem, prompt: buildCoinPrompt(d, news, now),
 			mood: d.Mood, score: moodScore(d.Change), reason: d.Reason, news: news,
 		})
 	}
@@ -94,7 +99,7 @@ func UpdateInsight(ctx context.Context, db *sql.DB, ic InsightConfig, symbolMap 
 			for _, n := range job.news {
 				ids[n.ID] = true
 			}
-			out, err := generateInsightText(ctx, ic.GeminiAPIKey, ic.GeminiModel, job.system, job.prompt, ids)
+			out, err := generateInsightText(ctx, ic.GeminiAPIKey, ic.GeminiModel, prompt, job.system, job.prompt, ids)
 			if err != nil {
 				log.Printf("인사이트 생성 실패(%s), 이 항목은 건너뜀: %v\n", job.symbol, err)
 				return
@@ -117,7 +122,7 @@ func UpdateInsight(ctx context.Context, db *sql.DB, ic InsightConfig, symbolMap 
 		return errors.New("인사이트를 하나도 만들지 못했습니다")
 	}
 	log.Printf("인사이트 %d/%d건 생성\n", len(insights), len(jobs))
-	return insertInsights(ctx, db, insights, ic.GeminiModel, now)
+	return insertInsights(ctx, db, insights, ic.GeminiModel, prompt.Version, now)
 }
 
 // collectNews 네이버 키가 없거나 검색이 실패하면 뉴스 없이 진행한다 (시세만으로도 쓸 수 있음)
@@ -149,7 +154,7 @@ func citedNews(news []NewsItem, ids []string) []NewsItem {
 }
 
 // insertInsights 같은 날짜·심볼이면 덮어쓴다 (재실행해도 결과가 하나)
-func insertInsights(ctx context.Context, db *sql.DB, insights []Insight, model string, now time.Time) error {
+func insertInsights(ctx context.Context, db *sql.DB, insights []Insight, model, promptVersion string, now time.Time) error {
 	queryCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
 
@@ -175,7 +180,7 @@ func insertInsights(ctx context.Context, db *sql.DB, insights []Insight, model s
 				sources = []byte("[]")
 			}
 			if _, err := stmt.ExecContext(queryCtx, in.Symbol, in.Summary, in.Score, date, in.Mood,
-				string(drivers), string(risks), string(sources), nullable(in.Reason), insightPromptVersion, model); err != nil {
+				string(drivers), string(risks), string(sources), nullable(in.Reason), promptVersion, model); err != nil {
 				return fmt.Errorf("데이터베이스 삽입 에러(%s): %w", in.Symbol, err)
 			}
 		}

@@ -18,38 +18,7 @@ import (
 )
 
 // 일일 인사이트 생성 (Gemini). 숫자·분위기 라벨·대상 선정은 코드가 하고, 모델은 받은 자료로 해설만 쓴다.
-// 프롬프트나 출력 형식을 바꾸면 insightPromptVersion을 올린다 (저장된 행에 남음)
-
-const insightPromptVersion = "daily-insight-v3"
-
-const coinSystemInstruction = `너는 모의투자 서비스 Bitground의 시장 요약 작성자다. <data>와 <news>로 코인 하나의 최근 24시간 움직임을 정리한다.
-규칙:
-1. <data>와 <news>에 있는 내용만 근거로 쓴다. 거기 없는 사실(ETF 자금 흐름, 파트너십, 업그레이드, 거시 지표, 지지선·저항선 등)은 쓰지 않는다.
-2. 숫자는 <data>의 표기 그대로 옮긴다 (예: -4.82%, 1.9배, 3,120억원). 새로 계산하거나 반올림을 바꾸지 않고, '마이너스', '퍼센트'처럼 말로 풀어 쓰지 않는다.
-3. 분위기 라벨은 이미 정해져 있다. 바꾸지 말고 그 라벨이 나온 이유를 데이터로 설명한다.
-4. 뉴스를 근거로 쓴 문장이 있으면 그 기사 id를 sources에 넣는다. 이름만 같고 이 코인(가상자산)과 관계없는 기사는 쓰지도 인용하지도 않는다. 관련 기사가 없으면 가격·거래대금만으로 쓰고 sources는 비운다.
-5. 매수·매도 권유, 목표가, 가격 예측("오를 것이다", "떨어질 것이다")은 쓰지 않는다. 앞으로에 대해서는 지켜볼 점으로만 쓴다.
-6. 한국어 존댓말 평서문. summary는 2~3문장 200자 이내, drivers는 2~3개, risks는 1~2개이며 각각 한 문장. 마크다운 기호를 쓰지 않는다.`
-
-const marketSystemInstruction = `너는 모의투자 서비스 Bitground의 시장 요약 작성자다. <data>와 <news>로 원화 코인 시장 전체의 최근 24시간 흐름을 정리한다.
-규칙:
-1. <data>와 <news>에 있는 내용만 근거로 쓴다. 거기 없는 사실(ETF 자금 흐름, 금리, 규제 발표, 비트코인 도미넌스 등)은 쓰지 않는다.
-2. 숫자는 <data>의 표기 그대로 옮긴다 (예: -1.58%, 3,120억원). 새로 계산하거나 반올림을 바꾸지 않고, '마이너스', '퍼센트'처럼 말로 풀어 쓰지 않는다.
-3. 분위기 라벨은 이미 정해져 있다. 바꾸지 말고 그 라벨이 나온 이유를 데이터로 설명한다.
-4. 뉴스를 근거로 쓴 문장이 있으면 그 기사 id를 sources에 넣는다. 관련 기사가 없으면 sources는 비운다.
-5. 매수·매도 권유, 목표가, 가격 예측은 쓰지 않는다. 앞으로에 대해서는 지켜볼 점으로만 쓴다.
-6. 한국어 존댓말 평서문. summary는 2~3문장 200자 이내, drivers는 2~3개, risks는 1~2개이며 각각 한 문장. 마크다운 기호를 쓰지 않는다.`
-
-var insightSchema = map[string]any{
-	"type": "OBJECT",
-	"properties": map[string]any{
-		"summary": map[string]any{"type": "STRING"},
-		"drivers": map[string]any{"type": "ARRAY", "items": map[string]any{"type": "STRING"}},
-		"risks":   map[string]any{"type": "ARRAY", "items": map[string]any{"type": "STRING"}},
-		"sources": map[string]any{"type": "ARRAY", "items": map[string]any{"type": "STRING"}},
-	},
-	"required": []string{"summary", "drivers", "risks", "sources"},
-}
+// 규칙(system)과 응답 스키마는 prompts/{버전}/ 파일에 있다 (insight_prompt.go)
 
 // 투자 권유·가격 예측으로 읽히는 표현
 var forbiddenInsight = regexp.MustCompile(`(매수|매도|구매|판매)(하세요|하십시오|를 추천|을 추천|를 권|을 권|할 만)|추천합니다|목표가|목표 가격|오를 것|떨어질 것|상승할 것|하락할 것|반드시|확실히`)
@@ -102,10 +71,10 @@ type insightOutput struct {
 var geminiRetryBackoff = []time.Duration{time.Second, 3 * time.Second}
 
 // generateInsightText 형식·근거 검증을 통과할 때까지 최대 2번 생성한다
-func generateInsightText(ctx context.Context, apiKey, model, system, prompt string, newsIDs map[string]bool) (insightOutput, error) {
+func generateInsightText(ctx context.Context, apiKey, model string, p insightPrompt, system, prompt string, newsIDs map[string]bool) (insightOutput, error) {
 	var lastErr error
 	for attempt := 1; attempt <= 2; attempt++ {
-		text, err := callGemini(ctx, apiKey, model, system, prompt)
+		text, err := callGemini(ctx, apiKey, model, p, system, prompt)
 		if err != nil {
 			return insightOutput{}, err
 		}
@@ -225,14 +194,14 @@ func checkWordConsistency(text, prompt string) error {
 }
 
 // callGemini generateContent 한 번 호출 (429·5xx·네트워크 오류는 재시도). 모델 출력 텍스트(JSON 문자열)를 돌려준다
-func callGemini(ctx context.Context, apiKey, model, system, prompt string) (string, error) {
+func callGemini(ctx context.Context, apiKey, model string, p insightPrompt, system, prompt string) (string, error) {
 	body, err := json.Marshal(map[string]any{
 		"systemInstruction": map[string]any{"parts": []map[string]string{{"text": system}}},
 		"contents":          []map[string]any{{"role": "user", "parts": []map[string]string{{"text": prompt}}}},
 		"generationConfig": map[string]any{
-			"temperature":      0.3,
+			"temperature":      p.Temperature,
 			"responseMimeType": "application/json",
-			"responseSchema":   insightSchema,
+			"responseSchema":   p.Schema,
 		},
 	})
 	if err != nil {

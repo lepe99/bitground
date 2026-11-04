@@ -10,6 +10,7 @@ import bit.bitgroundspring.entity.UserDailyBalance;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -30,14 +31,16 @@ import java.util.regex.Pattern;
 
 /**
  * AI 시즌 리뷰 생성 (Gemini). 숫자와 점수는 코드가 계산해 넘기고, 모델은 해석·회고 문장만 쓴다.
- * 프롬프트나 출력 형식을 바꾸면 PROMPT_VERSION을 올린다 (저장된 리뷰가 어떤 버전으로 만들어졌는지 남김)
+ * 규칙(system)과 응답 스키마는 resources/prompts/{버전}/ 파일에 있다 (PromptTemplate). 바꿀 때는 새 버전 폴더를 만들고
+ * 설정만 바꾼다. 저장된 리뷰에 버전이 남는다
  */
 @Service
 public class GeminiService {
 
     private static final Logger log = LoggerFactory.getLogger(GeminiService.class);
 
-    public static final String PROMPT_VERSION = "season-review-v2";
+    // 기본 프롬프트 버전 (resources/prompts/{버전}/). 설정 gemini.season-review.prompt-version으로 바꾼다
+    public static final String DEFAULT_PROMPT_VERSION = "season-review-v2";
 
     private static final String GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent";
     // 응답이 오지 않으면 요청 스레드가 무한정 묶이지 않도록 끊는다
@@ -52,52 +55,37 @@ public class GeminiService {
     private static final Pattern FORBIDDEN = Pattern.compile(
             "(매수|매도|구매|판매)(하세요|하십시오|를 추천|을 추천|를 권|을 권)|추천합니다|목표가|목표 수익률|반드시 오|확실히 오|우상향 코인|유망 코인");
 
-    static final String SYSTEM_INSTRUCTION = """
-            너는 모의투자 게임 Bitground의 시즌 회고 코치다. 플레이어의 지난 시즌 기록을 보고 무엇이 잘 됐고 무엇을 바꾸면 좋을지 정리한다.
-            규칙:
-            1. <season>에 있는 숫자와 사실만 근거로 쓴다. 숫자는 그대로 옮기고 새로 계산하지 않는다. 없는 정보(뉴스, 시장 이벤트 등)는 지어내지 않는다.
-            2. 점수와 구성 요소는 이미 계산되어 있다. 점수를 바꾸거나 새로 매기지 말고, scoreReason에서 어떤 요소가 점수를 올리고 내렸는지 설명한다.
-            3. 특정 코인의 매수·매도 추천, 유망 코인 제시, 목표 수익률 약속은 하지 않는다. 다음 시즌 제안은 분산, 손실 관리, 거래 빈도, 기록 복기 같은 행동 습관으로 쓴다.
-            4. 시장 비교 기준이 있으면 수익률을 그것과 비교해 평가한다 (시장보다 나았는지).
-            5. 한국어 존댓말 평서문. headline 40자 이내, 나머지 항목은 각각 1~2문장(80자 안팎). strengths·weaknesses는 각 2~3개, nextSeason은 2~3개.
-            6. 숫자는 <season>의 표기 그대로 쓴다 (예: +3.59%, -8.1%, 120,000원). '플러스', '퍼센트'처럼 풀어 쓰지 않는다.
-            7. 각 항목은 문장만 쓴다. 굵게(**), 제목(#), 줄머리 목록 기호는 쓰지 않는다.
-            """;
-
-    private static final Map<String, Object> RESPONSE_SCHEMA = Map.of(
-            "type", "OBJECT",
-            "properties", Map.of(
-                    "headline", Map.of("type", "STRING"),
-                    "strengths", Map.of("type", "ARRAY", "items", Map.of("type", "STRING")),
-                    "weaknesses", Map.of("type", "ARRAY", "items", Map.of("type", "STRING")),
-                    "nextSeason", Map.of("type", "ARRAY", "items", Map.of(
-                            "type", "OBJECT",
-                            "properties", Map.of(
-                                    "action", Map.of("type", "STRING"),
-                                    "reason", Map.of("type", "STRING")),
-                            "required", List.of("action", "reason"))),
-                    "scoreReason", Map.of("type", "STRING")
-            ),
-            "required", List.of("headline", "strengths", "weaknesses", "nextSeason", "scoreReason")
-    );
-
     private final String modelName;
     private final String apiKey;
     private final ObjectMapper objectMapper;
+    private final PromptTemplate prompt;
 
     // HttpClient는 한 번만 생성하여 재사용하는 것이 효율적입니다.
     private final HttpClient httpClient = HttpClient.newBuilder().connectTimeout(CONNECT_TIMEOUT).build();
 
+    @Autowired
     public GeminiService(@Value("${gemini.model-name}") String modelName,
                          @Value("${gemini.api-key}") String apiKey,
+                         @Value("${gemini.season-review.prompt-version:" + DEFAULT_PROMPT_VERSION + "}") String promptVersion,
                          ObjectMapper objectMapper) {
         this.modelName = modelName;
         this.apiKey = apiKey;
         this.objectMapper = objectMapper;
+        // 파일이 없으면 시작할 때 바로 실패한다 (리뷰를 요청하는 순간에 알게 되지 않도록)
+        this.prompt = PromptTemplate.load(promptVersion, objectMapper);
+    }
+
+    // 테스트·평가용: 기본 프롬프트 버전
+    GeminiService(String modelName, String apiKey, ObjectMapper objectMapper) {
+        this(modelName, apiKey, DEFAULT_PROMPT_VERSION, objectMapper);
     }
 
     public String getModelName() {
         return modelName;
+    }
+
+    public String getPromptVersion() {
+        return prompt.version();
     }
 
     /**
@@ -125,12 +113,12 @@ public class GeminiService {
 
     SeasonReviewContent requestReview(String userPrompt) throws IOException, InterruptedException {
         Map<String, Object> requestBody = Map.of(
-                "systemInstruction", Map.of("parts", List.of(Map.of("text", SYSTEM_INSTRUCTION))),
+                "systemInstruction", Map.of("parts", List.of(Map.of("text", prompt.system()))),
                 "contents", List.of(Map.of("role", "user", "parts", List.of(Map.of("text", userPrompt)))),
                 "generationConfig", Map.of(
-                        "temperature", 0.3, // 매번 비슷한 톤과 품질
+                        "temperature", prompt.temperature(),
                         "responseMimeType", "application/json",
-                        "responseSchema", RESPONSE_SCHEMA
+                        "responseSchema", prompt.responseSchema()
                 )
         );
 

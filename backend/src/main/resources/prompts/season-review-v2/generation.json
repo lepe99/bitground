@@ -1,0 +1,24 @@
+{
+  "temperature": 0.3,
+  "responseSchema": {
+    "type": "OBJECT",
+    "properties": {
+      "headline": {"type": "STRING"},
+      "strengths": {"type": "ARRAY", "items": {"type": "STRING"}},
+      "weaknesses": {"type": "ARRAY", "items": {"type": "STRING"}},
+      "nextSeason": {
+        "type": "ARRAY",
+        "items": {
+          "type": "OBJECT",
+          "properties": {
+            "action": {"type": "STRING"},
+            "reason": {"type": "STRING"}
+          },
+          "required": ["action", "reason"]
+        }
+      },
+      "scoreReason": {"type": "STRING"}
+    },
+    "required": ["headline", "strengths", "weaknesses", "nextSeason", "scoreReason"]
+  }
+}

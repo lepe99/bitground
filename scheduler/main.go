@@ -114,6 +114,7 @@ func run(ctx context.Context, db *sql.DB, cfg config.Config, now time.Time) erro
 					GeminiModel:       cfg.GeminiModel,
 					NaverClientID:     cfg.NaverClientID,
 					NaverClientSecret: cfg.NaverClientSecret,
+					PromptVersion:     cfg.InsightPromptVersion,
 				}, symbolMap, now)
 			})
 		})

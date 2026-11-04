@@ -102,7 +102,7 @@ public class AiAdviceService {
                     .season(season)
                     .score(score.total())
                     .advice(objectMapper.writeValueAsString(review))
-                    .promptVersion(GeminiService.PROMPT_VERSION)
+                    .promptVersion(geminiService.getPromptVersion())
                     .model(geminiService.getModelName())
                     .createdAt(LocalDateTime.now())
                     .build();

@@ -27,7 +27,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  * 자동 지표와 사람 평가용 원문을 build/reports/ai-eval에 남긴다.
  * 프롬프트·모델을 바꿀 때마다 같은 입력으로 돌려 보고서를 비교한다.
  *
- * <p>일반 테스트에서는 빠진다 (@Tag("eval")). 실행: {@code ./gradlew aiEval [-PevalRuns=3] [-PevalDelayMs=4000]}
+ * <p>일반 테스트에서는 빠진다 (@Tag("eval")). 실행: {@code ./gradlew aiEval [-PevalRuns=3] [-PevalDelayMs=4000] [-PpromptVersion=season-review-v2]}
  * GEMINI_API_KEY·GEMINI_MODEL은 환경변수 또는 backend/.env에서 읽는다.
  *
  * <p>지표
@@ -70,7 +70,9 @@ class SeasonReviewEval {
         try (InputStream in = getClass().getResourceAsStream("/eval/season-review.json")) {
             cases = List.of(mapper.readValue(in, EvalCase[].class));
         }
-        GeminiService gemini = new GeminiService(model, apiKey, mapper);
+        // -PpromptVersion=season-review-v3 처럼 바꿔 같은 입력으로 버전을 비교한다
+        String promptVersion = System.getProperty("eval.promptVersion", GeminiService.DEFAULT_PROMPT_VERSION);
+        GeminiService gemini = new GeminiService(model, apiKey, promptVersion, mapper);
 
         List<RunResult> results = new ArrayList<>();
         for (EvalCase c : cases) {
@@ -100,9 +102,9 @@ class SeasonReviewEval {
         Path dir = Path.of("build", "reports", "ai-eval");
         Files.createDirectories(dir);
         String stamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"));
-        Path report = dir.resolve("season-review-" + stamp + ".md");
-        Files.writeString(report, report(model, runs, cases, results, mapper));
-        Files.writeString(dir.resolve("season-review-" + stamp + "-human.csv"), humanSheet(results));
+        Path report = dir.resolve("season-review-" + promptVersion + "-" + stamp + ".md");
+        Files.writeString(report, report(model, promptVersion, runs, cases, results, mapper));
+        Files.writeString(dir.resolve("season-review-" + promptVersion + "-" + stamp + "-human.csv"), humanSheet(results));
         System.out.println("[eval] 보고서: " + report.toAbsolutePath());
     }
 
@@ -147,7 +149,7 @@ class SeasonReviewEval {
         return b.toString();
     }
 
-    private static String report(String model, int runs, List<EvalCase> cases, List<RunResult> results, ObjectMapper mapper) throws Exception {
+    private static String report(String model, String promptVersion, int runs, List<EvalCase> cases, List<RunResult> results, ObjectMapper mapper) throws Exception {
         List<RunResult> ok = results.stream().filter(r -> r.error() == null).toList();
         int numbers = ok.stream().mapToInt(RunResult::numbers).sum();
         int matched = ok.stream().mapToInt(RunResult::numbersMatched).sum();
@@ -156,7 +158,7 @@ class SeasonReviewEval {
         StringBuilder b = new StringBuilder();
         b.append("# AI 시즌 리뷰 평가 보고서\n\n");
         b.append("- 실행: ").append(LocalDateTime.now().withNano(0)).append('\n');
-        b.append("- 모델: `").append(model).append("` / 프롬프트: `").append(GeminiService.PROMPT_VERSION).append("`\n");
+        b.append("- 모델: `").append(model).append("` / 프롬프트: `").append(promptVersion).append("`\n");
         b.append("- 케이스 ").append(cases.size()).append("개 × ").append(runs).append("회 = ").append(results.size()).append("회 호출\n\n");
 
         b.append("## 요약\n\n| 지표 | 값 |\n|---|---|\n");

@@ -99,6 +99,23 @@ func TestValidateInsight(t *testing.T) {
 	}
 }
 
+func TestLoadInsightPrompt(t *testing.T) {
+	p, err := loadInsightPrompt("")
+	if err != nil || p.Version != DefaultInsightPromptVersion || p.CoinSystem == "" || p.MarketSystem == "" || p.Schema["type"] != "OBJECT" || p.Temperature != 0.3 {
+		t.Fatalf("기본 버전 로드 실패: %+v, %v", p.Version, err)
+	}
+	if strings.HasSuffix(p.CoinSystem, "\n") {
+		t.Error("파일 끝 줄바꿈은 떼어야 함 (요청이 바뀌지 않도록)")
+	}
+	// 지난 버전도 비교용으로 남아 있다
+	if v2, err := loadInsightPrompt("daily-insight-v2"); err != nil || v2.CoinSystem == p.CoinSystem {
+		t.Errorf("v2 로드 실패 또는 v3와 같음: %v", err)
+	}
+	if _, err := loadInsightPrompt("no-such-version"); err == nil {
+		t.Error("없는 버전은 오류여야 함")
+	}
+}
+
 func TestCheckWordConsistency(t *testing.T) {
 	prompt := "상승 0종 / 하락 6종 / 보합 0종\n등락률: -2.84%\n7일 등락률: +4.91%\n24시간 거래대금: 100억원\n"
 

@@ -8,7 +8,7 @@
 //	go test -tags eval -run TestInsightEval -v -timeout 10m ./service
 //
 // GEMINI_API_KEY·GEMINI_MODEL은 환경변수 또는 scheduler/.env에서 읽고, EVAL_RUNS로 케이스당 반복 횟수(기본 2),
-// EVAL_DELAY_MS로 호출 간격(기본 4000ms)을 정한다.
+// EVAL_DELAY_MS로 호출 간격(기본 4000ms), EVAL_PROMPT_VERSION으로 비교할 프롬프트 버전을 정한다.
 package service
 
 import (
@@ -87,6 +87,12 @@ func TestInsightEval(t *testing.T) {
 		delayMs = 4000
 	}
 
+	// EVAL_PROMPT_VERSION=daily-insight-v2 처럼 바꿔 같은 입력으로 버전을 비교한다
+	p, err := loadInsightPrompt(os.Getenv("EVAL_PROMPT_VERSION"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	raw, err := os.ReadFile("testdata/insight_eval.json")
 	if err != nil {
 		t.Fatal(err)
@@ -105,9 +111,9 @@ func TestInsightEval(t *testing.T) {
 			news[i] = NewsItem{ID: n.ID, Title: n.Title, PublishedAt: n.PublishedAt, Description: n.Description}
 			ids[n.ID] = true
 		}
-		system, prompt, mood := coinSystemInstruction, "", c.Coin.Mood
+		system, prompt, mood := p.CoinSystem, "", c.Coin.Mood
 		if c.Kind == "market" {
-			system, prompt, mood = marketSystemInstruction, buildMarketPrompt(c.Market, news, now), c.Market.Mood
+			system, prompt, mood = p.MarketSystem, buildMarketPrompt(c.Market, news, now), c.Market.Mood
 		} else {
 			prompt = buildCoinPrompt(c.Coin, news, now)
 		}
@@ -117,7 +123,7 @@ func TestInsightEval(t *testing.T) {
 				time.Sleep(time.Duration(delayMs) * time.Millisecond)
 			}
 			started := time.Now()
-			text, err := callGemini(context.Background(), apiKey, model, system, prompt)
+			text, err := callGemini(context.Background(), apiKey, model, p, system, prompt)
 			r := evalRun{caseName: c.Name, run: run, millis: time.Since(started).Milliseconds(), err: err}
 			if err == nil {
 				if err := json.Unmarshal([]byte(text), &r.out); err != nil {
@@ -137,8 +143,8 @@ func TestInsightEval(t *testing.T) {
 		t.Fatal(err)
 	}
 	stamp := time.Now().Format("20060102-150405")
-	report := filepath.Join("..", "eval-reports", "insight-"+stamp+".md")
-	if err := os.WriteFile(report, []byte(insightReport(model, runs, cases, results)), 0o644); err != nil {
+	report := filepath.Join("..", "eval-reports", "insight-"+p.Version+"-"+stamp+".md")
+	if err := os.WriteFile(report, []byte(insightReport(model, p.Version, runs, cases, results)), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	var sheet strings.Builder
@@ -146,7 +152,7 @@ func TestInsightEval(t *testing.T) {
 	for _, r := range results {
 		fmt.Fprintf(&sheet, "%s,%d,,,,\n", r.caseName, r.run)
 	}
-	_ = os.WriteFile(filepath.Join("..", "eval-reports", "insight-"+stamp+"-human.csv"), []byte(sheet.String()), 0o644)
+	_ = os.WriteFile(filepath.Join("..", "eval-reports", "insight-"+p.Version+"-"+stamp+"-human.csv"), []byte(sheet.String()), 0o644)
 	abs, _ := filepath.Abs(report)
 	t.Logf("보고서: %s", abs)
 }
@@ -185,7 +191,7 @@ func scoreInsight(r *evalRun, c evalCase, prompt, mood string, ids map[string]bo
 	}
 }
 
-func insightReport(model string, runs int, cases []evalCase, results []evalRun) string {
+func insightReport(model, promptVersion string, runs int, cases []evalCase, results []evalRun) string {
 	var ok []evalRun
 	for _, r := range results {
 		if r.err == nil {
@@ -219,7 +225,7 @@ func insightReport(model string, runs int, cases []evalCase, results []evalRun) 
 	var b strings.Builder
 	b.WriteString("# 일일 AI 인사이트 평가 보고서\n\n")
 	fmt.Fprintf(&b, "- 실행: %s\n- 모델: `%s` / 프롬프트: `%s`\n- 케이스 %d개 × %d회 = %d회 호출\n\n",
-		time.Now().Format("2006-01-02 15:04:05"), model, insightPromptVersion, len(cases), runs, len(results))
+		time.Now().Format("2006-01-02 15:04:05"), model, promptVersion, len(cases), runs, len(results))
 	b.WriteString("## 요약\n\n| 지표 | 값 |\n|---|---|\n")
 	fmt.Fprintf(&b, "| 호출 성공 | %s |\n", pct(len(ok), len(results)))
 	fmt.Fprintf(&b, "| 첫 시도 검증 통과 | %s |\n", pct(count(func(r evalRun) bool { return r.validation == nil }), len(ok)))
