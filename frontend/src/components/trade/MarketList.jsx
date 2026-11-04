@@ -15,8 +15,16 @@ const COLUMNS = [
     {key: 'volume', label: '거래대금', align: 'text-right'},
 ];
 
+// 유의·주의 종목 표시 (업비트 market_event)
+const MarketBadge = ({label, title, className}) => (
+    <span title={title} className={`flex size-4 shrink-0 items-center justify-center rounded-[3px] text-[10px] font-bold leading-none text-white ${className}`}>
+        <span aria-hidden="true">{label}</span>
+        <span className="sr-only">{title}</span>
+    </span>
+);
+
 // 가격이 바뀐 행을 잠깐 표시하는 시간
-const FLASH_MS = 500;
+const FLASH_MS = 300;
 
 /**
  * 원화 마켓 코인 목록 (검색 · 원화/보유/관심 · 정렬). 거래소·투자내역 오른쪽, 모바일 거래 첫 화면
@@ -38,8 +46,10 @@ export default function MarketList({
     const [sort, setSort] = useState({key: 'volume', desc: true});
     const [flash, setFlash] = useState({});
     const prevPrices = useRef({});
+    const flashTimers = useRef({});
 
-    // 직전 가격과 비교해 오르면 빨강, 내리면 파랑 테두리를 잠깐 보여준다
+    // 직전 가격과 비교해 오르면 빨강, 내리면 파랑 테두리를 잠깐 보여준다.
+    // 종목마다 타이머를 따로 둔다. (시세가 200ms마다 갱신되므로 effect 정리에서 타이머를 지우면 테두리가 꺼지지 않는다)
     useEffect(() => {
         const changed = {};
         for (const [market, t] of Object.entries(tickerMap)) {
@@ -49,15 +59,20 @@ export default function MarketList({
         }
         if (Object.keys(changed).length === 0) return;
         setFlash((f) => ({...f, ...changed}));
-        const timer = setTimeout(() => {
-            setFlash((f) => {
-                const next = {...f};
-                for (const m of Object.keys(changed)) delete next[m];
-                return next;
-            });
-        }, FLASH_MS);
-        return () => clearTimeout(timer);
+        for (const market of Object.keys(changed)) {
+            clearTimeout(flashTimers.current[market]);
+            flashTimers.current[market] = setTimeout(() => {
+                delete flashTimers.current[market];
+                setFlash((f) => {
+                    const next = {...f};
+                    delete next[market];
+                    return next;
+                });
+            }, FLASH_MS);
+        }
     }, [tickerMap]);
+
+    useEffect(() => () => Object.values(flashTimers.current).forEach(clearTimeout), []);
 
     const rows = useMemo(() => {
         const term = query.trim().toLowerCase();
@@ -123,7 +138,7 @@ export default function MarketList({
                         {filter === 'owned' ? '보유한 코인이 없어요.' : filter === 'fav' ? '관심 코인을 별표로 추가해 보세요.' : '검색 결과가 없어요.'}
                     </li>
                 )}
-                {rows.map(({market, name}) => {
+                {rows.map(({market, name, warning, caution}) => {
                     const t = tickerMap[market];
                     const color = changeColor(t?.changeRate);
                     const fav = favoriteMarkets.includes(market);
@@ -147,7 +162,11 @@ export default function MarketList({
                                         </button>
                                     )}
                                     <button type="button" aria-current={selected || undefined} className="flex min-w-0 flex-col text-left">
-                                        <span className="truncate text-[13px] font-semibold">{name}</span>
+                                        <span className="flex min-w-0 items-center gap-1">
+                                            <span className="truncate text-[13px] font-semibold">{name}</span>
+                                            {warning && <MarketBadge label="유" title="유의 종목" className="bg-up"/>}
+                                            {caution && <MarketBadge label="주" title="투자 주의 종목" className="bg-[#F08A00]"/>}
+                                        </span>
                                         <span className="text-[11px] text-fg-3">{market.replace('KRW-', '')}/KRW</span>
                                     </button>
                                 </span>

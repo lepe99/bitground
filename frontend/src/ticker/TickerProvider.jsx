@@ -1,6 +1,7 @@
 import {useState, useEffect, useMemo} from 'react';
 import {TickerContext} from './TickerContext.js';
 import {fetchCoinSymbols} from "../api/coinApi.js";
+import {fetchMarketEvents} from "../api/upbitApi.js";
 
 // Upbit 공개 시세 WebSocket. 인증이 필요 없어 브라우저가 직접 연결한다 (우리 서버를 거쳐 중계하지 않음)
 const UPBIT_WS_URL = 'wss://api.upbit.com/websocket/v1';
@@ -26,11 +27,14 @@ export function TickerProvider({ children }) {
 
     // (1) markets 불러오기
     useEffect(() => {
-        fetchCoinSymbols()
-            .then(symbols => {
+        // 유의·주의 지정은 업비트에서 바로 받는다. 실패해도 목록은 보여준다
+        Promise.all([fetchCoinSymbols(), fetchMarketEvents().catch(() => ({}))])
+            .then(([symbols, events]) => {
                 setMarkets(symbols.map(c => ({
                     market: c.symbol,
-                    name: c.koreanName
+                    name: c.koreanName,
+                    warning: events[c.symbol]?.warning ?? false,
+                    caution: events[c.symbol]?.caution ?? false,
                 })));
             })
             .catch(err => {

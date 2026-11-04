@@ -59,7 +59,7 @@ const Toast = ({toast}) => {
     return (
         <div
             role={error ? 'alert' : 'status'}
-            className={`pointer-events-auto flex w-full items-center gap-3 rounded-2xl px-4 py-3.5 shadow-xl transition duration-300 md:w-[360px] ${
+            className={`pointer-events-auto flex w-full items-center gap-3 rounded-2xl px-4 py-3.5 shadow-xl transition duration-300 max-w-[360px] ${
                 error ? 'bg-up text-white' : 'border border-line bg-surface text-fg'
             } ${shown ? 'translate-y-0 opacity-100' : '-translate-y-2 opacity-0'}`}
         >
@@ -72,7 +72,7 @@ const Toast = ({toast}) => {
 };
 
 const ToastContainer = ({toasts}) => (
-    <div className="pointer-events-none fixed inset-x-3 top-16 z-[10000] flex flex-col items-center gap-2 md:inset-x-auto md:top-20 md:right-5 md:items-end">
+    <div className="pointer-events-none fixed inset-x-3 top-16 z-[10000] flex flex-col items-end gap-2 md:left-auto md:right-5 md:top-20">
         {toasts.map((toast) => <Toast key={toast.id} toast={toast}/>)}
     </div>
 );
