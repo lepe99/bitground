@@ -24,7 +24,7 @@ export default function Header() {
     return (
         <header className="sticky top-0 z-40 border-b border-line bg-surface">
             <div className="flex h-14 items-center gap-6 px-5 md:gap-6 lg:gap-10">
-                <Link to="/" aria-label="Bitground 홈" className="text-fg">
+                <Link to="/" aria-label="Bitground 홈" className="flex items-center text-fg">
                     <Logo size={26}/>
                 </Link>
 
