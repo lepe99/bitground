@@ -33,7 +33,7 @@ const INTEGER = /^\d*$/;
 
 /**
  * 주문 비율 버튼 (10·25·50·100%·직접입력).
- * 직접입력을 누르면 슬라이더로 바뀌고, 완료하면 고른 비율이 직접입력 버튼에 남는다
+ * 직접입력을 누르면 슬라이더로 바뀌고, 움직이는 대로 수량·총액에 바로 반영한다. 완료하면 고른 비율이 직접입력 버튼에 남는다
  */
 function PercentPicker({custom, onPick}) {
     const [editing, setEditing] = useState(false);
@@ -41,10 +41,7 @@ function PercentPicker({custom, onPick}) {
     const [dragging, setDragging] = useState(false);
 
     if (editing) {
-        const done = () => {
-            setEditing(false);
-            onPick(value, true);
-        };
+        const done = () => setEditing(false);
         return (
             <div className="flex items-center gap-2">
                 <div className="relative flex h-8 flex-1 items-center">
@@ -63,7 +60,11 @@ function PercentPicker({custom, onPick}) {
                         min={1}
                         max={100}
                         value={value}
-                        onChange={(e) => setValue(Number(e.target.value))}
+                        onChange={(e) => {
+                            const next = Number(e.target.value);
+                            setValue(next);
+                            onPick(next, true);
+                        }}
                         onPointerDown={() => setDragging(true)}
                         onPointerUp={() => setDragging(false)}
                         onPointerCancel={() => setDragging(false)}
@@ -90,8 +91,11 @@ function PercentPicker({custom, onPick}) {
             <button
                 type="button"
                 onClick={() => {
-                    setValue(custom ?? 50);
+                    // 슬라이더를 여는 순간부터 입력칸이 슬라이더 값과 맞도록 바로 적용한다
+                    const start = custom ?? 50;
+                    setValue(start);
                     setEditing(true);
+                    onPick(start, true);
                 }}
                 className={`h-8 rounded-lg border text-xs font-semibold ${custom != null ? 'num border-brand text-brand-fg' : 'border-line text-fg-2 hover:bg-surface-2'}`}
             >
@@ -170,8 +174,9 @@ export default function OrderPanel({market, currentPrice, cash, holdings, onOrde
         setTotal(display(isBuy ? Math.ceil(p * a) : Math.floor(p * a)));
     }, [price, amount, isReserve, isBuy]);
 
-    // 소수 8자리에서 내림. 1e-6을 더해 0.00048359 × 1e8 = 48358.999… 같은 부동소수 오차로 한 단위가 빠지지 않게 한다
-    const floor8 = (n) => Math.floor(n * 1e8 + 1e-6) / 1e8;
+    // 소수 8자리에서 내림. 0.00048359 × 1e8 = 48358.999… 같은 부동소수 오차로 한 단위가 빠지지 않게
+    // 유효숫자 15자리로 먼저 정리한다 (고정값을 더하는 방식은 수량이 크면 오차보다 작아 효과가 없다)
+    const floor8 = (n) => Math.floor(Number((n * 1e8).toPrecision(15))) / 1e8;
 
     const applyPercent = (percent, custom) => {
         setCustomPercent(custom ? percent : null);

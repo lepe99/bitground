@@ -62,7 +62,6 @@ export default function OrderHistory({market, onChanged}) {
     }, [tab, pending, done, onlyThis, market]);
 
     const cancel = async (order) => {
-        if (!window.confirm(`${order.koreanName ?? tickerOf(order.symbol)} 예약 주문을 취소할까요?`)) return;
         setCancelling(order.id);
         try {
             await cancelReserveOrder(order.id);
