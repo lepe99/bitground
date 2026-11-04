@@ -1,0 +1,46 @@
+# Loki 설정. 이미지 기본값(/etc/loki/local-config.yaml)에 보관 기간만 더했다.
+# 로그에는 접속 IP 등 개인정보가 들어가므로 개인정보처리방침의 '접속 기록 3개월' 보관 원칙에 맞춰
+# 90일이 지난 로그는 compactor가 지운다.
+auth_enabled: false
+
+server:
+  http_listen_port: 3100
+
+common:
+  instance_addr: 127.0.0.1
+  path_prefix: /loki
+  storage:
+    filesystem:
+      chunks_directory: /loki/chunks
+      rules_directory: /loki/rules
+  replication_factor: 1
+  ring:
+    kvstore:
+      store: inmemory
+
+schema_config:
+  configs:
+    - from: 2020-10-24
+      store: tsdb
+      object_store: filesystem
+      schema: v13
+      index:
+        prefix: index_
+        period: 24h # 보관 기간 삭제는 24h 주기 인덱스에서만 동작한다
+
+limits_config:
+  retention_period: 2160h # 90일 (3개월)
+
+compactor:
+  working_directory: /loki/compactor
+  compaction_interval: 10m
+  retention_enabled: true
+  retention_delete_delay: 2h # 삭제 표시 후 실제로 지우기까지 기다리는 시간
+  delete_request_store: filesystem
+
+ruler:
+  alertmanager_url: http://localhost:9093
+
+# 사용 통계를 Grafana Labs로 보내지 않는다
+analytics:
+  reporting_enabled: false

@@ -185,8 +185,9 @@ services:
     profiles: ["monitoring"]
     image: grafana/loki:3.7.1
     container_name: loki
-    command: -config.file=/etc/loki/local-config.yaml
+    command: -config.file=/etc/loki/config.yaml
     volumes:
+      - ./monitoring/loki/config.yaml:/etc/loki/config.yaml:ro # 90일 보관 (개인정보처리방침 접속 기록 3개월)
       - loki-data:/loki
 
   alloy:
