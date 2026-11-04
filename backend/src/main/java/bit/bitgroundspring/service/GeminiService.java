@@ -120,7 +120,7 @@ public class GeminiService {
         throw new IOException("AI review rejected: " + problem);
     }
 
-    private SeasonReviewContent requestReview(String userPrompt) throws IOException, InterruptedException {
+    SeasonReviewContent requestReview(String userPrompt) throws IOException, InterruptedException {
         Map<String, Object> requestBody = Map.of(
                 "systemInstruction", Map.of("parts", List.of(Map.of("text", SYSTEM_INSTRUCTION))),
                 "contents", List.of(Map.of("role", "user", "parts", List.of(Map.of("text", userPrompt)))),

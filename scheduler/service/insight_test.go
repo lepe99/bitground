@@ -99,6 +99,13 @@ func TestValidateInsight(t *testing.T) {
 	}
 }
 
+func TestNormalizeNumbers(t *testing.T) {
+	got := normalizeNumbers("중앙값 마이너스 1.78퍼센트, 비트코인 플러스 2퍼센트, 이더리움 3.5 퍼센트, 도지 마이너스 9.65%")
+	if got != "중앙값 -1.78%, 비트코인 +2%, 이더리움 3.5%, 도지 -9.65%" {
+		t.Errorf("normalizeNumbers() = %q", got)
+	}
+}
+
 func TestCleanNewsAndCited(t *testing.T) {
 	if got := cleanNewsText("<b>솔라나</b> &quot;급락&quot; &amp; 회복"); got != `솔라나 "급락" & 회복` {
 		t.Errorf("cleanNewsText() = %q", got)

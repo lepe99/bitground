@@ -21,3 +21,6 @@ bootstrap
 *.iml
 .DS_Store
 Thumbs.db
+
+# AI 평가 보고서 (scheduler: go test -tags eval, backend는 build/reports/ai-eval)
+scheduler/eval-reports/

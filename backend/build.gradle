@@ -74,7 +74,28 @@ dependencies {
 }
 
 tasks.named('test') {
-    useJUnitPlatform()
+    // AI 평가셋(@Tag("eval"))은 실제 Gemini를 부르므로 일반 테스트에서 뺀다 → ./gradlew aiEval
+    useJUnitPlatform {
+        excludeTags 'eval'
+    }
     // Docker Engine 29+는 API 1.40 미만을 거부하므로 Testcontainers(docker-java)가 쓸 API 버전을 명시
     systemProperty 'api.version', '1.44'
+}
+
+// AI 평가셋 실행: ./gradlew aiEval [-PevalRuns=3]
+// 고정 입력(src/test/resources/eval)을 실제 Gemini로 돌려 build/reports/ai-eval에 보고서를 남긴다 (GEMINI_API_KEY 필요, backend/.env도 읽음)
+tasks.register('aiEval', Test) {
+    description = 'AI 시즌 리뷰 평가셋을 실제 Gemini로 실행'
+    group = 'verification'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    useJUnitPlatform {
+        includeTags 'eval'
+    }
+    outputs.upToDateWhen { false }
+    systemProperty 'eval.runs', findProperty('evalRuns') ?: '2'
+    testLogging {
+        events 'passed', 'failed'
+        showStandardStreams = true
+    }
 }

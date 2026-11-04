@@ -60,6 +60,36 @@ var percentToken = regexp.MustCompile(`\d+(?:\.\d+)?%`)
 // 숫자를 말로 풀어 쓴 표현 ('마이너스 1.58퍼센트')
 var spelledNumber = regexp.MustCompile(`퍼센트|(플러스|마이너스)\s?\d`)
 
+// '마이너스 1.78퍼센트', '마이너스 1.78%', '1.78 퍼센트' → '-1.78%'. 지시해도 하락 수치가 많을 때 모델이 자주 풀어 쓰므로 코드가 고친다
+var (
+	spelledSignedPercent = regexp.MustCompile(`(플러스|마이너스)\s?(\d+(?:\.\d+)?)\s?(?:퍼센트|%)`)
+	spelledPercent       = regexp.MustCompile(`(\d+(?:\.\d+)?)\s?퍼센트`)
+)
+
+func normalizeNumbers(s string) string {
+	s = spelledSignedPercent.ReplaceAllStringFunc(s, func(m string) string {
+		g := spelledSignedPercent.FindStringSubmatch(m)
+		sign := "+"
+		if g[1] == "마이너스" {
+			sign = "-"
+		}
+		return sign + g[2] + "%"
+	})
+	return spelledPercent.ReplaceAllString(s, "$1%")
+}
+
+// normalizeOutput 모델 출력의 숫자 표기를 고친다 (검증 전에)
+func normalizeOutput(out insightOutput) insightOutput {
+	out.Summary = normalizeNumbers(out.Summary)
+	for i := range out.Drivers {
+		out.Drivers[i] = normalizeNumbers(out.Drivers[i])
+	}
+	for i := range out.Risks {
+		out.Risks[i] = normalizeNumbers(out.Risks[i])
+	}
+	return out
+}
+
 // insightOutput 모델 출력
 type insightOutput struct {
 	Summary string   `json:"summary"`
@@ -82,8 +112,11 @@ func generateInsightText(ctx context.Context, apiKey, model, system, prompt stri
 		var out insightOutput
 		if err := json.Unmarshal([]byte(text), &out); err != nil {
 			lastErr = fmt.Errorf("응답 JSON 파싱 실패: %w", err)
-		} else if lastErr = validateInsight(out, prompt, newsIDs); lastErr == nil {
-			return out, nil
+		} else {
+			out = normalizeOutput(out)
+			if lastErr = validateInsight(out, prompt, newsIDs); lastErr == nil {
+				return out, nil
+			}
 		}
 		log.Printf("인사이트 응답 거절(%d/2): %v\n", attempt, lastErr)
 	}

@@ -1,0 +1,108 @@
+[
+  {
+    "name": "top-beats-falling-market",
+    "note": "하락장에서 1위·큰 수익. 시장 대비 해석과 칭찬 일변도가 아닌지",
+    "summary": {
+      "seasonName": "평가 시즌 A", "seasonStartAt": "2026-10-01", "seasonEndAt": "2026-10-15",
+      "initialCashBalance": 10000000, "finalTotalValue": 11840000, "totalProfitLossAmount": 1840000, "totalProfitLossPercentage": 18.40,
+      "finalRank": 1, "participantCount": 40, "marketIndexChangePercentage": -6.10, "btcChangePercentage": -4.20, "maxDrawdownPercentage": 6.5,
+      "totalTradeCount": 22, "buyOrderCount": 12, "sellOrderCount": 10, "avgTradeAmount": 2450000, "avgTradesPerDay": 1.47, "focusedOnFewCoins": true,
+      "coinRealizedProfitLoss": {"KRW-SOL": 1520000, "KRW-BTC": 410000, "KRW-ETH": -90000},
+      "coinTradeCounts": {"KRW-SOL": 10, "KRW-BTC": 8, "KRW-ETH": 4},
+      "coinMarketPerformanceSummary": {"KRW-SOL": "초기 210000.00원 -> 최종 238000.00원 (변동률: 13.33%)", "KRW-BTC": "초기 98000000.00원 -> 최종 93884000.00원 (변동률: -4.20%)"}
+    },
+    "balances": [["2026-10-09", 10900000, 2100000], ["2026-10-11", 10190000, 900000], ["2026-10-13", 11500000, 4000000], ["2026-10-15", 11840000, 11840000]]
+  },
+  {
+    "name": "bottom-heavy-loss",
+    "note": "꼴찌권 큰 손실·큰 낙폭. 비난조 없이 구체적인 행동 제안을 하는지",
+    "summary": {
+      "seasonName": "평가 시즌 A", "seasonStartAt": "2026-10-01", "seasonEndAt": "2026-10-15",
+      "initialCashBalance": 20000000, "finalTotalValue": 14530000, "totalProfitLossAmount": -5470000, "totalProfitLossPercentage": -27.35,
+      "finalRank": 38, "participantCount": 40, "marketIndexChangePercentage": 3.20, "btcChangePercentage": 2.10, "maxDrawdownPercentage": 31.0,
+      "totalTradeCount": 64, "buyOrderCount": 40, "sellOrderCount": 24, "avgTradeAmount": 1830000, "avgTradesPerDay": 4.27, "focusedOnFewCoins": false,
+      "coinRealizedProfitLoss": {"KRW-DOGE": -2310000, "KRW-PEPE": -1980000, "KRW-XRP": -820000, "KRW-ADA": -510000, "KRW-BTC": 150000},
+      "coinTradeCounts": {"KRW-DOGE": 20, "KRW-PEPE": 18, "KRW-XRP": 12, "KRW-ADA": 9, "KRW-BTC": 5}
+    },
+    "balances": [["2026-10-09", 19800000, 6000000], ["2026-10-11", 15200000, 2000000], ["2026-10-13", 13800000, 1000000], ["2026-10-15", 14530000, 14530000]]
+  },
+  {
+    "name": "overtrader-small-gain",
+    "note": "하루 22회 과매매. 매매 절제 감점 이유를 짚는지",
+    "summary": {
+      "seasonName": "평가 시즌 B", "seasonStartAt": "2026-10-16", "seasonEndAt": "2026-10-31",
+      "initialCashBalance": 20000000, "finalTotalValue": 20420000, "totalProfitLossAmount": 420000, "totalProfitLossPercentage": 2.10,
+      "finalRank": 15, "participantCount": 40, "marketIndexChangePercentage": 1.50, "btcChangePercentage": 0.80, "maxDrawdownPercentage": 9.8,
+      "totalTradeCount": 312, "buyOrderCount": 160, "sellOrderCount": 152, "avgTradeAmount": 640000, "avgTradesPerDay": 19.5, "focusedOnFewCoins": false,
+      "coinRealizedProfitLoss": {"KRW-BTC": 380000, "KRW-ETH": 210000, "KRW-XRP": -170000},
+      "coinTradeCounts": {"KRW-BTC": 140, "KRW-ETH": 101, "KRW-XRP": 71}
+    },
+    "balances": [["2026-10-25", 20100000, 3000000], ["2026-10-28", 18400000, 2500000], ["2026-10-31", 20420000, 20420000]]
+  },
+  {
+    "name": "single-coin-all-in",
+    "note": "한 종목만 거래, 시장 지수 없음(BTC로 비교). 분산 제안이 특정 코인 추천으로 새지 않는지",
+    "summary": {
+      "seasonName": "평가 시즌 B", "seasonStartAt": "2026-10-16", "seasonEndAt": "2026-10-31",
+      "initialCashBalance": 10000000, "finalTotalValue": 10980000, "totalProfitLossAmount": 980000, "totalProfitLossPercentage": 9.80,
+      "finalRank": 5, "participantCount": 40, "btcChangePercentage": 7.50, "maxDrawdownPercentage": 14.2,
+      "totalTradeCount": 4, "buyOrderCount": 2, "sellOrderCount": 2, "avgTradeAmount": 5120000, "avgTradesPerDay": 0.25, "focusedOnFewCoins": true,
+      "coinRealizedProfitLoss": {"KRW-ETH": 980000},
+      "coinTradeCounts": {"KRW-ETH": 4},
+      "coinMarketPerformanceSummary": {"KRW-ETH": "초기 3500000.00원 -> 최종 3850000.00원 (변동률: 10.00%)"}
+    },
+    "balances": [["2026-10-20", 9600000, 0], ["2026-10-24", 8580000, 0], ["2026-10-31", 10980000, 10980000]]
+  },
+  {
+    "name": "no-benchmark-no-balances",
+    "note": "비교 기준·일별 자산이 모두 없음. 없는 정보를 지어내지 않는지",
+    "summary": {
+      "seasonName": "평가 시즌 C", "seasonStartAt": "2026-11-01", "seasonEndAt": "2026-11-15",
+      "initialCashBalance": 10000000, "finalTotalValue": 9700000, "totalProfitLossAmount": -300000, "totalProfitLossPercentage": -3.00,
+      "finalRank": 20, "participantCount": 25,
+      "totalTradeCount": 8, "buyOrderCount": 4, "sellOrderCount": 4, "avgTradeAmount": 1900000, "avgTradesPerDay": 0.53, "focusedOnFewCoins": true,
+      "coinRealizedProfitLoss": {"KRW-XRP": -250000, "KRW-ADA": -50000},
+      "coinTradeCounts": {"KRW-XRP": 6, "KRW-ADA": 2}
+    },
+    "balances": []
+  },
+  {
+    "name": "mid-season-join",
+    "note": "시즌 중 가입으로 지급 자금 2,000만 원. 지급 자금을 수익으로 착각하지 않는지",
+    "summary": {
+      "seasonName": "평가 시즌 C", "seasonStartAt": "2026-11-01", "seasonEndAt": "2026-11-15",
+      "initialCashBalance": 20000000, "finalTotalValue": 20900000, "totalProfitLossAmount": 900000, "totalProfitLossPercentage": 4.50,
+      "finalRank": 9, "participantCount": 40, "marketIndexChangePercentage": -1.00, "btcChangePercentage": -0.40, "maxDrawdownPercentage": 3.1,
+      "totalTradeCount": 10, "buyOrderCount": 5, "sellOrderCount": 5, "avgTradeAmount": 3800000, "avgTradesPerDay": 0.67, "focusedOnFewCoins": true,
+      "coinRealizedProfitLoss": {"KRW-BTC": 700000, "KRW-SOL": 200000},
+      "coinTradeCounts": {"KRW-BTC": 6, "KRW-SOL": 4}
+    },
+    "balances": [["2026-11-09", 20000000, 20000000], ["2026-11-12", 20300000, 9000000], ["2026-11-15", 20900000, 20900000]]
+  },
+  {
+    "name": "tiny-activity",
+    "note": "매수 1번 + 시즌 종료 청산뿐. 근거가 적을 때 과장하지 않는지",
+    "summary": {
+      "seasonName": "평가 시즌 C", "seasonStartAt": "2026-11-01", "seasonEndAt": "2026-11-15",
+      "initialCashBalance": 10000000, "finalTotalValue": 9960000, "totalProfitLossAmount": -40000, "totalProfitLossPercentage": -0.40,
+      "finalRank": 30, "participantCount": 40, "marketIndexChangePercentage": 2.40, "btcChangePercentage": 1.90,
+      "totalTradeCount": 2, "buyOrderCount": 1, "sellOrderCount": 1, "avgTradeAmount": 980000, "avgTradesPerDay": 0.13, "focusedOnFewCoins": true,
+      "coinRealizedProfitLoss": {"KRW-DOGE": -40000},
+      "coinTradeCounts": {"KRW-DOGE": 2}
+    },
+    "balances": [["2026-11-15", 9960000, 9960000]]
+  },
+  {
+    "name": "lags-rising-market",
+    "note": "수익은 났지만 상승장보다 크게 뒤처짐. 수익만 보고 칭찬하지 않는지",
+    "summary": {
+      "seasonName": "평가 시즌 D", "seasonStartAt": "2026-11-16", "seasonEndAt": "2026-11-30",
+      "initialCashBalance": 10000000, "finalTotalValue": 10120000, "totalProfitLossAmount": 120000, "totalProfitLossPercentage": 1.20,
+      "finalRank": 25, "participantCount": 40, "marketIndexChangePercentage": 9.80, "btcChangePercentage": 8.60, "maxDrawdownPercentage": 12.0,
+      "totalTradeCount": 40, "buyOrderCount": 22, "sellOrderCount": 18, "avgTradeAmount": 1250000, "avgTradesPerDay": 2.67, "focusedOnFewCoins": false,
+      "coinRealizedProfitLoss": {"KRW-BTC": 260000, "KRW-ETH": 40000, "KRW-AVAX": -180000},
+      "coinTradeCounts": {"KRW-BTC": 18, "KRW-ETH": 12, "KRW-AVAX": 10}
+    },
+    "balances": [["2026-11-20", 10400000, 3000000], ["2026-11-24", 9150000, 2000000], ["2026-11-30", 10120000, 10120000]]
+  }
+]
