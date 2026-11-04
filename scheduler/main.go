@@ -109,7 +109,12 @@ func run(ctx context.Context, db *sql.DB, cfg config.Config, now time.Time) erro
 	default:
 		wg.Go(func() {
 			insightErr = step("인사이트 업데이트", func() error {
-				return service.UpdateInsight(ctx, db, cfg.GeminiAPIKey, cfg.GeminiModel, symbolMap)
+				return service.UpdateInsight(ctx, db, service.InsightConfig{
+					GeminiAPIKey:      cfg.GeminiAPIKey,
+					GeminiModel:       cfg.GeminiModel,
+					NaverClientID:     cfg.NaverClientID,
+					NaverClientSecret: cfg.NaverClientSecret,
+				}, symbolMap, now)
 			})
 		})
 	}

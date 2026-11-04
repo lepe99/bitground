@@ -22,6 +22,9 @@ type Config struct {
 
 	GeminiAPIKey string
 	GeminiModel  string
+	// 네이버 뉴스 검색(NAVER API HUB) 키. 비우면 인사이트를 뉴스 없이 시세만으로 만든다
+	NaverClientID     string
+	NaverClientSecret string
 
 	SeasonName string
 
@@ -45,9 +48,12 @@ func Load() (Config, error) {
 		TestTime:     os.Getenv("TEST_TIME"),
 		GeminiAPIKey: os.Getenv("GEMINI_API_KEY"),
 		GeminiModel:  getEnv("GEMINI_MODEL", "gemini-3.5-flash-lite"),
-		SeasonName:   os.Getenv("SEASON_NAME"),
-		BackendURL:   strings.TrimRight(os.Getenv("BACKEND_URL"), "/"),
-		SchedulerKey: os.Getenv("SEASON_UPDATE_KEY"),
+		// 백엔드와 같은 이름
+		NaverClientID:     os.Getenv("NAVER_NEWS_CLIENT_ID"),
+		NaverClientSecret: os.Getenv("NAVER_NEWS_CLIENT_SECRET"),
+		SeasonName:        os.Getenv("SEASON_NAME"),
+		BackendURL:        strings.TrimRight(os.Getenv("BACKEND_URL"), "/"),
+		SchedulerKey:      os.Getenv("SEASON_UPDATE_KEY"),
 	}
 
 	loc, err := time.LoadLocation(getEnv("TIMEZONE", "Asia/Seoul"))

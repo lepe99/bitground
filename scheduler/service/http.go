@@ -15,6 +15,11 @@ var httpClient = &http.Client{Timeout: 4 * time.Minute}
 
 // getJSON GET 요청을 보내고 2xx 응답 본문을 out에 디코딩합니다.
 func getJSON(ctx context.Context, url string, timeout time.Duration, out any) error {
+	return getJSONWithHeaders(ctx, url, timeout, nil, out)
+}
+
+// getJSONWithHeaders 인증 헤더 등이 필요한 GET 요청 (예: 네이버 뉴스 검색)
+func getJSONWithHeaders(ctx context.Context, url string, timeout time.Duration, headers map[string]string, out any) error {
 	reqCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
@@ -23,6 +28,9 @@ func getJSON(ctx context.Context, url string, timeout time.Duration, out any) er
 		return fmt.Errorf("HTTP 요청 생성 에러: %w", err)
 	}
 	req.Header.Set("Accept", "application/json")
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
 
 	resp, err := httpClient.Do(req)
 	if err != nil {

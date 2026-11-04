@@ -14,6 +14,70 @@ const NEWS_PAGE_SIZE = 5;
 // 네이버 뉴스 제목의 <b> 태그와 &quot; 같은 문자를 글자로 바꾼다
 const plain = (html) => new DOMParser().parseFromString(html ?? "", "text/html").body.textContent ?? "";
 
+// 분위기 라벨은 스케줄러가 등락률 규칙으로 정한다 (상승 빨강, 하락 파랑)
+const MOOD_STYLE = {
+    "강세": "bg-up/10 text-up",
+    "약간 강세": "bg-up/10 text-up",
+    "중립": "bg-surface-2 text-fg-2",
+    "약간 약세": "bg-down/10 text-down",
+    "약세": "bg-down/10 text-down",
+};
+
+function InsightList({title, items}) {
+    if (!items?.length) return null;
+    return (
+        <section className="flex flex-col gap-1.5">
+            <h3 className="text-[13px] font-bold text-fg-3">{title}</h3>
+            <ul className="flex flex-col gap-1.5">
+                {items.map((text, i) => (
+                    <li key={i} className="flex gap-2 text-[15px] leading-relaxed text-fg-2">
+                        <span className="mt-[9px] size-1.5 shrink-0 rounded-full bg-fg-3" aria-hidden="true"/>
+                        <span>{text}</span>
+                    </li>
+                ))}
+            </ul>
+        </section>
+    );
+}
+
+/** AI 분석 본문: 분위기 라벨·선정 이유, 요약, 근거, 지켜볼 점, 참고 기사 (예전 형식은 요약만) */
+function InsightBody({insight}) {
+    const date = new Date(insight.date).toLocaleDateString("ko-KR");
+    return (
+        <div className="flex flex-col gap-4">
+            {insight.mood && (
+                <div className="flex flex-wrap items-center gap-2">
+                    <span className={`rounded-full px-2.5 py-1 text-[13px] font-bold ${MOOD_STYLE[insight.mood] ?? "bg-surface-2 text-fg-2"}`}>
+                        최근 24시간 {insight.mood}
+                    </span>
+                    {insight.pickReason && insight.pickReason !== "주요 코인" && (
+                        <span className="rounded-full border border-line px-2.5 py-1 text-xs font-semibold text-fg-2">{insight.pickReason}</span>
+                    )}
+                </div>
+            )}
+            <p className="whitespace-pre-wrap text-[15px] leading-[1.75] text-fg-2">{insight.insight}</p>
+            <InsightList title="근거" items={insight.drivers}/>
+            <InsightList title="지켜볼 점" items={insight.risks}/>
+            {insight.sources?.length > 0 && (
+                <section className="flex flex-col gap-1.5">
+                    <h3 className="text-[13px] font-bold text-fg-3">참고 기사</h3>
+                    <ul className="flex flex-col gap-1">
+                        {insight.sources.map((s) => (
+                            <li key={s.id} className="flex flex-wrap items-baseline gap-x-2 text-sm">
+                                <a href={s.url} target="_blank" rel="noreferrer" className="text-fg-2 underline-offset-2 hover:text-fg hover:underline">{s.title}</a>
+                                <span className="num text-xs text-fg-3">{s.publishedAt}</span>
+                            </li>
+                        ))}
+                    </ul>
+                </section>
+            )}
+            <p className="text-xs text-fg-3">
+                <span className="num">{date} 0시</span> 기준 업비트 시세{insight.sources?.length > 0 ? "·뉴스" : ""}로 AI가 정리한 참고용 요약이며, 투자 권유가 아니에요.
+            </p>
+        </div>
+    );
+}
+
 function AiInsightCard() {
     const [options, setOptions] = useState(null);
     const [symbol, setSymbol] = useState(null);
@@ -49,7 +113,7 @@ function AiInsightCard() {
         <Card className="flex flex-col gap-4 p-5 md:col-span-2 md:p-6">
             <div className="flex items-baseline justify-between gap-2">
                 <h2 className="text-base font-bold md:text-[17px]">오늘의 AI 분석</h2>
-                <span className="text-xs text-fg-3">매일 아침 갱신</span>
+                <span className="text-xs text-fg-3">매일 0시 갱신</span>
             </div>
             {options?.length > 0 && (
                 <div role="tablist" aria-label="분석 종목" className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
@@ -72,16 +136,7 @@ function AiInsightCard() {
             {insight === undefined && options !== null && options.length > 0 ? (
                 <p className="py-8 text-center text-sm text-fg-3">불러오는 중…</p>
             ) : insight ? (
-                <div className="flex flex-col gap-3">
-                    <p className="whitespace-pre-wrap text-[15px] leading-[1.75] text-fg-2">{insight.insight}</p>
-                    <div className="flex flex-wrap items-center gap-3 text-xs text-fg-3">
-                        <span className={`rounded-full px-2.5 py-1 text-[13px] font-bold ${insight.score >= 60 ? "bg-up/10 text-up" : "bg-down/10 text-down"}`}>
-                            전망 점수 {insight.score}
-                        </span>
-                        <span className="num">{new Date(insight.date).toLocaleDateString("ko-KR")} 분석</span>
-                        <span>투자 권유가 아닌 참고용 분석이에요.</span>
-                    </div>
-                </div>
+                <InsightBody insight={insight}/>
             ) : (
                 <p className="py-8 text-center text-sm text-fg-3">{options === null ? "불러오는 중…" : "오늘 분석이 아직 없어요."}</p>
             )}

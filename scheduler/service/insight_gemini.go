@@ -1,0 +1,312 @@
+package service
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"log"
+	"math"
+	"net/http"
+	"net/url"
+	"regexp"
+	"strings"
+	"time"
+	"unicode/utf8"
+)
+
+// 일일 인사이트 생성 (Gemini). 숫자·분위기 라벨·대상 선정은 코드가 하고, 모델은 받은 자료로 해설만 쓴다.
+// 프롬프트나 출력 형식을 바꾸면 insightPromptVersion을 올린다 (저장된 행에 남음)
+
+const insightPromptVersion = "daily-insight-v2"
+
+const coinSystemInstruction = `너는 모의투자 서비스 Bitground의 시장 요약 작성자다. <data>와 <news>로 코인 하나의 최근 24시간 움직임을 정리한다.
+규칙:
+1. <data>와 <news>에 있는 내용만 근거로 쓴다. 거기 없는 사실(ETF 자금 흐름, 파트너십, 업그레이드, 거시 지표, 지지선·저항선 등)은 쓰지 않는다.
+2. 숫자는 <data>의 표기 그대로 옮긴다 (예: -4.82%, 1.9배, 3,120억원). 새로 계산하거나 반올림을 바꾸지 않고, '마이너스', '퍼센트'처럼 말로 풀어 쓰지 않는다.
+3. 분위기 라벨은 이미 정해져 있다. 바꾸지 말고 그 라벨이 나온 이유를 데이터로 설명한다.
+4. 뉴스를 근거로 쓴 문장이 있으면 그 기사 id를 sources에 넣는다. 관련 기사가 없으면 가격·거래대금만으로 쓰고 sources는 비운다.
+5. 매수·매도 권유, 목표가, 가격 예측("오를 것이다", "떨어질 것이다")은 쓰지 않는다. 앞으로에 대해서는 지켜볼 점으로만 쓴다.
+6. 한국어 존댓말 평서문. summary는 2~3문장 200자 이내, drivers는 2~3개, risks는 1~2개이며 각각 한 문장. 마크다운 기호를 쓰지 않는다.`
+
+const marketSystemInstruction = `너는 모의투자 서비스 Bitground의 시장 요약 작성자다. <data>와 <news>로 원화 코인 시장 전체의 최근 24시간 흐름을 정리한다.
+규칙:
+1. <data>와 <news>에 있는 내용만 근거로 쓴다. 거기 없는 사실(ETF 자금 흐름, 금리, 규제 발표, 비트코인 도미넌스 등)은 쓰지 않는다.
+2. 숫자는 <data>의 표기 그대로 옮긴다 (예: -1.58%, 3,120억원). 새로 계산하거나 반올림을 바꾸지 않고, '마이너스', '퍼센트'처럼 말로 풀어 쓰지 않는다.
+3. 분위기 라벨은 이미 정해져 있다. 바꾸지 말고 그 라벨이 나온 이유를 데이터로 설명한다.
+4. 뉴스를 근거로 쓴 문장이 있으면 그 기사 id를 sources에 넣는다. 관련 기사가 없으면 sources는 비운다.
+5. 매수·매도 권유, 목표가, 가격 예측은 쓰지 않는다. 앞으로에 대해서는 지켜볼 점으로만 쓴다.
+6. 한국어 존댓말 평서문. summary는 2~3문장 200자 이내, drivers는 2~3개, risks는 1~2개이며 각각 한 문장. 마크다운 기호를 쓰지 않는다.`
+
+var insightSchema = map[string]any{
+	"type": "OBJECT",
+	"properties": map[string]any{
+		"summary": map[string]any{"type": "STRING"},
+		"drivers": map[string]any{"type": "ARRAY", "items": map[string]any{"type": "STRING"}},
+		"risks":   map[string]any{"type": "ARRAY", "items": map[string]any{"type": "STRING"}},
+		"sources": map[string]any{"type": "ARRAY", "items": map[string]any{"type": "STRING"}},
+	},
+	"required": []string{"summary", "drivers", "risks", "sources"},
+}
+
+// 투자 권유·가격 예측으로 읽히는 표현
+var forbiddenInsight = regexp.MustCompile(`(매수|매도|구매|판매)(하세요|하십시오|를 추천|을 추천|를 권|을 권|할 만)|추천합니다|목표가|목표 가격|오를 것|떨어질 것|상승할 것|하락할 것|반드시|확실히`)
+
+// 본문에 나온 퍼센트 값 (입력에 있는 값인지 대조). 앞뒤 숫자까지 통째로 잡아 '1.02%' 안의 '2%' 같은 부분 일치를 막는다
+var percentToken = regexp.MustCompile(`\d+(?:\.\d+)?%`)
+
+// 숫자를 말로 풀어 쓴 표현 ('마이너스 1.58퍼센트')
+var spelledNumber = regexp.MustCompile(`퍼센트|(플러스|마이너스)\s?\d`)
+
+// insightOutput 모델 출력
+type insightOutput struct {
+	Summary string   `json:"summary"`
+	Drivers []string `json:"drivers"`
+	Risks   []string `json:"risks"`
+	Sources []string `json:"sources"`
+}
+
+// Gemini 재시도: 요청 한도 초과·서버 오류는 잠시 뒤 다시 보낸다
+var geminiRetryBackoff = []time.Duration{time.Second, 3 * time.Second}
+
+// generateInsightText 형식·근거 검증을 통과할 때까지 최대 2번 생성한다
+func generateInsightText(ctx context.Context, apiKey, model, system, prompt string, newsIDs map[string]bool) (insightOutput, error) {
+	var lastErr error
+	for attempt := 1; attempt <= 2; attempt++ {
+		text, err := callGemini(ctx, apiKey, model, system, prompt)
+		if err != nil {
+			return insightOutput{}, err
+		}
+		var out insightOutput
+		if err := json.Unmarshal([]byte(text), &out); err != nil {
+			lastErr = fmt.Errorf("응답 JSON 파싱 실패: %w", err)
+		} else if lastErr = validateInsight(out, prompt, newsIDs); lastErr == nil {
+			return out, nil
+		}
+		log.Printf("인사이트 응답 거절(%d/2): %v\n", attempt, lastErr)
+	}
+	return insightOutput{}, lastErr
+}
+
+// validateInsight 형식, 인용한 기사 id, 퍼센트 숫자 일치, 금지 표현을 확인한다
+func validateInsight(out insightOutput, prompt string, newsIDs map[string]bool) error {
+	if strings.TrimSpace(out.Summary) == "" {
+		return errors.New("summary 없음")
+	}
+	if utf8.RuneCountInString(out.Summary) > 400 {
+		return errors.New("summary가 너무 김")
+	}
+	if len(out.Drivers) == 0 || len(out.Drivers) > 4 || len(out.Risks) > 3 {
+		return fmt.Errorf("항목 수 이상 (drivers %d, risks %d)", len(out.Drivers), len(out.Risks))
+	}
+	for _, id := range out.Sources {
+		if !newsIDs[id] {
+			return fmt.Errorf("없는 기사 인용: %s", id)
+		}
+	}
+	all := strings.Join(append(append([]string{out.Summary}, out.Drivers...), out.Risks...), " ")
+	if m := forbiddenInsight.FindString(all); m != "" {
+		return fmt.Errorf("투자 권유·예측 표현: %s", m)
+	}
+	if m := spelledNumber.FindString(all); m != "" {
+		return fmt.Errorf("숫자를 말로 풀어 씀: %s", m)
+	}
+	allowed := map[string]bool{}
+	for _, p := range percentToken.FindAllString(prompt, -1) {
+		allowed[p] = true
+	}
+	for _, p := range percentToken.FindAllString(all, -1) {
+		if !allowed[p] {
+			return fmt.Errorf("입력에 없는 수치: %s", p)
+		}
+	}
+	return nil
+}
+
+// callGemini generateContent 한 번 호출 (429·5xx·네트워크 오류는 재시도). 모델 출력 텍스트(JSON 문자열)를 돌려준다
+func callGemini(ctx context.Context, apiKey, model, system, prompt string) (string, error) {
+	body, err := json.Marshal(map[string]any{
+		"systemInstruction": map[string]any{"parts": []map[string]string{{"text": system}}},
+		"contents":          []map[string]any{{"role": "user", "parts": []map[string]string{{"text": prompt}}}},
+		"generationConfig": map[string]any{
+			"temperature":      0.3,
+			"responseMimeType": "application/json",
+			"responseSchema":   insightSchema,
+		},
+	})
+	if err != nil {
+		return "", err
+	}
+	apiURL := "https://generativelanguage.googleapis.com/v1beta/models/" + url.PathEscape(model) + ":generateContent"
+
+	for attempt := 0; ; attempt++ {
+		last := attempt >= len(geminiRetryBackoff)
+		status, respBody, err := postJSON(ctx, apiURL, apiKey, body)
+		switch {
+		case err == nil && status == http.StatusOK:
+			return extractGeminiText(respBody)
+		case err == nil && status != http.StatusTooManyRequests && status < 500:
+			return "", fmt.Errorf("Gemini 호출 실패: 상태 코드 %d, 응답: %.300s", status, respBody)
+		case last:
+			if err != nil {
+				return "", fmt.Errorf("Gemini 호출 실패: %w", err)
+			}
+			return "", fmt.Errorf("Gemini 호출 실패: 상태 코드 %d", status)
+		}
+		log.Printf("Gemini 일시적 실패(상태 %d, 오류 %v), %s 뒤 재시도\n", status, err, geminiRetryBackoff[attempt])
+		select {
+		case <-time.After(geminiRetryBackoff[attempt]):
+		case <-ctx.Done():
+			return "", ctx.Err()
+		}
+	}
+}
+
+func postJSON(ctx context.Context, apiURL, apiKey string, body []byte) (int, []byte, error) {
+	reqCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(reqCtx, http.MethodPost, apiURL, bytes.NewReader(body))
+	if err != nil {
+		return 0, nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-goog-api-key", apiKey) // 키는 URL 쿼리가 아니라 헤더로 (로그에 남지 않게)
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return 0, nil, err
+	}
+	defer resp.Body.Close()
+	b, err := io.ReadAll(resp.Body)
+	return resp.StatusCode, b, err
+}
+
+func extractGeminiText(body []byte) (string, error) {
+	var res struct {
+		Candidates []struct {
+			Content struct {
+				Parts []struct {
+					Text string `json:"text"`
+				} `json:"parts"`
+			} `json:"content"`
+		} `json:"candidates"`
+	}
+	if err := json.Unmarshal(body, &res); err != nil {
+		return "", fmt.Errorf("Gemini 응답 파싱 실패: %w", err)
+	}
+	if len(res.Candidates) == 0 || len(res.Candidates[0].Content.Parts) == 0 {
+		return "", fmt.Errorf("Gemini 응답에 내용 없음: %.300s", body)
+	}
+	return res.Candidates[0].Content.Parts[0].Text, nil
+}
+
+// buildCoinPrompt 코인 하나의 입력. 숫자는 화면 표기와 같은 형식으로 넣는다
+func buildCoinPrompt(d coinData, news []NewsItem, now time.Time) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "<window>최근 24시간, 기준 시각 %s (KST)</window>\n<data>\n", now.Format("2006-01-02 15:04"))
+	fmt.Fprintf(&b, "코인: %s (%s)\n", d.Name, d.Symbol)
+	if d.Reason != "" {
+		fmt.Fprintf(&b, "분석 대상 선정 이유: %s\n", d.Reason)
+	}
+	fmt.Fprintf(&b, "현재가: %s\n", formatWon(d.Price))
+	fmt.Fprintf(&b, "등락률(전일 종가 대비): %s\n", signedPercent(d.Change))
+	fmt.Fprintf(&b, "고가/저가: %s / %s\n", formatWon(d.High), formatWon(d.Low))
+	fmt.Fprintf(&b, "24시간 거래대금: %s", formatEok(d.Volume24h))
+	if d.VolumeRatio > 0 {
+		fmt.Fprintf(&b, " (최근 7일 평균의 %.1f배)", d.VolumeRatio)
+	}
+	b.WriteString("\n")
+	if d.Has7d {
+		fmt.Fprintf(&b, "7일 등락률: %s\n", signedPercent(d.Change7d))
+	}
+	fmt.Fprintf(&b, "유의/주의 지정: %s\n", designation(d.Warning, d.Caution))
+	fmt.Fprintf(&b, "분위기 라벨(규칙으로 정함): %s\n</data>\n", d.Mood)
+	writeNews(&b, news)
+	return b.String()
+}
+
+// buildMarketPrompt 시장 전체 입력
+func buildMarketPrompt(m marketData, news []NewsItem, now time.Time) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "<window>최근 24시간, 기준 시각 %s (KST)</window>\n<data>\n", now.Format("2006-01-02 15:04"))
+	fmt.Fprintf(&b, "대상: 원화 마켓 상장 코인 %d종\n", m.Listed)
+	fmt.Fprintf(&b, "상승 %d종 / 하락 %d종 / 보합 %d종\n", m.Up, m.Down, m.Listed-m.Up-m.Down)
+	fmt.Fprintf(&b, "등락률 중앙값(전일 종가 대비): %s\n", signedPercent(m.MedianChange))
+	fmt.Fprintf(&b, "비트코인: %s / 이더리움: %s\n", signedPercent(m.BTC), signedPercent(m.ETH))
+	b.WriteString("거래대금 상위 5:\n")
+	for _, c := range m.TopVolume {
+		fmt.Fprintf(&b, "  - %s(%s): %s, 거래대금 %s\n", c.Name, c.Symbol, signedPercent(c.Change), formatEok(c.Volume24h))
+	}
+	fmt.Fprintf(&b, "유의 지정 %d종 / 주의 지정 %d종\n", m.Warnings, m.Cautions)
+	fmt.Fprintf(&b, "분위기 라벨(규칙으로 정함, 등락률 중앙값 기준): %s\n</data>\n", m.Mood)
+	writeNews(&b, news)
+	return b.String()
+}
+
+func writeNews(b *strings.Builder, news []NewsItem) {
+	if len(news) == 0 {
+		b.WriteString("<news>관련 기사 없음</news>\n")
+		return
+	}
+	b.WriteString("<news>\n")
+	for _, n := range news {
+		fmt.Fprintf(b, "[%s] %s | %s | %s\n", n.ID, n.PublishedAt, n.Title, n.Description)
+	}
+	b.WriteString("</news>\n")
+}
+
+func designation(warning, caution bool) string {
+	switch {
+	case warning && caution:
+		return "유의 종목, 투자 주의"
+	case warning:
+		return "유의 종목"
+	case caution:
+		return "투자 주의"
+	default:
+		return "없음"
+	}
+}
+
+func signedPercent(v float64) string {
+	return fmt.Sprintf("%+.2f%%", v)
+}
+
+// formatWon 100원 이상은 정수 쉼표, 그 아래는 소수 (업비트 호가 단위와 비슷하게)
+func formatWon(v float64) string {
+	switch {
+	case v >= 100:
+		return commaInt(int64(math.Round(v))) + "원"
+	case v >= 1:
+		return fmt.Sprintf("%.2f원", v)
+	default:
+		return fmt.Sprintf("%.4f원", v)
+	}
+}
+
+// formatEok 원 → '3,120억원' (1억 미만은 '1억원 미만')
+func formatEok(v float64) string {
+	eok := int64(math.Round(v / 1e8))
+	if eok < 1 {
+		return "1억원 미만"
+	}
+	return commaInt(eok) + "억원"
+}
+
+func commaInt(n int64) string {
+	s := fmt.Sprintf("%d", n)
+	neg := strings.HasPrefix(s, "-")
+	s = strings.TrimPrefix(s, "-")
+	var out []byte
+	for i := range s {
+		if i > 0 && (len(s)-i)%3 == 0 {
+			out = append(out, ',')
+		}
+		out = append(out, s[i])
+	}
+	if neg {
+		return "-" + string(out)
+	}
+	return string(out)
+}
