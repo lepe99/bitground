@@ -9,21 +9,23 @@ import bit.bitgroundspring.repository.OrderRepository;
 import bit.bitgroundspring.repository.UserRankingRepository;
 import bit.bitgroundspring.repository.UserRepository;
 import bit.bitgroundspring.repository.SeasonRepository;
-import bit.bitgroundspring.repository.UserDailyBalanceRepository; // UserDailyBalanceRepository 임포트
-import bit.bitgroundspring.repository.CoinPriceHistoryRepository; // CoinPriceHistoryRepository 임포트
-import bit.bitgroundspring.repository.CoinRepository; // CoinRepository 임포트
-import bit.bitgroundspring.service.InitialCashPolicy;
+import bit.bitgroundspring.repository.UserDailyBalanceRepository;
+import bit.bitgroundspring.repository.CoinPriceHistoryRepository;
+import bit.bitgroundspring.repository.CoinRepository;
 
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -35,161 +37,145 @@ public class InvestmentAnalysisService {
     private final UserRankingRepository userRankingRepository;
     private final UserRepository userRepository;
     private final SeasonRepository seasonRepository;
-    private final InitialCashPolicy initialCashPolicy;
     private final UserDailyBalanceRepository userDailyBalanceRepository;
     private final CoinPriceHistoryRepository coinPriceHistoryRepository;
     private final CoinRepository coinRepository;
 
     /**
-     * 특정 사용자 및 시즌에 대한 투자 요약 데이터를 생성합니다.
-     * 이 데이터는 AI 조언 생성을 위한 입력으로 사용됩니다.
+     * 특정 사용자 및 시즌에 대한 투자 요약 데이터를 생성합니다. (AI 시즌 리뷰의 입력)
      *
-     * @param userId 분석할 사용자의 ID
-     * @param seasonId 분석할 시즌의 ID
-     * @return InvestmentSummaryDto DTO (분석 결과 요약)
-     * @throws IllegalArgumentException 사용자를 찾을 수 없거나 시즌을 찾을 수 없는 경우
+     * <p>총 손익·기준 자금 계산 방식 (완료된 시즌):
+     * 시즌 정산 때 스케줄러가 남은 보유 코인을 랭킹과 같은 가격으로 청산해 SELL 주문으로 기록하므로,
+     * 시즌 체결 내역의 (매도 금액 − 매수 금액)이 곧 시즌 전체 매매 손익이고,
+     * 랭킹의 최종 총자산 − 매매 손익 = 시즌 동안 지급받은 현금(시즌 시작 지급 또는 시즌 중 가입 지급 + 스플릿 지급)이다.
+     * 지급 규칙(가입일·스플릿 시각)을 다시 계산하지 않아도 되고, 화면의 순위·총자산과 숫자가 어긋나지 않는다.
+     * (기존: 오늘 날짜 기준 초기 자금 정책 값을 기준으로 써서, 여는 날·가입 시점·스플릿에 따라 수익률이 틀렸음)
+     *
+     * <p>진행 중인 시즌은 아직 청산 전이라 보유 코인이 손익에 반영되지 않으므로 기준 자금·총 손익·수익률을 null로 둔다.
      */
+    @Transactional(readOnly = true)
     public InvestmentSummaryDto getUserInvestmentSummaryForSeason(Integer userId, Integer seasonId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
         Season season = seasonRepository.findById(seasonId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.SEASON_NOT_FOUND));
+        boolean completed = season.getStatus() == Status.COMPLETED;
 
         log.info("사용자 ID: {}, 시즌 ID: {}에 대한 투자 요약 계산 시작.", user.getId(), season.getId());
 
-        // 1. 시즌 전체 성과 지표 로딩 및 계산
-        // userRankingOptional은 순위 정보만 사용하고 totalValue는 아래에서 재계산합니다.
-        Optional<UserRanking> userRankingOptional = userRankingRepository.findByUserAndSeason(user, season);
-        UserRanking userRanking = userRankingOptional.orElse(null);
+        UserRanking userRanking = userRankingRepository.findByUserAndSeason(user, season).orElse(null);
+        int participantCount = (int) userRankingRepository.countBySeason(season);
 
-        Long initialCashBalance = (long) initialCashPolicy.getInitialCash();
+        // 1. 거래 활동 요약 (금액은 BigDecimal로 합산 후 원 단위로 반올림. Float은 1,600만 원을 넘으면 원 단위가 틀어짐)
+        List<Order> completedOrders = orderRepository.findByUserAndSeasonAndStatus(user, season, Status.COMPLETED);
 
-        // 2. 거래 활동 요약 (Order 엔티티 기반)
-        // season.getStatus() == Status.COMPLETED 조건 확인
-        List<Order> completedOrders = orderRepository.findByUserAndSeasonAndStatus(
-                user, season, Status.COMPLETED);
+        int totalTradeCount = completedOrders.size();
+        int buyOrderCount = (int) completedOrders.stream().filter(o -> o.getOrderType() == OrderType.BUY).count();
+        int sellOrderCount = totalTradeCount - buyOrderCount;
 
-        Integer totalTradeCount = completedOrders.size();
-        Integer buyOrderCount = (int) completedOrders.stream()
-                .filter(order -> order.getOrderType() == OrderType.BUY)
-                .count();
-        Integer sellOrderCount = (int) completedOrders.stream()
-                .filter(order -> order.getOrderType() == OrderType.SELL)
-                .count();
-
-        Float totalTradeValueSum = completedOrders.stream()
-                .map(order -> order.getTradePrice().multiply(order.getAmount()).floatValue())
-                .reduce(0.0F, Float::sum);
-        Float avgTradeAmount = (totalTradeCount > 0)
-                ? totalTradeValueSum / totalTradeCount
-                : 0.0F;
-
-        Float totalRealizedProfitLoss = 0.0F;
-        Map<String, Float> coinRealizedProfitLoss = new HashMap<>();
-
-        Map<String, List<Order>> ordersByCoin = completedOrders.stream()
-                .collect(Collectors.groupingBy(order -> order.getCoin().getSymbol()));
-
-        for (Map.Entry<String, List<Order>> entry : ordersByCoin.entrySet()) {
-            String coinSymbol = entry.getKey();
-            List<Order> coinOrders = entry.getValue();
-
-            Float coinBuyValue = 0.0F;
-            Float coinSellValue = 0.0F;
-
-            for (Order order : coinOrders) {
-                Float tradeValue = order.getTradePrice().multiply(order.getAmount()).floatValue();
-                if (order.getOrderType() == OrderType.BUY) {
-                    coinBuyValue += tradeValue;
-                } else if (order.getOrderType() == OrderType.SELL) {
-                    coinSellValue += tradeValue;
-                }
-            }
-            Float currentCoinPL = coinSellValue - coinBuyValue;
-            coinRealizedProfitLoss.put(coinSymbol, currentCoinPL);
-            totalRealizedProfitLoss += currentCoinPL;
+        Map<String, BigDecimal> coinProfit = new HashMap<>();   // 코인별 (매도 − 매수)
+        Map<String, BigDecimal> coinVolume = new HashMap<>();   // 코인별 거래 금액 합
+        Map<String, Integer> coinTradeCounts = new HashMap<>();
+        BigDecimal totalVolume = BigDecimal.ZERO;
+        for (Order order : completedOrders) {
+            String symbol = order.getCoin().getSymbol();
+            BigDecimal value = order.getTradePrice().multiply(order.getAmount());
+            BigDecimal signed = order.getOrderType() == OrderType.SELL ? value : value.negate();
+            coinProfit.merge(symbol, signed, BigDecimal::add);
+            coinVolume.merge(symbol, value, BigDecimal::add);
+            coinTradeCounts.merge(symbol, 1, Integer::sum);
+            totalVolume = totalVolume.add(value);
         }
 
-        Map<String, Integer> coinTradeCounts = completedOrders.stream()
-                .collect(Collectors.groupingBy(order -> order.getCoin().getSymbol(),
-                        Collectors.summingInt(order -> 1)));
+        Map<String, Long> coinRealizedProfitLoss = coinProfit.entrySet().stream()
+                .collect(Collectors.toMap(Map.Entry::getKey, e -> toWon(e.getValue())));
+        long totalRealizedProfitLoss = toWon(coinProfit.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add));
+        long avgTradeAmount = totalTradeCount > 0
+                ? toWon(totalVolume.divide(BigDecimal.valueOf(totalTradeCount), 0, RoundingMode.HALF_UP))
+                : 0L;
 
-        // 3. 투자 성향 관련 지표 (Order 엔티티 기반 심화 분석)
-        String mostTradedCoinSymbol = null;
-        Float mostTradedCoinTradeVolume = 0.0F;
-        if (!completedOrders.isEmpty()) {
-            Map<String, Float> coinVolumes = new HashMap<>();
-            for (Order order : completedOrders) {
-                String symbol = order.getCoin().getSymbol();
-                Float tradeVolume = order.getTradePrice().multiply(order.getAmount()).floatValue();
-                coinVolumes.put(symbol, coinVolumes.getOrDefault(symbol, 0.0F) + tradeVolume);
-            }
-
-            mostTradedCoinSymbol = coinVolumes.entrySet().stream()
-                    .max(Map.Entry.comparingByValue())
-                    .map(Map.Entry::getKey)
-                    .orElse(null);
-            mostTradedCoinTradeVolume = coinVolumes.getOrDefault(mostTradedCoinSymbol, 0.0F);
-        }
-
-        String highestProfitCoinSymbol = null;
-        Float highestProfitCoinAmount = 0.0F;
-        String lowestProfitCoinSymbol = null;
-        Float lowestProfitCoinAmount = 0.0F;
-
-        if (!coinRealizedProfitLoss.isEmpty()) {
-            highestProfitCoinSymbol = coinRealizedProfitLoss.entrySet().stream()
-                    .max(Map.Entry.comparingByValue())
-                    .map(Map.Entry::getKey)
-                    .orElse(null);
-            highestProfitCoinAmount = coinRealizedProfitLoss.getOrDefault(highestProfitCoinSymbol, 0.0F);
-
-            lowestProfitCoinSymbol = coinRealizedProfitLoss.entrySet().stream()
-                    .min(Map.Entry.comparingByValue())
-                    .map(Map.Entry::getKey)
-                    .orElse(null);
-            lowestProfitCoinAmount = coinRealizedProfitLoss.getOrDefault(lowestProfitCoinSymbol, 0.0F);
-        }
+        // 2. 투자 성향 지표
+        String mostTradedCoinSymbol = maxKey(coinVolume);
+        long mostTradedCoinTradeVolume = mostTradedCoinSymbol != null ? toWon(coinVolume.get(mostTradedCoinSymbol)) : 0L;
+        String highestProfitCoinSymbol = maxKey(coinProfit);
+        long highestProfitCoinAmount = highestProfitCoinSymbol != null ? coinRealizedProfitLoss.get(highestProfitCoinSymbol) : 0L;
+        String lowestProfitCoinSymbol = coinProfit.entrySet().stream()
+                .min(Map.Entry.comparingByValue()).map(Map.Entry::getKey).orElse(null);
+        long lowestProfitCoinAmount = lowestProfitCoinSymbol != null ? coinRealizedProfitLoss.get(lowestProfitCoinSymbol) : 0L;
 
         long seasonDurationDays = ChronoUnit.DAYS.between(season.getStartAt(), season.getEndAt().plusDays(1));
-        Double avgTradesPerDay = (seasonDurationDays > 0)
-                ? (double) totalTradeCount / seasonDurationDays
-                : (totalTradeCount > 0 ? (double)totalTradeCount : 0.0);
+        double avgTradesPerDay = seasonDurationDays > 0 ? (double) totalTradeCount / seasonDurationDays : totalTradeCount;
 
-        Boolean focusedOnFewCoins = false;
-        if (totalTradeCount > 0) {
-            long distinctCoinsTraded = completedOrders.stream()
-                    .map(order -> order.getCoin().getSymbol())
-                    .distinct()
-                    .count();
-            // 전체 거래 중 3개 이하의 코인에 집중했을 경우 true
-            if (distinctCoinsTraded <= 3 && totalTradeCount > 0) {
-                focusedOnFewCoins = true;
-            }
-        }
+        // 거래한 코인이 3종 이하면 소수 코인 집중
+        boolean focusedOnFewCoins = totalTradeCount > 0 && coinTradeCounts.size() <= 3;
 
-        // 4. 일별 자산 잔고 추이 데이터 조회 및 추가
+        // 3. 일별 자산 잔고 추이
         List<UserDailyBalance> dailyBalanceTrend = userDailyBalanceRepository
                 .findByUserAndSeasonAndSnapshotDateBetweenOrderBySnapshotDateAsc(
                         user, season, season.getStartAt(), season.getEndAt()
                 );
 
-        // 5. 주요 코인들의 시즌 내 시세 변동 요약
-        Map<String, String> coinMarketPerformanceSummary = new HashMap<>();
-        List<String> keyCoinSymbols = new java.util.ArrayList<>();
-        if (mostTradedCoinSymbol != null) keyCoinSymbols.add(mostTradedCoinSymbol);
-        if (highestProfitCoinSymbol != null && !keyCoinSymbols.contains(highestProfitCoinSymbol)) keyCoinSymbols.add(highestProfitCoinSymbol);
-        if (lowestProfitCoinSymbol != null && !keyCoinSymbols.contains(lowestProfitCoinSymbol)) keyCoinSymbols.add(lowestProfitCoinSymbol);
+        // 4. 주요 코인들의 시즌 내 시세 변동 요약
+        Map<String, String> coinMarketPerformanceSummary = summarizeCoinPerformance(season,
+                distinct(mostTradedCoinSymbol, highestProfitCoinSymbol, lowestProfitCoinSymbol));
 
-        // 대상 코인(최대 3개)과 시즌 시작·종료일 시세를 쿼리 두 번으로 가져온다 (기존: 코인마다 코인·시세를 따로 조회)
-        Map<String, Coin> coinsBySymbol = coinRepository.findAllBySymbolIn(keyCoinSymbols).stream()
+        // 5. 최종 자산·기준 자금·총 손익 (위 설명 참고)
+        Long finalTotalValue = userRanking != null ? userRanking.getTotalValue() : null;
+        Long grantedCash = null;
+        Long totalProfitLoss = null;
+        Float totalProfitLossPercentage = null;
+        if (completed && finalTotalValue != null) {
+            totalProfitLoss = totalRealizedProfitLoss;
+            grantedCash = finalTotalValue - totalProfitLoss;
+            totalProfitLossPercentage = grantedCash > 0 ? (float) (totalProfitLoss * 100.0 / grantedCash) : null;
+        }
+
+        return InvestmentSummaryDto.builder()
+                .userId(user.getId())
+                .userName(user.getName())
+                .seasonId(season.getId())
+                .seasonName(season.getName())
+                .seasonStartAt(season.getStartAt())
+                .seasonEndAt(season.getEndAt())
+                .initialCashBalance(grantedCash)
+                .finalTotalValue(finalTotalValue)
+                .totalProfitLossAmount(totalProfitLoss)
+                .totalProfitLossPercentage(totalProfitLossPercentage)
+                .finalRank(userRanking != null ? userRanking.getRanks() : null)
+                .participantCount(participantCount)
+                .totalTradeCount(totalTradeCount)
+                .buyOrderCount(buyOrderCount)
+                .sellOrderCount(sellOrderCount)
+                .avgTradeAmount(avgTradeAmount)
+                .totalRealizedProfitLoss(totalRealizedProfitLoss)
+                .coinRealizedProfitLoss(coinRealizedProfitLoss)
+                .coinTradeCounts(coinTradeCounts)
+                .mostTradedCoinSymbol(mostTradedCoinSymbol)
+                .mostTradedCoinTradeVolume(mostTradedCoinTradeVolume)
+                .highestProfitCoinSymbol(highestProfitCoinSymbol)
+                .highestProfitCoinAmount(highestProfitCoinAmount)
+                .lowestProfitCoinSymbol(lowestProfitCoinSymbol)
+                .lowestProfitCoinAmount(lowestProfitCoinAmount)
+                .avgTradesPerDay(avgTradesPerDay)
+                .focusedOnFewCoins(focusedOnFewCoins)
+                .dailyBalanceTrend(dailyBalanceTrend)
+                .coinMarketPerformanceSummary(coinMarketPerformanceSummary)
+                .build();
+    }
+
+    /** 대상 코인(최대 3개)의 시즌 시작일 시가 → 종료일 종가. 쿼리 두 번으로 가져온다 */
+    private Map<String, String> summarizeCoinPerformance(Season season, List<String> symbols) {
+        Map<String, String> summary = new HashMap<>();
+        if (symbols.isEmpty()) return summary;
+
+        Map<String, Coin> coinsBySymbol = coinRepository.findAllBySymbolIn(symbols).stream()
                 .collect(Collectors.toMap(Coin::getSymbol, c -> c));
         Map<String, List<CoinPriceHistory>> pricesBySymbol = coinsBySymbol.isEmpty() ? Map.of()
                 : coinPriceHistoryRepository.findByCoinsAndDates(coinsBySymbol.values(), List.of(season.getStartAt(), season.getEndAt()))
                 .stream()
                 .collect(Collectors.groupingBy(h -> h.getCoin().getSymbol()));
 
-        for (String symbol : keyCoinSymbols) {
+        for (String symbol : symbols) {
             if (!coinsBySymbol.containsKey(symbol)) {
                 log.warn("코인 심볼 {}에 해당하는 Coin 엔티티를 찾을 수 없습니다.", symbol);
                 continue;
@@ -209,78 +195,30 @@ public class InvestmentAnalysisService {
                     .orElse(null);
 
             if (startPrice != null && endPrice != null && startPrice != 0) {
-                String performanceSummary = String.format(
+                summary.put(symbol, String.format(
                         "초기 %.2f원 -> 최종 %.2f원 (변동률: %.2f%%)",
-                        startPrice,
-                        endPrice,
-                        ((endPrice - startPrice) / startPrice) * 100
-                );
-                coinMarketPerformanceSummary.put(symbol, performanceSummary);
+                        startPrice, endPrice, ((endPrice - startPrice) / startPrice) * 100));
             } else {
                 log.warn("코인 {}의 시즌 시작/종료 가격 데이터를 찾을 수 없거나 시작 가격이 0입니다. (시즌 기간: {} ~ {})",
                         symbol, season.getStartAt(), season.getEndAt());
             }
         }
+        return summary;
+    }
 
-        // ⭐⭐ 수정된 부분: finalTotalValue와 totalProfitLossAmount/Percentage 재계산 ⭐⭐
-        // 시즌이 COMPLETED 상태라면, 모든 자산이 매도 처리되어 totalRealizedProfitLoss에 반영되었다고 가정합니다.
-        // 따라서 최종 총 자산은 초기 자산 + 총 실현 손익으로 계산합니다.
-        Long finalTotalValue;
-        Long totalProfitLossAmountRecalculated; // 기존 totalProfitLossAmount와 구분
-        Float totalProfitLossPercentageRecalculated; // 기존 totalProfitLossPercentage와 구분
+    private static long toWon(BigDecimal value) {
+        return value.setScale(0, RoundingMode.HALF_UP).longValueExact();
+    }
 
-        if (season.getStatus() == Status.COMPLETED) {
-            // 시즌이 완료된 경우, 최종 총 자산은 초기 현금에 총 실현 손익을 더한 값으로 간주
-            finalTotalValue = initialCashBalance + Math.round(totalRealizedProfitLoss);
-            totalProfitLossAmountRecalculated = finalTotalValue - initialCashBalance;
-            totalProfitLossPercentageRecalculated = (initialCashBalance != 0) ?
-                    ((float) totalProfitLossAmountRecalculated / initialCashBalance) * 100.0F : 0.0F;
-            log.info("COMPLETED 시즌의 finalTotalValue 재계산: 초기자금 {} + 실현손익 {} = 최종자산 {}",
-                    initialCashBalance, totalRealizedProfitLoss, finalTotalValue);
-        } else {
-            // 진행 중인 시즌의 경우, user_rankings의 totalValue를 사용 (혹은 실시간 자산 평가 로직)
-            // 현재는 user_rankings의 값을 그대로 사용하거나, 필요시 실시간 평가 로직 추가
-            finalTotalValue = (userRanking != null && userRanking.getTotalValue() != null)
-                    ? userRanking.getTotalValue()
-                    : initialCashBalance; // 랭크 데이터 없으면 초기 현금으로 시작 (임시)
-            totalProfitLossAmountRecalculated = finalTotalValue - initialCashBalance;
-            totalProfitLossPercentageRecalculated = (initialCashBalance != 0) ?
-                    ((float) totalProfitLossAmountRecalculated / initialCashBalance) * 100.0F : 0.0F;
-            log.info("ACTIVE 시즌의 finalTotalValue 사용: UserRanking의 최종자산 {} (초기자금 {})",
-                    finalTotalValue, initialCashBalance);
+    private static String maxKey(Map<String, BigDecimal> values) {
+        return values.entrySet().stream().max(Map.Entry.comparingByValue()).map(Map.Entry::getKey).orElse(null);
+    }
+
+    private static List<String> distinct(String... symbols) {
+        List<String> result = new ArrayList<>();
+        for (String s : symbols) {
+            if (s != null && !result.contains(s)) result.add(s);
         }
-
-
-        // 6. 모든 정보를 포함하는 InvestmentSummaryDto 빌드
-        return InvestmentSummaryDto.builder()
-                .userId(user.getId())
-                .userName(user.getName())
-                .seasonId(season.getId())
-                .seasonName(season.getName())
-                .seasonStartAt(season.getStartAt())
-                .seasonEndAt(season.getEndAt())
-                .initialCashBalance(initialCashBalance)
-                .finalTotalValue(finalTotalValue) // ✅ 재계산된 값 사용
-                .totalProfitLossAmount(totalProfitLossAmountRecalculated) // ✅ 재계산된 값 사용
-                .totalProfitLossPercentage(totalProfitLossPercentageRecalculated) // ✅ 재계산된 값 사용
-                .finalRank((userRanking != null && userRanking.getRanks() != null) ? userRanking.getRanks() : null)
-                .totalTradeCount(totalTradeCount)
-                .buyOrderCount(buyOrderCount)
-                .sellOrderCount(sellOrderCount)
-                .avgTradeAmount(avgTradeAmount)
-                .totalRealizedProfitLoss(totalRealizedProfitLoss)
-                .coinRealizedProfitLoss(coinRealizedProfitLoss)
-                .coinTradeCounts(coinTradeCounts)
-                .mostTradedCoinSymbol(mostTradedCoinSymbol)
-                .mostTradedCoinTradeVolume(mostTradedCoinTradeVolume)
-                .highestProfitCoinSymbol(highestProfitCoinSymbol)
-                .highestProfitCoinAmount(highestProfitCoinAmount)
-                .lowestProfitCoinSymbol(lowestProfitCoinSymbol)
-                .lowestProfitCoinAmount(lowestProfitCoinAmount)
-                .avgTradesPerDay(avgTradesPerDay)
-                .focusedOnFewCoins(focusedOnFewCoins)
-                .dailyBalanceTrend(dailyBalanceTrend)
-                .coinMarketPerformanceSummary(coinMarketPerformanceSummary)
-                .build();
+        return result;
     }
 }

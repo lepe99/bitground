@@ -44,7 +44,8 @@ public class AiAdvice {
     @Column(name = "score", nullable = false , columnDefinition = "tinyint")
     private Integer score;
     
-    @Column(name = "advice", length = 2000, nullable = false)
+    // 모델 출력 길이는 지시해도 정확히 지켜지지 않으므로 넉넉한 TEXT (기존 varchar(2000)은 넘치면 저장 오류)
+    @Column(name = "advice", columnDefinition = "text", nullable = false)
     private String advice;
     
     @CreationTimestamp

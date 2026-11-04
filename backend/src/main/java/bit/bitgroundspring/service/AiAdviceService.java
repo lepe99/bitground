@@ -16,6 +16,7 @@ import bit.bitgroundspring.repository.SeasonRepository;
 import bit.bitgroundspring.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,11 +38,13 @@ public class AiAdviceService {
      * 특정 사용자 및 특정 시즌에 대한 AI 투자 조언을 생성하고 저장합니다.
      * 시즌 상태가 COMPLETED일 때만 작동하며, 이미 조언이 존재하는 경우 기존 조언을 반환합니다.
      *
+     * <p>트랜잭션을 걸지 않는다. Gemini 응답을 기다리는 수십 초 동안 DB 연결을 붙잡지 않도록
+     * 조회(투자 요약은 자체 읽기 전용 트랜잭션)와 저장만 각각 짧게 DB를 쓴다.
+     *
      * @param userId 조언을 생성할 사용자의 ID
      * @param seasonId 조언을 생성할 시즌의 ID
      * @return 생성되거나 조회된 AiAdviceDto
      */
-    @Transactional
     @Loggable("AI 조언")
     public AiAdviceDto generateOrGetAiAdviceForUserAndSeason(Integer userId, Integer seasonId) {
         log.info("[AiAdviceService] generateOrGetAiAdviceForUserAndSeason 요청 시작: User ID={}, Season ID={}", userId, seasonId);
@@ -94,40 +97,29 @@ public class AiAdviceService {
             log.info("[AiAdviceService] Gemini API로부터 AI 조언 성공적으로 생성. Score: {}, Advice Length: {}",
                     generatedAdviceDto.getScore(), generatedAdviceDto.getAdvice().length());
 
-            // ⭐⭐⭐ 문제 해결 지점: generatedAdviceDto.getScore()의 런타임 타입과 값 확인 및 명시적 형변환 ⭐⭐⭐
-            Object rawScore = generatedAdviceDto.getScore(); // 디버깅을 위해 Object로 받아서 실제 타입 확인
-            log.debug("[AiAdviceService] generatedAdviceDto.getScore()의 런타임 타입: {}", rawScore != null ? rawScore.getClass().getName() : "null");
-            log.debug("[AiAdviceService] generatedAdviceDto.getScore()의 값: {}", rawScore);
-
-            Integer finalScore;
-            if (rawScore instanceof Number) { // Number (Integer, Float, Double 등) 인스턴스인지 확인
-                finalScore = ((Number) rawScore).intValue(); // Number를 intValue()로 변환 후 Integer로 오토박싱
-            } else if (rawScore instanceof String) { // 문자열인 경우 파싱 시도
-                try {
-                    finalScore = Integer.parseInt((String) rawScore);
-                } catch (NumberFormatException e) {
-                    log.error("[AiAdviceService] Score 파싱 오류: 문자열 score '{}'를 Integer로 변환할 수 없습니다.", rawScore, e);
-                    finalScore = 0; // 변환 실패 시 기본값 설정
-                }
-            } else {
-                log.warn("[AiAdviceService] 예상치 못한 score 타입: {}", rawScore != null ? rawScore.getClass().getName() : "null");
-                finalScore = 0; // 예상치 못한 타입일 경우 기본값 설정
-            }
+            // 점수는 tinyint 컬럼에 들어가므로 0~100으로 자른다 (모델이 범위를 벗어난 값을 줄 수 있음)
+            Integer rawScore = generatedAdviceDto.getScore();
+            int finalScore = rawScore == null ? 0 : Math.max(0, Math.min(100, rawScore));
 
             AiAdvice newAdvice = AiAdvice.builder()
                     .user(user)
                     .season(season)
-                    .score(finalScore) // ⭐⭐⭐ 수정된 finalScore 사용 ⭐⭐⭐
+                    .score(finalScore)
                     .advice(generatedAdviceDto.getAdvice())
                     .createdAt(LocalDateTime.now())
                     .build();
-            log.debug("[AiAdviceService] AiAdvice 엔티티 빌드 완료. 저장 시도 중...");
 
-            AiAdvice savedAdvice = aiAdviceRepository.save(newAdvice);
-            log.info("[AiAdviceService] AI 조언이 성공적으로 데이터베이스에 저장되었습니다. User ID={}, Season ID={}. Advice ID: {}",
-                    userId, seasonId, savedAdvice.getId());
-
-            return convertToDto(savedAdvice);
+            try {
+                AiAdvice savedAdvice = aiAdviceRepository.save(newAdvice);
+                log.info("[AiAdviceService] AI 조언 저장 완료. User ID={}, Season ID={}, Advice ID={}", userId, seasonId, savedAdvice.getId());
+                return convertToDto(savedAdvice);
+            } catch (DataIntegrityViolationException e) {
+                // 같은 사용자가 거의 동시에 두 번 요청해 다른 요청이 먼저 저장한 경우: 그쪽 결과를 돌려준다
+                log.info("[AiAdviceService] 다른 요청이 먼저 저장한 AI 조언을 반환합니다. User ID={}, Season ID={}", userId, seasonId);
+                return aiAdviceRepository.findByUserAndSeason(user, season)
+                        .map(this::convertToDto)
+                        .orElseThrow(() -> e);
+            }
 
         } catch (IllegalArgumentException | IllegalStateException e) {
             log.error("[AiAdviceService] generateOrGetAiAdviceForUserAndSeason - 비즈니스 로직 오류: {}", e.getMessage());

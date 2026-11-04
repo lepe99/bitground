@@ -19,6 +19,9 @@ public interface UserRankingRepository extends JpaRepository<UserRanking, Long> 
     // 단일 사용자 + 시즌별 랭킹 조회
     Optional<UserRanking> findByUserAndSeason(User user, Season season);
 
+    // 시즌 랭킹 참가자 수 (순위를 '상위 몇 %'로 해석할 때)
+    long countBySeason(Season season);
+
     // 특정 시즌의 전체 랭킹 목록 (Projection)
     @Query("SELECT ur.user.id as userId, " +
             "u.name as name, " +

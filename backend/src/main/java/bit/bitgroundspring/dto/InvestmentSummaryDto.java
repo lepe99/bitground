@@ -31,29 +31,32 @@ public class InvestmentSummaryDto {
     private LocalDate seasonStartAt;
     private LocalDate seasonEndAt;
 
-    // 2. 시즌 전체 성과 지표
-    private Long initialCashBalance;          // 시즌 시작 시 초기 현금 잔고
-    private Long finalTotalValue;             // 시즌 종료 시점 최종 총 자산
-    private Long totalProfitLossAmount;       // 총 손익 금액
-    private Float totalProfitLossPercentage; // 총 수익률 (%)
+    // 2. 시즌 전체 성과 지표 (금액은 모두 원 단위 long)
+    // AssetSummaryService: 시즌 첫날 스냅샷 기준 / InvestmentAnalysisService: 시즌 중 지급받은 현금 합계
+    // (시즌 시작 지급 또는 시즌 중 가입 시 지급 + 스플릿 추가 지급). 진행 중인 시즌이면 null
+    private Long initialCashBalance;
+    private Long finalTotalValue;             // 시즌 종료 시점 최종 총 자산 (랭킹 정산 값)
+    private Long totalProfitLossAmount;       // 총 손익 금액 (진행 중인 시즌이면 null)
+    private Float totalProfitLossPercentage; // 총 수익률 (%) (진행 중인 시즌이면 null)
     private Integer finalRank;             // 시즌 최종 랭크
+    private Integer participantCount;      // 시즌 랭킹 참가자 수
 
     // 3. 거래 활동 요약
-    private Integer totalTradeCount;             // 총 거래 횟수
+    private Integer totalTradeCount;             // 총 거래 횟수 (시즌 종료 시 일괄 청산 기록 포함)
     private Integer buyOrderCount;               // 총 매수 주문 횟수
     private Integer sellOrderCount;              // 총 매도 주문 횟수
-    private Float avgTradeAmount;           // 평균 거래 금액
-    private Float totalRealizedProfitLoss;  // 총 실현 손익
-    private Map<String, Float> coinRealizedProfitLoss; // 코인별 실현 손익
+    private Long avgTradeAmount;           // 평균 거래 금액
+    private Long totalRealizedProfitLoss;  // 총 매매 손익 (매도 금액 − 매수 금액. 완료 시즌은 청산 포함이라 = 총 손익)
+    private Map<String, Long> coinRealizedProfitLoss; // 코인별 매매 손익
     private Map<String, Integer> coinTradeCounts; // 코인별 거래 횟수
 
     // 4. 투자 성향 관련 지표
     private String mostTradedCoinSymbol;       // 가장 많이 거래한 코인 심볼
-    private Float mostTradedCoinTradeVolume; // 가장 많이 거래한 코인의 총 거래 금액
+    private Long mostTradedCoinTradeVolume; // 가장 많이 거래한 코인의 총 거래 금액
     private String highestProfitCoinSymbol;    // 가장 수익을 많이 낸 코인 심볼
-    private Float highestProfitCoinAmount;  // 가장 수익을 많이 낸 코인의 수익 금액
+    private Long highestProfitCoinAmount;  // 가장 수익을 많이 낸 코인의 수익 금액
     private String lowestProfitCoinSymbol;     // 가장 손실을 많이 낸 코인 심볼
-    private Float lowestProfitCoinAmount;   // 가장 손실을 많이 낸 코인의 손실 금액
+    private Long lowestProfitCoinAmount;   // 가장 손실을 많이 낸 코인의 손실 금액
     private Double avgTradesPerDay;            // 하루 평균 거래 횟수
     private Boolean focusedOnFewCoins;         // 소수 코인에 집중했는지 여부
 
