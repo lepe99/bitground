@@ -24,6 +24,7 @@ type Result struct {
 }
 
 // main AWS Lambda에서는 핸들러를 등록하고, 로컬에서는 .env를 읽어 한 번 실행합니다.
+// RUN_HOURLY=1이면 로컬에서 Lambda + EventBridge(매시 정각)를 흉내 내 계속 실행합니다.
 func main() {
 	if os.Getenv("AWS_LAMBDA_RUNTIME_API") != "" {
 		lambda.Start(handler)
@@ -33,6 +34,10 @@ func main() {
 	if err := godotenv.Load(); err != nil {
 		log.Printf(".env 파일을 읽지 못해 환경변수만 사용합니다: %v", err)
 	}
+	if os.Getenv("RUN_HOURLY") == "1" {
+		runHourly()
+		return
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
 	defer cancel()
 
@@ -41,9 +46,34 @@ func main() {
 	}
 }
 
+// runHourly 로컬 테스트용 매시 실행: 시작할 때 한 번(그 시각의 정시 기준), 이후 매시 정각 10초 뒤마다.
+// 한 번 실패해도 멈추지 않고 다음 정각에 다시 실행한다 (Lambda 재시도 대신)
+func runHourly() {
+	log.Println("매시 실행 모드 시작 (RUN_HOURLY=1)")
+	at := time.Now()
+	for {
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
+		if _, err := handleAt(ctx, at); err != nil {
+			log.Println("이번 실행 실패, 다음 정각에 다시 실행:", err)
+		}
+		cancel()
+
+		next := time.Now().Truncate(time.Hour).Add(time.Hour)
+		log.Printf("다음 실행: %s\n", next.Format(time.DateTime))
+		time.Sleep(time.Until(next.Add(10 * time.Second)))
+		at = next
+	}
+}
+
 // handler 한 시간마다 EventBridge Scheduler가 호출합니다.
 // 에러를 반환하면 Lambda가 재시도하므로, 재실행돼도 결과가 같도록 각 작업을 멱등하게 만든다.
 func handler(ctx context.Context) (Result, error) {
+	return handleAt(ctx, time.Time{})
+}
+
+// handleAt at이 비어 있으면 설정의 기준 시각(cfg.Now), 있으면 그 시각이 속한 정시를 기준으로 실행한다.
+// (매시 실행 모드의 첫 실행은 14:42에 시작해도 15시가 아니라 14시 작업을 해야 하므로 반올림하지 않고 내린다)
+func handleAt(ctx context.Context, at time.Time) (Result, error) {
 	cfg, err := config.Load()
 	if err != nil {
 		log.Println("설정 오류:", err)
@@ -56,6 +86,9 @@ func handler(ctx context.Context) (Result, error) {
 	if err != nil {
 		log.Println("설정 오류:", err)
 		return Result{}, err
+	}
+	if !at.IsZero() {
+		now = at.In(cfg.Location).Truncate(time.Hour)
 	}
 
 	db, err := config.ConnectDB(ctx, cfg.DB)
@@ -81,6 +114,10 @@ func handler(ctx context.Context) (Result, error) {
 
 func run(ctx context.Context, db *sql.DB, cfg config.Config, now time.Time) error {
 	flags := util.TimeCheck(now, cfg.Mode)
+	if cfg.InsightEveryHour && !flags.Insight {
+		// 로컬 테스트용: 0시까지 기다리지 않고 매번 인사이트를 다시 만든다 (같은 날짜 행을 덮어씀)
+		flags.Insight = true
+	}
 	log.Printf("기준 시각: %s, 업데이트 플래그: %+v\n", now.Format(time.DateTime), flags)
 
 	// 이후 작업이 모두 필요로 하는 값. 실패하면 더 진행하지 않는다

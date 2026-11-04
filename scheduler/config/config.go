@@ -26,6 +26,9 @@ type Config struct {
 	// 네이버 뉴스 검색(NAVER API HUB) 키. 비우면 인사이트를 뉴스 없이 시세만으로 만든다
 	NaverClientID     string
 	NaverClientSecret string
+	// InsightEveryHour 로컬 테스트용: 0시만이 아니라 매 실행마다 인사이트를 만든다 (INSIGHT_EVERY_HOUR=1, Gemini 호출 약 10회/시간)
+	InsightEveryHour bool
+
 	// InsightPromptVersion 인사이트 프롬프트 버전 (service/prompts/{버전}/). 비우면 기본값
 	InsightPromptVersion string
 
@@ -62,6 +65,7 @@ func Load() (Config, error) {
 		NaverClientID:        os.Getenv("NAVER_NEWS_CLIENT_ID"),
 		NaverClientSecret:    os.Getenv("NAVER_NEWS_CLIENT_SECRET"),
 		InsightPromptVersion: os.Getenv("INSIGHT_PROMPT_VERSION"),
+		InsightEveryHour:     os.Getenv("INSIGHT_EVERY_HOUR") == "1",
 		PineconeAPIKey:       os.Getenv("PINECONE_API_KEY"),
 		PineconeIndex:        getEnv("PINECONE_INDEX", "bitground-news"),
 		NewsEmbedModel:       getEnv("NEWS_EMBED_MODEL", "gemini-embedding-2"),
