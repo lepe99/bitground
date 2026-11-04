@@ -166,7 +166,7 @@ const SECTIONS = [
             <>
                 <p>개인정보 처리에 관한 업무를 총괄하고, 관련 문의·불만·피해 구제를 처리하는 책임자는 다음과 같습니다.</p>
                 <ul>
-                    <li>개인정보 보호책임자: {SITE.operator}</li>
+                    <li>개인정보 보호책임자: 운영자 {SITE.privacyOfficer}</li>
                     <li>이메일: <a href={`mailto:${SITE.contactEmail}`} className="underline underline-offset-2">{SITE.contactEmail}</a></li>
                 </ul>
             </>

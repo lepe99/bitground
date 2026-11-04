@@ -25,7 +25,7 @@ export default function Footer({className = ""}) {
                 </div>
                 <div className="flex flex-col gap-1 leading-relaxed">
                     <p>{SITE.name}는 가상 자금으로 하는 모의투자 서비스입니다. 실제 자산을 거래하지 않으며, 서비스의 정보는 투자 권유가 아닙니다.</p>
-                    <p>시세 정보: 업비트(Upbit) 공개 API · 운영: {SITE.operator} · 문의: {SITE.contactEmail}</p>
+                    <p>시세 정보: 업비트(Upbit) 공개 API · 문의: {SITE.contactEmail}</p>
                 </div>
                 <p>© 2026 {SITE.name}</p>
             </div>

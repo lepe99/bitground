@@ -7,7 +7,7 @@ import {SITE} from '../../constants/site.js';
 const SECTIONS = [
     {
         title: '목적',
-        body: <p>이 약관은 {SITE.operator}(이하 '운영자')가 제공하는 {SITE.name}(이하 '서비스')의 이용 조건과 절차, 운영자와 회원의 권리·의무 및 책임 사항을 정합니다.</p>,
+        body: <p>이 약관은 {SITE.name}(이하 '서비스')의 이용 조건과 절차, 서비스를 운영하는 자(이하 '운영자')와 회원의 권리·의무 및 책임 사항을 정합니다.</p>,
     },
     {
         title: '용어의 정의',
@@ -130,11 +130,10 @@ const SECTIONS = [
         body: <p>이 약관은 대한민국 법률을 따릅니다. 서비스 이용과 관련한 분쟁은 먼저 문의처를 통해 협의하고, 협의가 되지 않아 소송이 제기되면 민사소송법에 따른 관할 법원에서 해결합니다.</p>,
     },
     {
-        title: '운영자 정보와 문의',
+        title: '문의와 시행일',
         body: (
             <ul>
-                <li>운영자: {SITE.operator}</li>
-                <li>문의: <a href={`mailto:${SITE.contactEmail}`} className="underline underline-offset-2">{SITE.contactEmail}</a></li>
+                <li>운영자 문의: <a href={`mailto:${SITE.contactEmail}`} className="underline underline-offset-2">{SITE.contactEmail}</a></li>
                 <li>이 약관은 {SITE.effectiveDate}부터 적용됩니다.</li>
             </ul>
         ),

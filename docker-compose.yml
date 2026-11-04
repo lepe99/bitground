@@ -4,8 +4,17 @@
 #   + 모니터링 (Pinpoint APM, 로그 수집):
 #       PINPOINT_ENABLED=true LOG_FORMAT=logstash docker compose --profile app --profile monitoring up -d --build
 #       Pinpoint Web: http://localhost:8080   Grafana(Loki 로그): http://localhost:3000
+# 컨테이너 출력 로그(json-file)는 호스트에 따로 쌓이므로 크기를 제한한다.
+# 백엔드 로그에는 접속 IP 등이 들어가며, 회전된 옛 파일은 지워져 오래 남지 않는다 (개인정보처리방침 '접속 기록 3개월')
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "20m"
+    max-file: "5"
+
 services:
   mysql:
+    logging: *default-logging
     image: mysql:8.0
     container_name: bitground-mysql
     environment:
@@ -29,6 +38,7 @@ services:
       retries: 10
 
   redis:
+    logging: *default-logging
     image: redis:7-alpine
     container_name: bitground-redis
     ports:
@@ -40,6 +50,7 @@ services:
 
   # S3 호환 로컬 스토리지 (이미지 업로드). 인증 없이 읽기 가능
   s3:
+    logging: *default-logging
     image: adobe/s3mock:3.12.0
     container_name: bitground-s3
     environment:
@@ -53,6 +64,7 @@ services:
 
   # ── app 프로필: 백엔드 컨테이너 ─────────────────────────────────────────
   backend:
+    logging: *default-logging
     profiles: ["app"]
     build: ./backend
     container_name: bitground-backend
@@ -83,6 +95,7 @@ services:
   # 공식 pinpoint-docker 구성에서 트랜잭션 추적에 필요한 최소 구성만 사용
   # (Flink 실시간 통계, 알람 배치, Pinot 메트릭은 제외)
   zoo1:
+    logging: *default-logging
     profiles: ["monitoring"]
     image: zookeeper:3.4.13
     container_name: pinpoint-zookeeper
@@ -94,6 +107,7 @@ services:
         aliases: [zoo2, zoo3]
 
   pinpoint-hbase:
+    logging: *default-logging
     profiles: ["monitoring"]
     image: pinpointdocker/pinpoint-hbase:4.0.0
     container_name: pinpoint-hbase
@@ -104,6 +118,7 @@ services:
       - zoo1
 
   pinpoint-mysql:
+    logging: *default-logging
     profiles: ["monitoring"]
     image: mysql:8.4 # Pinpoint 4.0은 MySQL 8.4 이상 필요
     container_name: pinpoint-mysql
@@ -121,11 +136,13 @@ services:
       retries: 20
 
   pinpoint-redis:
+    logging: *default-logging
     profiles: ["monitoring"]
     image: redis:7-alpine
     container_name: pinpoint-redis
 
   pinpoint-collector:
+    logging: *default-logging
     profiles: ["monitoring"]
     image: pinpointdocker/pinpoint-collector:4.0.0
     container_name: pinpoint-collector
@@ -162,6 +179,7 @@ services:
         condition: service_started
 
   pinpoint-web:
+    logging: *default-logging
     profiles: ["monitoring"]
     image: pinpointdocker/pinpoint-web:4.0.0
     container_name: pinpoint-web
@@ -182,6 +200,7 @@ services:
 
   # ── monitoring 프로필: 로그 수집 (Alloy → Loki → Grafana) ────────────────
   loki:
+    logging: *default-logging
     profiles: ["monitoring"]
     image: grafana/loki:3.7.1
     container_name: loki
@@ -191,6 +210,7 @@ services:
       - loki-data:/loki
 
   alloy:
+    logging: *default-logging
     profiles: ["monitoring"]
     image: grafana/alloy:v1.21.3
     container_name: alloy
@@ -202,6 +222,7 @@ services:
       - loki
 
   grafana:
+    logging: *default-logging
     profiles: ["monitoring"]
     image: grafana/grafana:13.3.0
     container_name: grafana
