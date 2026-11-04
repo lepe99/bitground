@@ -14,4 +14,5 @@ import lombok.Setter;
 public class AiInsightSymbolDto {
     private String symbol;
     private String koreanName;
+    private String pickReason; // 스케줄러가 고른 이유 (거래대금 상위, 상승률 상위 등)
 }

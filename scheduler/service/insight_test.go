@@ -23,25 +23,23 @@ func TestSelectInsightTargets(t *testing.T) {
 	snap := marketSnapshot{Tickers: map[string]upbitTicker{}, Names: map[string]string{}, Warning: map[string]bool{}, Caution: map[string]bool{}}
 	for _, tk := range []upbitTicker{
 		ticker("KRW-BTC", 1, 900e9), ticker("KRW-ETH", 1, 300e9), ticker("KRW-SOL", 1, 100e9), ticker("KRW-XRP", 1, 200e9),
+		ticker("KRW-USDT", 0.1, 500e9), // 스테이블코인은 제외
 		ticker("KRW-DOGE", 2, 80e9),  // 거래대금 1위(고정 제외)
 		ticker("KRW-ADA", -1, 70e9),  // 거래대금 2위
 		ticker("KRW-PUMP", 30, 5e9),  // 상승률 1위
 		ticker("KRW-DUMP", -20, 3e9), // 하락률 1위
-		ticker("KRW-WARN", 0, 2e9),   // 유의 지정
 		ticker("KRW-TINY", 90, 1e8),  // 거래대금이 너무 작아 제외
 		ticker("KRW-LINK", 0.5, 60e9),
 	} {
 		snap.Tickers[tk.Market] = tk
 	}
-	snap.Warning["KRW-WARN"] = true
 
 	var got []string
 	for _, tg := range selectInsightTargets(snap) {
 		got = append(got, tg.Symbol+":"+tg.Reason)
 	}
 	want := []string{
-		"KRW-BTC:주요 코인", "KRW-ETH:주요 코인", "KRW-SOL:주요 코인", "KRW-XRP:주요 코인",
-		"KRW-DOGE:거래대금 상위", "KRW-ADA:거래대금 상위", "KRW-PUMP:상승률 상위", "KRW-DUMP:하락률 상위", "KRW-WARN:유의·주의 지정",
+		"KRW-BTC:주요 코인", "KRW-ETH:거래대금 상위", "KRW-XRP:거래대금 상위", "KRW-PUMP:상승률 상위", "KRW-DUMP:하락률 상위",
 	}
 	if strings.Join(got, ",") != strings.Join(want, ",") {
 		t.Errorf("selectInsightTargets() =\n%v\nwant\n%v", got, want)

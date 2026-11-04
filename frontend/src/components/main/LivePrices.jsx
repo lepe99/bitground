@@ -4,33 +4,36 @@ import Card from '../ui/Card.jsx';
 import CoinIcon from '../ui/CoinIcon.jsx';
 import Sparkline from '../ui/Sparkline.jsx';
 import {useUpbitTickers} from '../../hooks/useUpbitTickers.js';
-import {fetchHourlyCandles} from '../../api/upbitApi.js';
+import {fetchHourlyCandles, fetchTopVolumeMarkets} from '../../api/upbitApi.js';
 import {changeColor, formatKRW, formatPercent} from '../../utils/format.js';
 
-// 메인에 보여줄 대표 종목
-const COINS = [
-    {market: 'KRW-BTC', name: '비트코인'},
-    {market: 'KRW-ETH', name: '이더리움'},
-    {market: 'KRW-XRP', name: '리플'},
-    {market: 'KRW-SOL', name: '솔라나'},
-    {market: 'KRW-DOGE', name: '도지코인'},
-];
-const MARKETS = COINS.map((c) => c.market);
+// 비트코인은 고정, 나머지는 원화 마켓 24시간 거래대금 상위 (스테이블코인 제외)
+const BITCOIN = {market: 'KRW-BTC', name: '비트코인'};
+const TOP_COUNT = 4;
 
-/** 대표 종목 실시간 시세 + 24시간 추이 */
+/** 비트코인 + 거래대금 상위 종목 실시간 시세 + 24시간 추이. 종목은 화면을 열 때 한 번 정하고 보는 동안 바꾸지 않는다 */
 export default function LivePrices() {
-    const tickers = useUpbitTickers(MARKETS);
+    const [coins, setCoins] = useState([BITCOIN]);
+    const markets = coins.map((c) => c.market);
+    const tickers = useUpbitTickers(markets);
     const [sparks, setSparks] = useState({});
 
     useEffect(() => {
+        fetchTopVolumeMarkets(TOP_COUNT, [BITCOIN.market])
+            .then((top) => setCoins([BITCOIN, ...top]))
+            .catch((error) => console.warn('거래대금 상위 조회 실패:', error.message));
+    }, []);
+
+    const marketKey = markets.join(',');
+    useEffect(() => {
         Promise.all(
-            MARKETS.map((market) =>
+            marketKey.split(',').map((market) =>
                 fetchHourlyCandles(market, 24)
                     .then((candles) => [market, candles.map((c) => c.trade_price).reverse()])
                     .catch(() => [market, []]),
             ),
-        ).then((entries) => setSparks(Object.fromEntries(entries)));
-    }, []);
+        ).then((entries) => setSparks((prev) => ({...prev, ...Object.fromEntries(entries)})));
+    }, [marketKey]);
 
     return (
         <Card className="flex flex-col p-5 md:p-6">
@@ -42,7 +45,7 @@ export default function LivePrices() {
                 </span>
             </div>
             <ul>
-                {COINS.map((coin) => {
+                {coins.map((coin) => {
                     const t = tickers[coin.market];
                     return (
                         <li key={coin.market} className="border-t border-line first:border-t-0 md:first:border-t">

@@ -13,14 +13,19 @@ import (
 // 일일 인사이트에 들어가는 시세 데이터. 모델이 기억으로 시장을 지어내지 않도록 코드가 업비트에서 직접 모아 넘긴다.
 
 const (
-	// 고정 대상 외에 자동으로 고를 코인 수
-	extraInsightCoins = 5
+	// 고정 대상 외에 자동으로 고를 코인 수 (화면 버튼이 가로 스크롤 없이 들어가도록 시장 전체 포함 6개)
+	extraInsightCoins = 4
 	// 자동 선정 후보의 최소 24시간 거래대금 (너무 한산한 코인은 등락률만 커서 제외)
 	minInsightVolume = 1_000_000_000
 )
 
 // 매일 분석하는 고정 대상
-var fixedInsightCoins = []string{"KRW-BTC", "KRW-ETH", "KRW-SOL", "KRW-XRP"}
+var fixedInsightCoins = []string{"KRW-BTC"}
+
+// 가격이 원화에 묶여 있어 거래대금만 크고 분석할 거리가 없는 스테이블코인 (자동 선정에서 제외)
+var stableCoins = map[string]bool{
+	"KRW-USDT": true, "KRW-USDC": true, "KRW-USDS": true, "KRW-USDE": true, "KRW-USD1": true, "KRW-DAI": true, "KRW-PYUSD": true,
+}
 
 // upbitTicker 업비트 현재가 (ticker/all)
 type upbitTicker struct {
@@ -114,8 +119,8 @@ func collectMarketSnapshot(ctx context.Context, symbolMap map[string]int) (marke
 	return snap, nil
 }
 
-// selectInsightTargets 고정 4종 + 자동 5종. 자동 선정은 거래대금 상위 2, 상승률 1위, 하락률 1위, 유의·주의 지정 중 거래대금 1위,
-// 남는 자리는 거래대금 순으로 채운다 (모델이 '관심 가질 만한 코인'을 추정해 고르던 방식을 대체)
+// selectInsightTargets 비트코인 + 자동 4종. 자동 선정은 거래대금 상위 2, 상승률 1위, 하락률 1위이고
+// 남는 자리(오르거나 내린 코인이 없는 날)는 거래대금 순으로 채운다. 이 순서가 화면 버튼 순서가 된다
 func selectInsightTargets(snap marketSnapshot) []insightTarget {
 	var targets []insightTarget
 	picked := map[string]bool{}
@@ -136,7 +141,7 @@ func selectInsightTargets(snap marketSnapshot) []insightTarget {
 
 	var candidates []upbitTicker
 	for s, t := range snap.Tickers {
-		if !picked[s] && t.AccTradePrice24h >= minInsightVolume {
+		if !picked[s] && !stableCoins[s] && t.AccTradePrice24h >= minInsightVolume {
 			candidates = append(candidates, t)
 		}
 	}
@@ -162,7 +167,6 @@ func selectInsightTargets(snap marketSnapshot) []insightTarget {
 	pick(byVolume, "거래대금 상위", 2, nil)
 	pick(byChangeDesc, "상승률 상위", 1, func(t upbitTicker) bool { return t.SignedChangeRate > 0 })
 	pick(byChangeAsc, "하락률 상위", 1, func(t upbitTicker) bool { return t.SignedChangeRate < 0 })
-	pick(byVolume, "유의·주의 지정", 1, func(t upbitTicker) bool { return snap.Warning[t.Market] || snap.Caution[t.Market] })
 	pick(byVolume, "거래대금 상위", extraInsightCoins, nil)
 	return targets
 }

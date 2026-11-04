@@ -11,10 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 /**
  * 스케줄러가 매일 만드는 AI 시장 인사이트 조회
@@ -25,9 +22,7 @@ import java.util.Set;
 public class AiInsightService {
 
     private static final String MARKET_OVERALL = "MARKET_OVERALL";
-    // 드롭다운 상단에 고정으로 보여줄 심볼 순서
-    private static final List<String> PREFERRED_SYMBOLS = List.of(MARKET_OVERALL, "KRW-BTC", "KRW-ETH", "KRW-SOL", "KRW-XRP");
-    private static final int EXTRA_SYMBOL_LIMIT = 5;
+    private static final String BITCOIN = "KRW-BTC";
 
     private final AiInsightRepository aiInsightRepository;
 
@@ -44,28 +39,18 @@ public class AiInsightService {
     }
 
     /**
-     * 오늘 인사이트가 있는 심볼 목록 (드롭다운용). 없으면 빈 배열.
-     * 고정 심볼(전체 시장, BTC, ETH, SOL, XRP)을 먼저, 나머지는 한글명 순으로 최대 5개.
+     * 오늘 인사이트가 있는 심볼 목록 (분석 종목 버튼용). 없으면 빈 배열.
+     * 전체 시장과 비트코인을 앞에 두고, 나머지는 스케줄러가 고른 순서(거래대금 상위 2, 상승률 1위, 하락률 1위) 그대로.
      */
     public List<AiInsightSymbolDto> getTodaySymbols() {
-        List<AiInsightSymbolDto> todayInsights = new ArrayList<>(aiInsightRepository.findTodaySymbolsAndKoreanNames());
-        if (aiInsightRepository.findByAiInsightSymbolAndDate(MARKET_OVERALL, LocalDate.now()).isPresent()) {
-            todayInsights.add(0, new AiInsightSymbolDto(MARKET_OVERALL, "전체 시장"));
-        }
-
+        LocalDate today = LocalDate.now();
         List<AiInsightSymbolDto> result = new ArrayList<>();
-        Set<String> added = new HashSet<>();
-        for (String symbol : PREFERRED_SYMBOLS) {
-            todayInsights.stream().filter(dto -> dto.getSymbol().equals(symbol)).findFirst().ifPresent(dto -> {
-                result.add(dto);
-                added.add(symbol);
-            });
+        if (aiInsightRepository.findByAiInsightSymbolAndDate(MARKET_OVERALL, today).isPresent()) {
+            result.add(new AiInsightSymbolDto(MARKET_OVERALL, "전체 시장", null));
         }
-        todayInsights.stream()
-                .filter(dto -> !added.contains(dto.getSymbol()))
-                .sorted(Comparator.comparing(AiInsightSymbolDto::getKoreanName))
-                .limit(EXTRA_SYMBOL_LIMIT)
-                .forEach(result::add);
+        List<AiInsightSymbolDto> coins = aiInsightRepository.findSymbolsByDate(today);
+        coins.stream().filter(dto -> dto.getSymbol().equals(BITCOIN)).forEach(result::add);
+        coins.stream().filter(dto -> !dto.getSymbol().equals(BITCOIN)).forEach(result::add);
         return result;
     }
 }

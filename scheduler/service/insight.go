@@ -132,16 +132,19 @@ func UpdateInsight(ctx context.Context, db *sql.DB, ic InsightConfig, symbolMap 
 	wg.Wait()
 
 	var insights []Insight
-	for _, r := range results {
+	var failed []string
+	for i, r := range results {
 		if r != nil {
 			insights = append(insights, *r)
+		} else {
+			failed = append(failed, jobs[i].symbol)
 		}
 	}
 	if len(insights) == 0 {
 		return errors.New("인사이트를 하나도 만들지 못했습니다")
 	}
 	log.Printf("인사이트 %d/%d건 생성\n", len(insights), len(jobs))
-	return insertInsights(ctx, db, insights, ic.GeminiModel, prompt.Version, now)
+	return insertInsights(ctx, db, insights, failed, ic.GeminiModel, prompt.Version, now)
 }
 
 // collectNews 네이버 키가 없거나 검색이 실패하면 뉴스 없이 진행한다 (시세만으로도 쓸 수 있음)
@@ -172,12 +175,26 @@ func citedNews(news []NewsItem, ids []string) []NewsItem {
 	return out
 }
 
-// insertInsights 같은 날짜·심볼이면 덮어쓴다 (재실행해도 결과가 하나)
-func insertInsights(ctx context.Context, db *sql.DB, insights []Insight, model, promptVersion string, now time.Time) error {
+// insertInsights 그날 행을 지우고 선정 순서대로 다시 넣는다. 화면은 id 순서로 버튼을 놓으므로 재실행해도 순서가 맞고,
+// 오늘 대상에서 빠진 코인의 이전 실행 결과도 남지 않는다. 생성에 실패한 대상(keep)은 이전 결과를 그대로 둔다
+func insertInsights(ctx context.Context, db *sql.DB, insights []Insight, keep []string, model, promptVersion string, now time.Time) error {
 	queryCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
 
+	date := now.Format(time.DateOnly)
 	return withTx(queryCtx, db, func(tx *sql.Tx) error {
+		del := "DELETE FROM ai_insights WHERE date = ?"
+		args := []any{date}
+		if len(keep) > 0 {
+			del += " AND symbol NOT IN (?" + strings.Repeat(", ?", len(keep)-1) + ")"
+			for _, s := range keep {
+				args = append(args, s)
+			}
+		}
+		if _, err := tx.ExecContext(queryCtx, del, args...); err != nil {
+			return fmt.Errorf("오늘 인사이트 정리 에러: %w", err)
+		}
+
 		stmt, err := tx.PrepareContext(queryCtx, `
 			INSERT INTO ai_insights (symbol, insight, score, date, mood, drivers, risks, sources, background, pick_reason, prompt_version, model)
 			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -190,7 +207,6 @@ func insertInsights(ctx context.Context, db *sql.DB, insights []Insight, model, 
 		}
 		defer stmt.Close()
 
-		date := now.Format(time.DateOnly)
 		for _, in := range insights {
 			drivers, _ := json.Marshal(nonNil(in.Drivers))
 			risks, _ := json.Marshal(nonNil(in.Risks))

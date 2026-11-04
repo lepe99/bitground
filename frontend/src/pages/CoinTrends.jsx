@@ -5,10 +5,19 @@ import {fetchAlertCoins, fetchCoinInsight, fetchTodayInsightSymbols, fetchWarnin
 import Card from "../components/ui/Card.jsx";
 import SegmentedTabs from "../components/ui/SegmentedTabs.jsx";
 import TopCoins from "../components/main/TopCoins.jsx";
+import {fetchTopVolumeMarkets} from "../api/upbitApi.js";
 
-// AI 분석 목록 맨 앞에 둘 종목 (나머지는 그날 AI가 고른 종목을 이름순으로 최대 5개)
-const PINNED = ["MARKET_OVERALL", "KRW-BTC", "KRW-ETH", "KRW-SOL", "KRW-XRP"];
-const NEWS_KEYWORDS = ["비트코인", "이더리움", "리플", "솔라나", "가상자산"];
+// 뉴스 키워드: 비트코인 + 오늘 AI 분석 종목 4개(거래대금 상위 2, 상승률 1위, 하락률 1위) + 가상자산.
+// 분석이 아직 없거나 모자라면 거래대금 상위로 채운다
+const NEWS_FIRST = "비트코인";
+const NEWS_LAST = "가상자산";
+const NEWS_MIDDLE = 4;
+
+// 가운데 키워드: 버튼은 한글 이름만, 검색은 이름 + 티커로 한다 ('리스크'처럼 일반 단어와 겹치는 이름이 있어서)
+const newsChip = (symbol, koreanName) => {
+    const label = koreanName.replace(/\(.*\)/, "").trim();
+    return {label, query: `${label} ${symbol.replace("KRW-", "")}`};
+};
 const NEWS_PAGE_SIZE = 5;
 
 // 네이버 뉴스 제목의 <b> 태그와 &quot; 같은 문자를 글자로 바꾼다
@@ -131,24 +140,15 @@ function InsightBody({insight, title}) {
     );
 }
 
-function AiInsightCard() {
-    const [options, setOptions] = useState(null);
-    const [symbol, setSymbol] = useState(null);
+/** 오늘 분석 종목 버튼: 시장 전체, 비트코인, 그다음 스케줄러가 고른 순서 그대로 (서버가 정렬해서 준다) */
+function AiInsightCard({options}) {
+    const [picked, setPicked] = useState(null);
     const [insight, setInsight] = useState(undefined); // undefined: 불러오는 중, null: 없음
+    const symbol = picked ?? options?.[0]?.symbol ?? null;
 
     useEffect(() => {
-        fetchTodayInsightSymbols().then((list) => {
-            const pinned = PINNED.map((s) => list.find((x) => x.symbol === s)).filter(Boolean);
-            const others = list
-                .filter((x) => !PINNED.includes(x.symbol))
-                .sort((a, b) => a.koreanName.localeCompare(b.koreanName, "ko"))
-                .slice(0, 5);
-            const all = [...pinned, ...others];
-            setOptions(all);
-            setSymbol(all[0]?.symbol ?? null);
-            if (!all.length) setInsight(null);
-        });
-    }, []);
+        if (options?.length === 0) setInsight(null);
+    }, [options]);
 
     useEffect(() => {
         if (!symbol) return;
@@ -169,14 +169,15 @@ function AiInsightCard() {
                 <span className="text-xs text-fg-3">매일 0시 갱신</span>
             </div>
             {options?.length > 0 && (
-                <div role="tablist" aria-label="분석 종목" className="-mx-1 flex gap-1.5 overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <div role="tablist" aria-label="분석 종목" className="flex flex-wrap gap-1.5">
                     {options.map((o) => (
                         <button
                             key={o.symbol}
                             type="button"
                             role="tab"
                             aria-selected={o.symbol === symbol}
-                            onClick={() => setSymbol(o.symbol)}
+                            onClick={() => setPicked(o.symbol)}
+                            title={o.pickReason ?? undefined}
                             className={`h-9 shrink-0 whitespace-nowrap rounded-full border px-3.5 text-[13px] font-semibold ${
                                 o.symbol === symbol ? "border-fg bg-fg text-bg" : "border-line text-fg-2 hover:text-fg"
                             }`}
@@ -236,8 +237,10 @@ function CautionCard() {
     );
 }
 
-function NewsCard() {
-    const [keyword, setKeyword] = useState(NEWS_KEYWORDS[0]);
+function NewsCard({symbols}) {
+    const [middle, setMiddle] = useState([]);
+    const [keyword, setKeyword] = useState(NEWS_FIRST);
+    const query = middle.find((m) => m.label === keyword)?.query ?? keyword;
     const [draft, setDraft] = useState("");
     const [page, setPage] = useState(1);
     const [news, setNews] = useState(null);
@@ -246,7 +249,7 @@ function NewsCard() {
     useEffect(() => {
         let alive = true;
         setNews(null);
-        fetchNews(keyword, page, NEWS_PAGE_SIZE).then((res) => {
+        fetchNews(query, page, NEWS_PAGE_SIZE).then((res) => {
             if (!alive) return;
             setNews(res.newsData ?? []);
             setTotalPages(res.totalPage ?? 1);
@@ -254,7 +257,23 @@ function NewsCard() {
         return () => {
             alive = false;
         };
-    }, [keyword, page]);
+    }, [query, page]);
+
+    useEffect(() => {
+        if (symbols === null) return;
+        const picks = symbols.filter((s) => s.symbol !== "MARKET_OVERALL" && s.symbol !== "KRW-BTC").slice(0, NEWS_MIDDLE);
+        const chips = picks.map((s) => newsChip(s.symbol, s.koreanName));
+        setMiddle(chips);
+        if (chips.length >= NEWS_MIDDLE) return;
+        let alive = true;
+        fetchTopVolumeMarkets(NEWS_MIDDLE - chips.length, ["KRW-BTC", ...picks.map((s) => s.symbol)])
+            .then((top) => alive && setMiddle([...chips, ...top.map((t) => newsChip(t.market, t.name))]))
+            .catch(() => {});
+        return () => {
+            alive = false;
+        };
+    }, [symbols]);
+    const keywords = [NEWS_FIRST, ...middle.map((m) => m.label), NEWS_LAST];
 
     const search = (e) => {
         e.preventDefault();
@@ -273,8 +292,8 @@ function NewsCard() {
                     <input id="news-q" value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="키워드 검색" className="min-w-0 flex-1 text-[13px] text-fg outline-none placeholder:text-fg-3"/>
                 </form>
             </div>
-            <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1">
-                {NEWS_KEYWORDS.map((k) => (
+            <div className="flex flex-wrap gap-1.5">
+                {keywords.map((k) => (
                     <button
                         key={k}
                         type="button"
@@ -313,17 +332,23 @@ function NewsCard() {
 
 /** 최신동향: AI 분석 · TOP5 · 주의 종목 · 뉴스 */
 export default function CoinTrends() {
+    const [symbols, setSymbols] = useState(null); // 오늘 AI 분석 종목 (AI 분석 버튼과 뉴스 키워드가 같이 쓴다)
+
+    useEffect(() => {
+        fetchTodayInsightSymbols().then((list) => setSymbols(list ?? []));
+    }, []);
+
     return (
         <div className="mx-auto flex max-w-[1280px] flex-col gap-4 px-5 pt-4 pb-10 md:gap-5 md:px-8 md:pt-8 md:pb-14">
             <h1 className="text-xl font-extrabold md:text-[28px]">최신동향</h1>
             {/* 모바일: 한 줄씩 / 태블릿: TOP 5·주의 종목만 나란히 / PC: 왼쪽 2단(AI·뉴스) + 오른쪽 1단(TOP 5·주의 종목) */}
             <div className="grid items-start gap-4 md:gap-5 lg:grid-cols-3">
-                <AiInsightCard/>
+                <AiInsightCard options={symbols}/>
                 <div className="grid min-w-0 items-start gap-4 md:grid-cols-2 md:gap-5 lg:row-span-2 lg:grid-cols-1">
                     <TopCoins/>
                     <CautionCard/>
                 </div>
-                <NewsCard/>
+                <NewsCard symbols={symbols}/>
             </div>
         </div>
     );

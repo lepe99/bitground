@@ -6,7 +6,7 @@ import bit.bitgroundspring.entity.AiInsight; // AiInsight 엔티티 임포트
 import bit.bitgroundspring.dto.response.AiInsightSymbolDto; // AiInsightSymbolDto 임포트 추가
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query; // Query 임포트 추가
-import org.springframework.data.repository.query.Param; // Param 임포트 제거 (필요 없어짐)
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
@@ -22,17 +22,13 @@ public interface AiInsightRepository extends JpaRepository<AiInsight, Integer> {
     List<AiInsight> findBySymbolOrderByCreatedAtDesc(String symbol);
 
     /**
-     * 오늘 날짜에 대한 AI 인사이트 중 드롭다운에 표시할 심볼과 한글 이름을 조회합니다.
-     * AiInsight 엔티티와 Coin 엔티티를 조인하여 AiInsightSymbolDto에 매핑합니다.
-     * 이 메서드는 특정 날짜를 매개변수로 받지 않고, 항상 '오늘' 날짜를 기준으로 조회합니다.
-     * (데이터베이스의 `CURDATE()` 함수를 사용하여 '오늘' 날짜를 지정합니다. 이는 MySQL 기준입니다.)
-     *
-     * @return AiInsightSymbolDto 목록
+     * 오늘 코인 인사이트의 심볼·한글 이름·선정 이유. 스케줄러가 선정 순서대로 넣으므로 id 순서가 곧 화면 순서다.
+     * MARKET_OVERALL은 coins 테이블에 없어 조인에서 빠진다.
      */
-    @Query("SELECT NEW bit.bitgroundspring.dto.response.AiInsightSymbolDto(ai.symbol, c.koreanName) " +
+    @Query("SELECT NEW bit.bitgroundspring.dto.response.AiInsightSymbolDto(ai.symbol, c.koreanName, ai.pickReason) " +
             "FROM AiInsight ai JOIN Coin c ON ai.symbol = c.symbol " +
-            "WHERE ai.date = CURDATE()") // CURDATE() 함수를 사용하여 오늘 날짜 지정 (MySQL 전용)
-    List<AiInsightSymbolDto> findTodaySymbolsAndKoreanNames(); // 매개변수 제거
+            "WHERE ai.date = :date ORDER BY ai.id")
+    List<AiInsightSymbolDto> findSymbolsByDate(@Param("date") LocalDate date);
 
     /**
      * "MARKET_OVERALL" 심볼에 대한 특정 날짜의 인사이트를 조회합니다.
