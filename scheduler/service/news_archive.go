@@ -32,7 +32,7 @@ const (
 	// 검색어마다 받는 기사 수 (네이버 최대 100)
 	newsPerQuery = 50
 	// 한 번 실행에서 새로 임베딩하는 최대 기사 수 (남은 기사는 다음 실행에서)
-	newsMaxEmbedPerRun = 150
+	newsMaxEmbedPerRun = 100
 	// 동시에 보내는 임베딩 요청 수
 	newsEmbedConcurrency = 3
 	// 메타데이터에 남기는 요약 길이 (검색 결과의 요약도 이 길이로 자른다)
@@ -51,6 +51,8 @@ type NewsArchiveConfig struct {
 	NaverClientSecret string
 	PineconeAPIKey    string
 	PineconeIndex     string
+	// 분당 임베딩 요청 상한 (0이면 기본 80). 첫 실행에서 몰아 보내다 요청 한도(429)에 걸려 줄였다
+	EmbedPerMinute int
 }
 
 func (c NewsArchiveConfig) Enabled() bool {
@@ -246,11 +248,23 @@ func containsKoreanWord(text, word string) bool {
 func embedArchiveNews(ctx context.Context, cfg NewsArchiveConfig, news []archivedNews, now time.Time) []pineconeVector {
 	results := make([]*pineconeVector, len(news))
 	sem := make(chan struct{}, newsEmbedConcurrency)
+	perMinute := cfg.EmbedPerMinute
+	if perMinute <= 0 {
+		perMinute = 80
+	}
+	// 모든 작업자가 함께 쓰는 간격 조절 (분당 perMinute회)
+	ticker := time.NewTicker(time.Minute / time.Duration(perMinute))
+	defer ticker.Stop()
 	var wg sync.WaitGroup
 	for i, n := range news {
 		wg.Go(func() {
 			sem <- struct{}{}
 			defer func() { <-sem }()
+			select {
+			case <-ticker.C:
+			case <-ctx.Done():
+				return
+			}
 			values, err := embedText(ctx, cfg.GeminiAPIKey, cfg.EmbedModel, cfg.EmbedDimension, embedTaskDocument,
 				n.Article.Title+"\n"+n.Article.Description)
 			if err != nil {

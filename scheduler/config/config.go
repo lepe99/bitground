@@ -34,6 +34,7 @@ type Config struct {
 	PineconeIndex      string
 	NewsEmbedModel     string
 	NewsEmbedDimension int
+	NewsEmbedPerMinute int
 
 	SeasonName string
 
@@ -83,6 +84,14 @@ func Load() (Config, error) {
 			return Config{}, fmt.Errorf("NEWS_EMBED_DIM이 올바르지 않습니다: %q", v)
 		}
 		cfg.NewsEmbedDimension = dim
+	}
+	// 분당 임베딩 요청 상한 (Gemini 요청 한도에 맞춘다)
+	if v := os.Getenv("NEWS_EMBED_RPM"); v != "" {
+		rpm, err := strconv.Atoi(v)
+		if err != nil || rpm <= 0 {
+			return Config{}, fmt.Errorf("NEWS_EMBED_RPM이 올바르지 않습니다: %q", v)
+		}
+		cfg.NewsEmbedPerMinute = rpm
 	}
 
 	var missing []string

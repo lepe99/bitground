@@ -109,6 +109,7 @@ func run(ctx context.Context, db *sql.DB, cfg config.Config, now time.Time) erro
 		NaverClientSecret: cfg.NaverClientSecret,
 		PineconeAPIKey:    cfg.PineconeAPIKey,
 		PineconeIndex:     cfg.PineconeIndex,
+		EmbedPerMinute:    cfg.NewsEmbedPerMinute,
 	}
 	if newsCfg.Enabled() {
 		// 매시간 새 기사를 쌓고, 0시에는 보관 기간이 지난 기사도 지운다
