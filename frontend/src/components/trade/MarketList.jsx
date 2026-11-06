@@ -132,7 +132,7 @@ export default function MarketList({
                 ))}
             </div>
 
-            <ul className="min-h-0 flex-1 overflow-y-auto">
+            <ul className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
                 {rows.length === 0 && (
                     <li className="px-3 py-10 text-center text-sm text-fg-3">
                         {filter === 'owned' ? '보유한 코인이 없어요.' : filter === 'fav' ? '관심 코인을 별표로 추가해 보세요.' : '검색 결과가 없어요.'}

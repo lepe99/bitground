@@ -102,7 +102,9 @@ export default function Trade() {
                         onOrderPlaced={reloadAssets}
                     />
                 ) : (
-                    list("h-[calc(100dvh-56px-56px-env(safe-area-inset-bottom))]")
+                    // 헤더(57px)와 하단 메뉴(57px) 사이에 고정해 목록만 스크롤되게 한다.
+                    // (높이를 100dvh로 계산하면 1px 넘쳐 페이지도 같이 스크롤됐고, 주소창이 접히며 100dvh가 바뀌면 목록이 잘려 보였다)
+                    list("fixed inset-x-0 top-[57px] bottom-[calc(57px+env(safe-area-inset-bottom))]")
                 )}
             </div>
         );
