@@ -162,6 +162,11 @@ function SeasonPicker({seasons, value, onChange}) {
     );
 }
 
+// 진행 중인 AI 리뷰 생성 요청 ("userId:seasonId" → 요청). 화면을 떠나도 남아 있어서, 돌아와 다시 누르면 새로 요청하지 않고 이어서 기다린다
+// (새로고침하면 사라지지만 그때는 서버가 같은 사용자·시즌의 진행 중인 생성을 함께 기다리게 한다)
+const pendingReviews = new Map();
+const reviewKey = (userId, seasonId) => `${userId}:${seasonId}`;
+
 /** 종료된 시즌 리포트: 요약 · AI 리뷰 · 종목 하이라이트 · 종목별 성과/거래 내역 */
 export default function SeasonReport() {
     const {user} = useAuth();
@@ -170,10 +175,19 @@ export default function SeasonReport() {
     const [seasonId, setSeasonId] = useState(null);
     const [report, setReport] = useState(null);
     const [advice, setAdvice] = useState(undefined); // undefined: 불러오는 중, null: 아직 안 만듦
-    const [generating, setGenerating] = useState(false);
+    const [, rerender] = useState(0); // 진행 중인 요청 목록(화면 밖 Map)이 바뀌었을 때 다시 그린다
+    const generating = Boolean(seasonId && pendingReviews.has(reviewKey(user?.id, seasonId)));
     const [detailTab, setDetailTab] = useState('coins');
     const currentSeason = useRef(null);
     currentSeason.current = seasonId;
+    const mounted = useRef(true);
+    const followed = useRef(new Set());
+    useEffect(() => {
+        mounted.current = true;
+        return () => {
+            mounted.current = false;
+        };
+    }, []);
 
     useEffect(() => {
         fetchSeasons()
@@ -209,18 +223,37 @@ export default function SeasonReport() {
         };
     }, [seasonId, user?.id]);
 
-    const requestAdvice = async () => {
+    // 진행 중인 요청의 결과를 이 화면에 반영한다. 같은 요청은 한 번만 따라간다 (알림이 겹치지 않게)
+    const follow = (target, promise) => {
+        if (followed.current.has(promise)) return;
+        followed.current.add(promise);
+        promise
+            .then((created) => {
+                // 생성하는 동안 다른 시즌으로 옮겼으면 그 화면에 덮어쓰지 않는다
+                if (mounted.current && currentSeason.current === target) setAdvice(created);
+            })
+            .catch((error) => {
+                if (mounted.current) errorAlert(getErrorMessage(error, 'AI 리뷰를 만들지 못했어요. 잠시 후 다시 시도해 주세요.'));
+            })
+            .finally(() => mounted.current && rerender((n) => n + 1));
+    };
+
+    // 다른 화면에 갔다 와도 진행 중인 요청이 있으면 '돌아보는 중'으로 보여 주고 그 결과를 기다린다
+    useEffect(() => {
+        const pending = seasonId && pendingReviews.get(reviewKey(user?.id, seasonId));
+        if (pending) follow(seasonId, pending);
+    }, [seasonId, user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    const requestAdvice = () => {
         const target = seasonId;
-        setGenerating(true);
-        try {
-            const created = await generateAiAdvice(target);
-            // 생성하는 동안 다른 시즌으로 옮겼으면 그 화면에 덮어쓰지 않는다
-            if (currentSeason.current === target) setAdvice(created);
-        } catch (error) {
-            errorAlert(getErrorMessage(error, 'AI 리뷰를 만들지 못했어요. 잠시 후 다시 시도해 주세요.'));
-        } finally {
-            setGenerating(false);
+        const key = reviewKey(user?.id, target);
+        let pending = pendingReviews.get(key);
+        if (!pending) {
+            pending = generateAiAdvice(target).finally(() => pendingReviews.delete(key));
+            pendingReviews.set(key, pending);
         }
+        rerender((n) => n + 1);
+        follow(target, pending);
     };
 
     if (seasons === null) return <p className="py-16 text-center text-sm text-fg-3">불러오는 중…</p>;
@@ -320,7 +353,39 @@ export default function SeasonReport() {
                     summary.length === 0 ? (
                         <p className="border-t border-line px-5 py-10 text-center text-sm text-fg-3">이 시즌의 거래가 없어요.</p>
                     ) : (
-                        <div className="overflow-x-auto">
+                        <>
+                        {/* 모바일: 종목마다 카드 (8칸 표를 가로로 밀어 보지 않게) */}
+                        <ul className="md:hidden">
+                            {summary.map((s) => (
+                                <li key={s.coin} className="num flex flex-col gap-2.5 border-t border-line px-4 py-3.5">
+                                    <div className="flex items-center gap-3">
+                                        <CoinIcon symbol={s.coin} size={32}/>
+                                        <div className="flex min-w-0 flex-1 flex-col">
+                                            <span className="truncate text-[15px] font-semibold">{s.koreanName}</span>
+                                            <span className="text-xs text-fg-3">최초 매수 {s.buyDate}</span>
+                                        </div>
+                                        <div className="flex flex-col items-end">
+                                            <span className={`text-[15px] font-bold ${changeColor(rateOf(s.returnRate))}`}>{s.returnRate}</span>
+                                            <span className={`text-xs ${changeColor(Math.round(s.profit))}`}>{formatSignedKRW(s.profit)}</span>
+                                        </div>
+                                    </div>
+                                    <dl className="grid grid-cols-2 gap-x-4 gap-y-1 rounded-xl bg-surface-2 px-3 py-2.5 text-[13px]">
+                                        {[
+                                            ['총 매수', formatKRW(s.buyAmount)],
+                                            ['총 매도', formatKRW(s.sellAmount)],
+                                            ['평균 매수가', formatPrice(s.avgBuy)],
+                                            ['평균 매도가', s.avgSell ? formatPrice(s.avgSell) : '—'],
+                                        ].map(([label, value]) => (
+                                            <div key={label} className="flex min-w-0 justify-between gap-2">
+                                                <dt className="shrink-0 text-fg-3">{label}</dt>
+                                                <dd className="truncate text-right font-medium">{value}</dd>
+                                            </div>
+                                        ))}
+                                    </dl>
+                                </li>
+                            ))}
+                        </ul>
+                        <div className="overflow-x-auto max-md:hidden">
                             <table className="num w-full min-w-[640px] text-sm">
                                 <thead className="text-xs text-fg-3">
                                     <tr className="border-t border-line">
@@ -345,6 +410,7 @@ export default function SeasonReport() {
                                 </tbody>
                             </table>
                         </div>
+                        </>
                     )
                 )}
                 {report && detailTab === 'trades' && (
