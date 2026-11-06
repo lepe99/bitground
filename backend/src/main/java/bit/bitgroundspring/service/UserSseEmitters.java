@@ -14,6 +14,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.http.MediaType;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import jakarta.annotation.PreDestroy;
@@ -103,7 +104,12 @@ public class UserSseEmitters {
                 wrapper.updateHeartbeat();
                 hasSuccessfulSend = true;
             } catch (Exception e) {
-                log.error("사용자 {}에게 데이터 전송 중 오류 발생: {}", userId, e.getMessage());
+                // 탭을 닫거나 새로고침해 끊긴 연결은 서버가 보낼 때야 알게 된다 (Broken pipe 등): 정상이라 DEBUG
+                if (isClientGone(e)) {
+                    log.debug("사용자 {}의 끊긴 SSE 연결 정리: {}", userId, e.getMessage());
+                } else {
+                    log.warn("사용자 {}에게 SSE 전송 실패: {}", userId, e.toString());
+                }
                 wrapper.markAsDead();
                 deadWrappers.add(wrapper);
             }
@@ -125,6 +131,17 @@ public class UserSseEmitters {
                 .message(notification.getMessageType())
                 .data(data)
                 .build());
+    }
+
+    /** 클라이언트가 이미 연결을 끊어 생긴 오류인지 (서버 문제가 아님) */
+    static boolean isClientGone(Throwable e) {
+        for (Throwable t = e; t != null; t = t.getCause()) {
+            if (t instanceof AsyncRequestNotUsableException || t instanceof java.io.IOException
+                    || t instanceof IllegalStateException) { // 이미 완료된 emitter
+                return true;
+            }
+        }
+        return false;
     }
 
     // 하트비트 전송 - 30초마다 실행

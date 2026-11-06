@@ -23,6 +23,7 @@ import org.springframework.web.socket.handler.TextWebSocketHandler;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
@@ -30,42 +31,49 @@ import java.util.Map;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
+import org.slf4j.event.Level;
 
 @Service
 @Slf4j
 public class UpbitWebSocketService {
-    
+
     private final CoinService coinService;
     private final PriceUpdateService priceUpdateService;
-    
+
     // 추가: Config 클래스에서 생성한 TaskExecutor 주입
     @Qualifier("webSocketTaskExecutor")
     private final Executor webSocketTaskExecutor;
-    
+
     // 추가: Spring의 스케줄러 주입
     private final TaskScheduler taskScheduler;
-    
+
     @Value("${upbit.websocket.ticker-url}")
     private String websocketUrl;
-    
+
     @Value("${upbit.websocket.connection-timeout}")
     private long connectionTimeout;
-    
+
     @Value("${upbit.websocket.reconnect.initial-delay}")
     private long initialReconnectDelay;
-    
+
     @Value("${upbit.websocket.reconnect.max-delay}")
     private long maxReconnectDelay;
-    
+
     private volatile WebSocketSession session;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private WebSocketConnectionManager connectionManager;
-    
+
     // 재연결 관련 설정
     private final AtomicInteger reconnectAttempts = new AtomicInteger(0);
+    /** 끊긴 시각 (다시 붙으면 얼마나 끊겼는지 남긴다) */
+    private final AtomicReference<Instant> disconnectedAt = new AtomicReference<>();
+    /** 재연결이 이만큼 연달아 실패하면 WARN (약 7초), 이만큼이면 ERROR (약 2분 이상 시세 없음) */
+    private static final int WARN_AFTER_FAILURES = 3;
+    private static final int ERROR_AFTER_FAILURES = 7;
     private volatile boolean isReconnecting = false;
     private final AtomicBoolean isShuttingDown = new AtomicBoolean(false);
-    
+
     public UpbitWebSocketService(
             CoinService coinService,
             PriceUpdateService priceUpdateService,
@@ -76,39 +84,58 @@ public class UpbitWebSocketService {
         this.webSocketTaskExecutor = webSocketTaskExecutor;
         this.taskScheduler = taskScheduler;
     }
-    
+
     @EventListener(ContextRefreshedEvent.class)
     public void onApplicationReady() {
         webSocketTaskExecutor.execute(this::connectToUpbit);
     }
-    
+
     @PreDestroy
     public void shutdown() {
         log.info("Shutting down UpbitWebSocketService...");
         isShuttingDown.set(true); // 종료 플래그 설정
-        
+
         // 1. ConnectionManager를 먼저 중지시켜 재연결 로직을 차단합니다.
         if (connectionManager != null) {
             connectionManager.stop();
         }
-        
+
         // 2. 주입받은 Executor를 명시적으로 종료시킵니다.
         // TaskExecutor가 ThreadPoolTaskExecutor의 인스턴스일 경우에만 종료 가능
         if (webSocketTaskExecutor instanceof ThreadPoolTaskExecutor) {
             ((ThreadPoolTaskExecutor) webSocketTaskExecutor).shutdown();
         }
-        
+
         log.info("UpbitWebSocketService has been shut down.");
     }
-    
+
     @Scheduled(fixedDelay = 30000) // 30초마다 연결 상태 체크
     public void checkConnectionHealth() {
-        if (!isShuttingDown.get() && !isConnected()) {
-            log.warn("WebSocket connection is not healthy, attempting reconnection");
+        // 이미 재연결을 기다리는 중이면 끊김은 이미 알고 있다 (같은 끊김을 두 번 알리지 않음)
+        if (!isShuttingDown.get() && !isConnected() && !isReconnecting) {
+            // 끊김 알림(종료·전송 오류) 없이 연결이 죽은 경우라 드물다
+            log.warn("Upbit WebSocket found dead without a close event, reconnecting");
+            markDisconnected();
             scheduleReconnect();
         }
     }
-    
+
+    /**
+     * 끊김 로그 수준: 업비트와의 장기 연결은 서버 점검·네트워크로 가끔 끊기고 곧 다시 붙으므로 한 번은 INFO.
+     * 재연결이 연달아 실패하면 WARN, 오래 못 붙으면 ERROR (시세가 멈춰 예약 주문이 체결되지 않는다)
+     */
+    private Level disconnectLevel() {
+        int failures = reconnectAttempts.get();
+        if (failures >= ERROR_AFTER_FAILURES) {
+            return Level.ERROR;
+        }
+        return failures >= WARN_AFTER_FAILURES ? Level.WARN : Level.INFO;
+    }
+
+    private void markDisconnected() {
+        disconnectedAt.compareAndSet(null, Instant.now());
+    }
+
     @Scheduled(cron = "0 3 0 * * ?") // 매일 0시 3분
     public void updateSymbolList() {
         if (isShuttingDown.get()) {
@@ -117,12 +144,12 @@ public class UpbitWebSocketService {
         List<String> activeSymbols = coinService.getActiveSymbols();
         sendSymbolRequest(activeSymbols);
     }
-    
+
     private synchronized void connectToUpbit() {
         if (isShuttingDown.get()) {
             return;
         }
-        
+
         try {
             // 기존 연결 정리
             if (connectionManager != null) {
@@ -132,47 +159,47 @@ public class UpbitWebSocketService {
                     log.warn("Error stopping previous connection manager", e);
                 }
             }
-            
+
             StandardWebSocketClient client = new StandardWebSocketClient();
             client.setTaskExecutor((AsyncTaskExecutor) webSocketTaskExecutor);
             client.getUserProperties().put("org.apache.tomcat.websocket.IO_TIMEOUT_MS", String.valueOf(connectionTimeout));
-            
+
             UpbitWebSocketHandler handler = new UpbitWebSocketHandler();
             connectionManager = new WebSocketConnectionManager(client, handler, websocketUrl);
             connectionManager.setAutoStartup(false);
             connectionManager.start();
-            
-            reconnectAttempts.set(0);
+
+            // 시도 횟수는 실제로 연결된 뒤에 초기화한다 (start는 비동기라 여기서 초기화하면 재시도 간격이 늘지 않음)
             isReconnecting = false;
-            
-            log.info("WebSocketConnectionManager started for Upbit WebSocket");
-            
+
+            log.debug("WebSocketConnectionManager started for Upbit WebSocket");
+
         } catch (Exception e) {
-            log.error("Failed to connect to Upbit WebSocket (attempt {})",
-                    reconnectAttempts.get() + 1, e);
+            log.atLevel(disconnectLevel()).log("Failed to connect to Upbit WebSocket (attempt {}): {}",
+                    reconnectAttempts.get(), e.toString());
             if (!isShuttingDown.get()) {
                 scheduleReconnect();
             }
         }
     }
-    
+
     public synchronized void sendSymbolRequest(List<String> symbols) {
         if (isShuttingDown.get() || !isConnected()) {
             log.warn("Cannot send symbol request - service is shutting down or WebSocket session is not available");
             return;
         }
-        
+
         try {
             List<Object> request = Arrays.asList(
                     Map.of("ticket", "bitground"),
                     Map.of("type", "ticker", "codes", symbols),
                     Map.of("format", "SIMPLE")
             );
-            
+
             String jsonRequest = objectMapper.writeValueAsString(request);
             session.sendMessage(new TextMessage(jsonRequest));
             log.info("Sent symbol request for {} symbols", symbols.size());
-            
+
         } catch (Exception e) {
             log.error("Failed to send symbol request", e);
             if (!isShuttingDown.get()) {
@@ -180,9 +207,9 @@ public class UpbitWebSocketService {
             }
         }
     }
-    
+
     private class UpbitWebSocketHandler extends TextWebSocketHandler {
-        
+
         @Override
         public void afterConnectionEstablished(WebSocketSession session) {
             if (isShuttingDown.get()) {
@@ -193,10 +220,17 @@ public class UpbitWebSocketService {
                 }
                 return;
             }
-            
+
             UpbitWebSocketService.this.session = session;
-            log.info("WebSocket connection established to Upbit");
-            
+            Instant downSince = disconnectedAt.getAndSet(null);
+            int attempts = reconnectAttempts.getAndSet(0);
+            if (downSince == null) {
+                log.info("WebSocket connection established to Upbit");
+            } else {
+                log.info("WebSocket reconnected to Upbit after {} attempt(s), down {} s",
+                        attempts, Duration.between(downSince, Instant.now()).toSeconds());
+            }
+
             taskScheduler.schedule(() -> {
                 if (!isShuttingDown.get()) {
                     List<String> activeSymbols = coinService.getActiveSymbols();
@@ -204,29 +238,29 @@ public class UpbitWebSocketService {
                 }
             }, Instant.now().plusSeconds(1));
         }
-        
+
         @Override
         protected void handleBinaryMessage(WebSocketSession session, BinaryMessage message) {
             // 종료 중이면 메시지 처리하지 않음
             if (isShuttingDown.get()) {
                 return;
             }
-            
+
             try {
                 ByteBuffer buffer = message.getPayload();
                 byte[] bytes = new byte[buffer.remaining()];
                 buffer.get(bytes);
                 String jsonString = new String(bytes, StandardCharsets.UTF_8);
-                
+
                 processTickerMessage(jsonString);
-                
+
             } catch (Exception e) {
                 if (!isShuttingDown.get()) {
                     log.error("Failed to process binary message", e);
                 }
             }
         }
-        
+
         private void processTickerMessage(String jsonString) {
             if (isShuttingDown.get()) {
                 return;
@@ -241,7 +275,7 @@ public class UpbitWebSocketService {
 
                 String symbol = tickerData.get("cd").asText();
                 double price = tickerData.get("tp").asDouble();
-                
+
                 if (symbol != null && !symbol.trim().isEmpty() && price > 0) {
                     // 변경: 개선된 updatePrice 메서드 호출
                     priceUpdateService.updatePrice(symbol, price);
@@ -252,57 +286,62 @@ public class UpbitWebSocketService {
                 }
             }
         }
-        
+
         @Override
         public void handleTransportError(WebSocketSession session, Throwable exception) {
             if (!isShuttingDown.get()) {
-                log.error("WebSocket transport error", exception);
+                // 네트워크·TLS 오류로 끊김. 곧 다시 붙으므로 끊김과 같은 수준으로 남긴다 (스택은 DEBUG)
+                markDisconnected();
+                log.atLevel(disconnectLevel()).log("WebSocket transport error: {}", exception.toString());
+                log.debug("WebSocket transport error detail", exception);
             }
             UpbitWebSocketService.this.session = null;
-            
+
             if (!isShuttingDown.get()) {
                 scheduleReconnect();
             }
         }
-        
+
         @Override
         public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
             if (!isShuttingDown.get()) {
-                log.warn("WebSocket connection closed: code={}, reason={}",
+                markDisconnected();
+                log.atLevel(disconnectLevel()).log("WebSocket connection closed: code={}, reason={}",
                         status.getCode(), status.getReason());
             }
             UpbitWebSocketService.this.session = null;
-            
+
             if (!status.equals(CloseStatus.NORMAL) && !isShuttingDown.get()) {
                 scheduleReconnect();
             }
         }
     }
-    
+
     private void scheduleReconnect() {
         if (isShuttingDown.get()) {
             return;
         }
-        
+
         synchronized (this) {
             if (isReconnecting || isShuttingDown.get()) {
                 return;
             }
             isReconnecting = true;
         }
-        
+
         int currentAttempt = reconnectAttempts.getAndIncrement();
-        
+
         long delay = Math.min(
                 initialReconnectDelay * (1L << Math.min(currentAttempt, 6)),
                 maxReconnectDelay
         );
-        
-        log.info("Scheduling reconnection attempt {} in {} ms", currentAttempt + 1, delay);
-        
+
+        log.atLevel(currentAttempt == 0 ? Level.INFO : Level.DEBUG)
+                .log("Scheduling reconnection attempt {} in {} ms", currentAttempt + 1, delay);
+
         taskScheduler.schedule(this::connectToUpbit, Instant.now().plusMillis(delay));
     }
-    
+
     public boolean isConnected() {
         return !isShuttingDown.get() && session != null && session.isOpen() &&
                 connectionManager != null && connectionManager.isRunning();
