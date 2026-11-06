@@ -1,4 +1,7 @@
+import {useMemo, useState} from 'react';
 import {useSearchParams} from 'react-router-dom';
+import AdminUserSheet from './AdminUserSheet.jsx';
+import {AdminUserContext} from './adminUserContext.js';
 import AdminOverview from './AdminOverview.jsx';
 import AdminUsers from './AdminUsers.jsx';
 import AdminCommunity from './AdminCommunity.jsx';
@@ -21,8 +24,12 @@ export default function AdminPanel() {
     const [params, setParams] = useSearchParams();
     const current = SECTIONS.find((s) => s.value === params.get('section')) ?? SECTIONS[0];
     const Section = current.Component;
+    const [userId, setUserId] = useState(null);
+    const [version, setVersion] = useState(0);
+    const userContext = useMemo(() => ({openUser: setUserId, version}), [version]);
 
     return (
+        <AdminUserContext.Provider value={userContext}>
         <div className="flex flex-col gap-4">
             <h2 className="text-lg font-extrabold md:text-[22px]">관리자</h2>
             <div role="tablist" aria-label="관리 영역" className="flex flex-wrap gap-1.5">
@@ -42,6 +49,8 @@ export default function AdminPanel() {
                 ))}
             </div>
             <Section key={current.value}/>
+            <AdminUserSheet id={userId} onClose={() => setUserId(null)} onChanged={() => setVersion((v) => v + 1)}/>
         </div>
+        </AdminUserContext.Provider>
     );
 }

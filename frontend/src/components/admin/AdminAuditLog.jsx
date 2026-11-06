@@ -3,8 +3,10 @@ import Card from '../ui/Card.jsx';
 import Pagination from '../ui/Pagination.jsx';
 import {fetchAuditLogs} from '../../api/adminApi.js';
 import {ACTIONS, shortTime} from './adminFormat.js';
+import UserTag from './UserTag.jsx';
 
 const PAGE_SIZE = 20;
+const TARGETS = {POST: '게시글', COMMENT: '댓글', NOTICE: '공지'};
 
 /** 관리자 작업 기록: 누가 언제 무엇을 했는지 (읽기만) */
 export default function AdminAuditLog() {
@@ -31,10 +33,15 @@ export default function AdminAuditLog() {
                         <li key={a.id} className="flex flex-col gap-0.5 border-b border-line px-5 py-3 last:border-b-0">
                             <span className="flex items-center gap-2 text-sm">
                                 <span className="font-bold">{ACTIONS[a.action] ?? a.action}</span>
-                                <span className="text-xs text-fg-3">{a.targetType} {a.targetId ?? ''}</span>
+                                {a.targetType === 'USER'
+                                    ? <UserTag id={a.targetId} name="대상 사용자" className="text-xs text-fg-2"/>
+                                    : <span className="num text-xs text-fg-3">{TARGETS[a.targetType] ?? a.targetType} #{a.targetId ?? ''}</span>}
                             </span>
                             {a.detail && <span className="line-clamp-2 text-[13px] text-fg-2">{a.detail}</span>}
-                            <span className="num text-xs text-fg-3">{a.adminName} · {shortTime(a.createdAt)}</span>
+                            <span className="num flex items-baseline gap-1 text-xs text-fg-3">
+                                <UserTag id={a.adminId} name={a.adminName} className="text-fg-2"/>
+                                <span>· {shortTime(a.createdAt)}</span>
+                            </span>
                         </li>
                     ))}
                 </ul>

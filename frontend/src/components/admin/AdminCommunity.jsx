@@ -7,6 +7,7 @@ import {useToast} from '../toastContext.js';
 import {deleteAdminComment, deleteAdminPost, fetchAdminComments, fetchAdminPosts} from '../../api/adminApi.js';
 import {getErrorMessage} from '../../api/apiError.js';
 import {shortTime} from './adminFormat.js';
+import UserTag from './UserTag.jsx';
 
 const KINDS = [
     {value: 'posts', label: '게시글'},
@@ -63,23 +64,29 @@ export default function AdminCommunity() {
                 <ul>
                     {kind === 'posts' && data?.content.map((p) => (
                         <li key={p.id} className="flex items-center gap-2 border-b border-line pr-3 last:border-b-0">
-                            <Link to={`/community/${p.id}`} className={`flex min-w-0 flex-1 flex-col gap-0.5 px-5 py-3 hover:bg-surface-2 ${p.deleted ? 'opacity-50' : ''}`}>
-                                <span className="truncate text-[15px] font-semibold">
+                            <div className={`flex min-w-0 flex-1 flex-col gap-0.5 px-5 py-3 ${p.deleted ? 'opacity-50' : ''}`}>
+                                <Link to={`/community/${p.id}`} className="truncate text-[15px] font-semibold hover:underline">
                                     <span className="mr-1.5 text-xs font-bold text-fg-3">{CATEGORIES[p.category] ?? p.category}</span>
                                     {p.title}
                                     {p.deleted && <span className="ml-1.5 text-xs text-fg-3">(삭제됨)</span>}
+                                </Link>
+                                <span className="num flex min-w-0 items-baseline gap-1 text-xs text-fg-3">
+                                    <UserTag id={p.authorId} name={p.authorName} className="text-fg-2"/>
+                                    <span className="shrink-0">· {shortTime(p.createdAt)} · 댓글 {p.comments}</span>
                                 </span>
-                                <span className="num text-xs text-fg-3">{p.authorName} · {shortTime(p.createdAt)} · 댓글 {p.comments}</span>
-                            </Link>
+                            </div>
                             {!p.deleted && <TrashButton label={`${p.title} 삭제`} onClick={() => remove(p.id, '이 게시글')}/>}
                         </li>
                     ))}
                     {kind === 'comments' && data?.content.map((c) => (
                         <li key={c.id} className="flex items-center gap-2 border-b border-line pr-3 last:border-b-0">
-                            <Link to={`/community/${c.postId}`} className="flex min-w-0 flex-1 flex-col gap-0.5 px-5 py-3 hover:bg-surface-2">
-                                <span className="line-clamp-2 text-sm">{c.content}</span>
-                                <span className="num truncate text-xs text-fg-3">{c.authorName} · {shortTime(c.createdAt)} · {c.postTitle}</span>
-                            </Link>
+                            <div className="flex min-w-0 flex-1 flex-col gap-0.5 px-5 py-3">
+                                <Link to={`/community/${c.postId}`} className="line-clamp-2 text-sm hover:underline">{c.content}</Link>
+                                <span className="num flex min-w-0 items-baseline gap-1 text-xs text-fg-3">
+                                    <UserTag id={c.authorId} name={c.authorName} className="text-fg-2"/>
+                                    <span className="truncate">· {shortTime(c.createdAt)} · {c.postTitle}</span>
+                                </span>
+                            </div>
                             <TrashButton label="댓글 삭제" onClick={() => remove(c.id, '이 댓글')}/>
                         </li>
                     ))}

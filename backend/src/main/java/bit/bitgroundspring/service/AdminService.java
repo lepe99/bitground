@@ -117,13 +117,27 @@ public class AdminService {
 
     // ── 사용자 ────────────────────────────────────────────────
 
+    /**
+     * 사용자 검색. 닉네임은 겹칠 수 있으므로 번호·이메일로도 정확히 찾는다:
+     * "#33"이나 "33" → 번호, "@"가 있으면 → 이메일 전체 일치 (화면에는 가린 채로), 그 밖에는 닉네임 일부
+     */
     @Transactional(readOnly = true)
     public PageResponse<UserRow> users(String query, int page, int size) {
-        var params = new MapSqlParameterSource()
-                .addValue("q", query == null || query.isBlank() ? null : "%" + query.trim() + "%")
-                .addValue("limit", size)
-                .addValue("offset", page * size);
-        String where = " WHERE (:q IS NULL OR name LIKE :q)";
+        String q = query == null ? "" : query.trim();
+        var params = new MapSqlParameterSource().addValue("limit", size).addValue("offset", page * size);
+        String where;
+        if (q.isEmpty()) {
+            where = "";
+        } else if (q.matches("#?\\d{1,9}")) {
+            where = " WHERE id = :id";
+            params.addValue("id", Long.parseLong(q.replace("#", "")));
+        } else if (q.contains("@")) {
+            where = " WHERE LOWER(email) = LOWER(:email)";
+            params.addValue("email", q);
+        } else {
+            where = " WHERE name LIKE :name";
+            params.addValue("name", "%" + q + "%");
+        }
         List<UserRow> rows = jdbc.query("SELECT * FROM users" + where + " ORDER BY id DESC LIMIT :limit OFFSET :offset",
                 params, (rs, i) -> userRow(rs));
         long total = count("SELECT COUNT(*) FROM users" + where, params);
@@ -252,7 +266,8 @@ public class AdminService {
     // ── 공통 ──────────────────────────────────────────────────
 
     private UserRow userRow(ResultSet rs) throws SQLException {
-        return new UserRow(rs.getInt("id"), rs.getString("name"), rs.getString("provider"), maskEmail(rs.getString("email")),
+        return new UserRow(rs.getInt("id"), rs.getString("name"), rs.getString("profile_image"), rs.getString("provider"),
+                maskEmail(rs.getString("email")),
                 "ROLE_ADMIN".equals(rs.getString("role")), rs.getInt("tier"), rs.getBoolean("is_deleted"),
                 time(rs, "suspended_at"), time(rs, "created_at"));
     }

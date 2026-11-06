@@ -75,6 +75,15 @@ class AdminApiTest extends IntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalElements").value(1))
                 .andExpect(jsonPath("$.content[0].email").value("me***@example.com"));
+        // 닉네임은 겹칠 수 있어 번호(#id)와 이메일 전체로도 정확히 찾는다
+        mvc.perform(get("/admin/users").param("q", "#" + member.getId()).cookie(adminCookie))
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].id").value(member.getId()));
+        mvc.perform(get("/admin/users").param("q", "MEMBER@example.com").cookie(adminCookie))
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].email").value("me***@example.com"));
+        mvc.perform(get("/admin/users").param("q", "ember@example.com").cookie(adminCookie))
+                .andExpect(jsonPath("$.totalElements").value(0)); // 이메일은 일부만으로 찾지 않는다
         mvc.perform(get("/admin/users/{id}", member.getId()).cookie(adminCookie))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.cash").value(1000))

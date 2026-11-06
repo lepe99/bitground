@@ -30,8 +30,8 @@ public final class AdminDtos {
                      long reviewsTotal, long reviewsToday, String reviewModel, String reviewPromptVersion) {
     }
 
-    /** 사용자 목록 한 줄 (이메일은 일부 가림) */
-    public record UserRow(int id, String name, String provider, String email, boolean admin, int tier,
+    /** 사용자 목록 한 줄 (이메일은 일부 가림). 닉네임은 겹칠 수 있어 화면은 id로 구분한다 */
+    public record UserRow(int id, String name, String profileImage, String provider, String email, boolean admin, int tier,
                           boolean withdrawn, LocalDateTime suspendedAt, LocalDateTime createdAt) {
     }
 
