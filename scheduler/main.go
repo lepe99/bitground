@@ -53,15 +53,30 @@ func main() {
 	}
 }
 
+// hourlyRetries 한 정시 실행이 실패했을 때 같은 정시로 다시 시도하는 횟수와 간격 (Lambda 재시도 대신)
+const (
+	hourlyRetries    = 3
+	hourlyRetryDelay = time.Minute
+)
+
 // runHourly 로컬 테스트용 매시 실행: 시작할 때 한 번(그 시각의 정시 기준), 이후 매시 정각 10초 뒤마다.
-// 한 번 실패해도 멈추지 않고 다음 정각에 다시 실행한다 (Lambda 재시도 대신)
+// 실패하면 1분 간격으로 같은 정시 작업을 세 번까지 다시 시도하고, 그래도 안 되면 다음 정각을 기다린다.
+// (Docker가 다시 시작될 때 DB보다 먼저 떠서 첫 실행이 실패하면 그 시각의 스플릿·정산을 통째로 놓쳤다.
+// 작업은 멱등하고 정산·지급은 scheduler_runs로 한 번만 실행되므로 다시 시도해도 안전하다)
 func runHourly() {
 	slog.Info("매시 실행 모드 시작 (RUN_HOURLY=1)")
 	at := time.Now()
 	for {
-		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
-		_, _ = handleAt(ctx, at) // 실패는 handleAt이 기록한다. 다음 정각에 다시 실행
-		cancel()
+		for attempt := 0; ; attempt++ {
+			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
+			_, err := handleAt(ctx, at) // 실패 내용은 handleAt이 기록한다
+			cancel()
+			if err == nil || attempt == hourlyRetries {
+				break
+			}
+			slog.Warn("실행 실패, 같은 정시로 다시 시도", "attempt", attempt+1, "max_retries", hourlyRetries, "delay", hourlyRetryDelay.String())
+			time.Sleep(hourlyRetryDelay)
+		}
 
 		next := time.Now().Truncate(time.Hour).Add(time.Hour)
 		slog.Info("다음 실행 대기", "next", next.In(applog.KST).Format(time.DateTime))

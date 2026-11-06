@@ -29,6 +29,11 @@ loki.source.docker "backend" {
 }
 
 loki.process "backend" {
+  // JVM이 시작할 때 한 번 찍는 텍스트 줄(JSON이 아님)은 버린다
+  stage.drop {
+    expression = "^Picked up JAVA_TOOL_OPTIONS"
+  }
+
   stage.json {
     expressions = {
       level   = "level",

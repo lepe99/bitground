@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import jakarta.servlet.DispatcherType;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -49,6 +50,9 @@ public class SecurityConfig {
                         .authenticationEntryPoint(problemDetailSecurityHandler)
                         .accessDeniedHandler(problemDetailSecurityHandler))
                 .authorizeHttpRequests(authorizeRequests -> authorizeRequests
+                        // SSE(알림 구독)가 끝나거나 시간이 다 되면 같은 요청이 ASYNC로 다시 디스패치된다. 이때는 JWT 필터가 다시 돌지 않아
+                        // 인증 정보가 없으므로 막히고 'Access Denied' 스택 트레이스가 30초마다 ERROR로 남았다. 첫 요청에서 이미 인가를 거쳤으므로 통과시킨다
+                        .dispatcherTypeMatchers(DispatcherType.ASYNC, DispatcherType.ERROR).permitAll()
                         .requestMatchers("/auth/refresh", "/oauth2/**", "/error", "/favicon.ico", "/ws/**", // 인증, WebSocket
                                 "/coins/**", "/coins", "/news", "/market-index/**", "/ai-insights/**", "/public/**", // 공개 API
                                 "/auth/logout", "/seasons/update", "/seasons/current").permitAll()

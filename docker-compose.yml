@@ -2,8 +2,10 @@
 #   인프라만 (MySQL, Redis, S3Mock):     docker compose up -d
 #   + 백엔드 컨테이너:                   docker compose --profile app up -d --build
 #   + 모니터링 (Pinpoint APM, 로그 수집):
-#       PINPOINT_ENABLED=true LOG_FORMAT=logstash docker compose --profile app --profile monitoring up -d --build
+#       PINPOINT_ENABLED=true docker compose --profile app --profile monitoring up -d --build
 #       Pinpoint Web: http://localhost:8080   Grafana(Loki 로그): http://localhost:3000
+# 계속 떠 있어야 하는 서비스는 모두 restart: unless-stopped.
+#   (Docker Desktop이 다시 시작되면 일부만 살아나, 의존 대상(MySQL·HBase 등) 없이 오류만 반복하던 문제가 있었다)
 # 컨테이너 출력 로그(json-file)는 호스트에 따로 쌓이므로 크기를 제한한다.
 # 백엔드 로그에는 접속 IP 등이 들어가며, 회전된 옛 파일은 지워져 오래 남지 않는다 (개인정보처리방침 '접속 기록 3개월')
 x-logging: &default-logging
@@ -17,6 +19,7 @@ services:
     logging: *default-logging
     image: mysql:8.0
     container_name: bitground-mysql
+    restart: unless-stopped
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
       MYSQL_DATABASE: bitground
@@ -41,6 +44,7 @@ services:
     logging: *default-logging
     image: redis:7-alpine
     container_name: bitground-redis
+    restart: unless-stopped
     ports:
       - "6379:6379"
     healthcheck:
@@ -53,6 +57,7 @@ services:
     logging: *default-logging
     image: adobe/s3mock:3.12.0
     container_name: bitground-s3
+    restart: unless-stopped
     environment:
       initialBuckets: bitground
       retainFilesOnExit: "true"
@@ -68,6 +73,7 @@ services:
     profiles: ["app"]
     build: ./backend
     container_name: bitground-backend
+    restart: unless-stopped
     env_file: ./backend/.env
     environment:
       DB_URL: jdbc:mysql://mysql:3306/bitground?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
@@ -81,8 +87,9 @@ services:
       PINPOINT_ENABLED: ${PINPOINT_ENABLED:-false}
       PINPOINT_COLLECTOR_HOST: pinpoint-collector
       PINPOINT_PROFILE: ${PINPOINT_PROFILE:-local}
-      # logstash 로 두면 JSON 로그 출력 (Alloy → Loki 수집용), 비우면 텍스트
-      LOGGING_STRUCTURED_FORMAT_CONSOLE: ${LOG_FORMAT:-}
+      # 기본 JSON(logstash): Alloy → Loki 수집용. 텍스트로 보려면 LOG_FORMAT= (빈 값)
+      # (텍스트 로그를 Loki가 JSON으로 읽지 못해 스택 트레이스 줄마다 파싱 오류가 나던 문제)
+      LOGGING_STRUCTURED_FORMAT_CONSOLE: ${LOG_FORMAT-logstash}
     ports:
       - "8090:8090"
     depends_on:
@@ -119,6 +126,7 @@ services:
     profiles: ["monitoring"]
     image: zookeeper:3.4.13
     container_name: pinpoint-zookeeper
+    restart: unless-stopped
     environment:
       ZOO_MY_ID: 1
     networks:
@@ -131,6 +139,7 @@ services:
     profiles: ["monitoring"]
     image: pinpointdocker/pinpoint-hbase:4.0.0
     container_name: pinpoint-hbase
+    restart: unless-stopped
     volumes:
       - pinpoint-hbase-data:/home/pinpoint/hbase
       - /home/pinpoint/zookeeper
@@ -142,6 +151,7 @@ services:
     profiles: ["monitoring"]
     image: mysql:8.4 # Pinpoint 4.0은 MySQL 8.4 이상 필요
     container_name: pinpoint-mysql
+    restart: unless-stopped
     environment:
       MYSQL_ROOT_PASSWORD: pinpoint
       MYSQL_DATABASE: pinpoint
@@ -160,6 +170,7 @@ services:
     profiles: ["monitoring"]
     image: redis:7-alpine
     container_name: pinpoint-redis
+    restart: unless-stopped
 
   pinpoint-collector:
     logging: *default-logging
@@ -224,6 +235,7 @@ services:
     profiles: ["monitoring"]
     image: grafana/loki:3.7.1
     container_name: loki
+    restart: unless-stopped
     command: -config.file=/etc/loki/config.yaml
     volumes:
       - ./monitoring/loki/config.yaml:/etc/loki/config.yaml:ro # 90일 보관 (개인정보처리방침 접속 기록 3개월)
@@ -234,6 +246,7 @@ services:
     profiles: ["monitoring"]
     image: grafana/alloy:v1.21.3
     container_name: alloy
+    restart: unless-stopped
     command: run /etc/alloy/config.alloy
     volumes:
       - ./monitoring/alloy/config.alloy:/etc/alloy/config.alloy:ro
@@ -246,6 +259,7 @@ services:
     profiles: ["monitoring"]
     image: grafana/grafana:13.3.0
     container_name: grafana
+    restart: unless-stopped
     environment:
       # 로컬 시연용: 로그인 없이 조회
       GF_AUTH_ANONYMOUS_ENABLED: "true"
