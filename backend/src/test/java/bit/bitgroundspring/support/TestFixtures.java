@@ -10,7 +10,10 @@ import jakarta.servlet.http.Cookie;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.test.context.TestComponent;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.jdbc.core.ConnectionCallback;
 import org.springframework.jdbc.core.JdbcTemplate;
+
+import java.sql.Statement;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -24,7 +27,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class TestFixtures {
 
-    // FK 순서와 무관하게 비우기 위해 FOREIGN_KEY_CHECKS 를 끄고 TRUNCATE
+    // FK 순서와 무관하게 비우기 위해 FOREIGN_KEY_CHECKS 를 끄고 DELETE
     private static final List<String> TABLES = List.of(
             "admin_audit_logs", "outbox_events", "reactions", "comments", "posts", "notices", "notifications", "favorite_coins", "orders",
             "user_assets", "user_rankings", "user_daily_balances", "ai_advices", "ai_insights",
@@ -38,10 +41,23 @@ public class TestFixtures {
     private final UserAssetRepository userAssetRepository;
     private final JwtTokenProvider jwtTokenProvider;
 
+    /**
+     * 테스트마다 DB·Redis를 비운다.
+     * TRUNCATE는 테이블을 새로 만들어 표마다 0.1초 이상 걸리고, 백그라운드 작업(스트림 소비·아웃박스 전달)의 조회와
+     * 메타데이터 잠금을 기다려 테스트 하나가 5~12초씩 걸렸다. 몇 행뿐인 테스트 데이터는 DELETE가 훨씬 빠르다.
+     * FK 검사 끄기는 연결 단위 설정이라 한 연결에서 함께 실행한다
+     */
     public void clear() {
-        jdbc.execute("SET FOREIGN_KEY_CHECKS = 0");
-        TABLES.forEach(t -> jdbc.execute("TRUNCATE TABLE " + t));
-        jdbc.execute("SET FOREIGN_KEY_CHECKS = 1");
+        jdbc.execute((ConnectionCallback<Object>) connection -> {
+            try (Statement st = connection.createStatement()) {
+                st.execute("SET FOREIGN_KEY_CHECKS = 0");
+                for (String table : TABLES) {
+                    st.execute("DELETE FROM " + table);
+                }
+                st.execute("SET FOREIGN_KEY_CHECKS = 1");
+            }
+            return null;
+        });
         redisTemplate.execute((org.springframework.data.redis.core.RedisCallback<Object>) c -> {
             c.serverCommands().flushDb();
             return null;
