@@ -65,6 +65,7 @@ public enum ErrorCode {
     INVALID_ORDER(HttpStatus.BAD_REQUEST, "주문 정보가 올바르지 않습니다."),
     ORDER_NOT_FOUND(HttpStatus.NOT_FOUND, "주문을 찾을 수 없습니다."),
     ORDER_NOT_PENDING(HttpStatus.CONFLICT, "이미 체결되었거나 취소된 주문입니다."),
+    SEASON_SETTLING(HttpStatus.CONFLICT, "시즌 정산 중이에요. 새 시즌이 시작되면 다시 거래할 수 있어요."),
     INSUFFICIENT_CASH(HttpStatus.UNPROCESSABLE_ENTITY, "주문 가능 금액이 부족합니다."),
     INSUFFICIENT_ASSET(HttpStatus.UNPROCESSABLE_ENTITY, "주문 가능 수량이 부족합니다."),
     PRICE_OUT_OF_RANGE(HttpStatus.UNPROCESSABLE_ENTITY, "지정가가 시장가에서 너무 벗어났습니다."),

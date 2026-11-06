@@ -1,12 +1,7 @@
-import {useEffect, useState} from 'react';
 import Card from '../ui/Card.jsx';
-import {fetchCurrentSeason} from '../../api/seasonApi.js';
+import {parseServerTime as parse, useCurrentSeason} from '../../hooks/useCurrentSeason.js';
 
-const TICK_MS = 30_000;
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
-
-// 서버가 주는 시각은 한국 시각(시간대 없음). 화면과 서버 시각을 같은 방식으로 읽어 차이만 쓰므로 PC 시간대와 상관없다
-const parse = (s) => (s ? new Date(s) : null);
 
 const when = (d) => `${d.getMonth() + 1}월 ${d.getDate()}일 (${WEEKDAYS[d.getDay()]}) ${d.getHours()}시`;
 
@@ -18,44 +13,6 @@ const left = (ms) => {
     if (hours > 0) return `${hours}시간 ${minutes % 60}분`;
     return `${Math.max(1, minutes)}분`;
 };
-
-/** 진행 중인 시즌 정보와 서버 시각에 맞춘 현재 시각 (30초마다 갱신, 시즌이 끝나면 새 시즌을 다시 읽는다) */
-function useCurrentSeason() {
-    const [season, setSeason] = useState(null);
-    const [offset, setOffset] = useState(0); // 서버 시각 - 내 PC 시각
-    const [now, setNow] = useState(() => Date.now());
-    const [version, setVersion] = useState(0);
-
-    useEffect(() => {
-        let alive = true;
-        fetchCurrentSeason()
-            .then((s) => {
-                if (!alive) return;
-                setSeason(s);
-                setOffset(parse(s.now).getTime() - Date.now());
-            })
-            .catch(() => alive && setSeason(false));
-        return () => {
-            alive = false;
-        };
-    }, [version]);
-
-    useEffect(() => {
-        const timer = setInterval(() => setNow(Date.now()), TICK_MS);
-        return () => clearInterval(timer);
-    }, []);
-
-    const current = now + offset;
-    const endsAt = parse(season?.endsAt)?.getTime();
-    // 정산이 끝날 즈음(1분 뒤) 새 시즌을 다시 읽는다
-    useEffect(() => {
-        if (!endsAt) return;
-        const timer = setTimeout(() => setVersion((v) => v + 1), Math.max(endsAt - current, 0) + 60_000);
-        return () => clearTimeout(timer);
-    }, [endsAt]); // eslint-disable-line react-hooks/exhaustive-deps
-
-    return {season, now: current};
-}
 
 const short = (d) => `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}시`;
 
@@ -108,7 +65,7 @@ function Milestone({label, at, note, now, done}) {
  * 홈과 랭킹 화면 위쪽에 둔다
  */
 export default function SeasonSchedule({className = ''}) {
-    const {season, now} = useCurrentSeason();
+    const {season, now, closed} = useCurrentSeason();
     if (!season) return null;
 
     const start = parse(season.startAt + 'T00:00:00');
@@ -127,9 +84,13 @@ export default function SeasonSchedule({className = ''}) {
             <div className="flex min-w-0 flex-col gap-3 md:flex-[1.3]">
                 <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
                     <h2 className="text-base font-bold md:text-[17px]">{season.name}</h2>
-                    <span className="rounded-full bg-brand-soft px-2 py-0.5 text-xs font-bold text-brand-fg">
-                        스플릿 {inSplit2 ? 2 : 1} 진행 중
-                    </span>
+                    {closed ? (
+                        <span className="rounded-full bg-up/10 px-2 py-0.5 text-xs font-bold text-up">시즌 정산 중 · 거래 마감</span>
+                    ) : (
+                        <span className="rounded-full bg-brand-soft px-2 py-0.5 text-xs font-bold text-brand-fg">
+                            스플릿 {inSplit2 ? 2 : 1} 진행 중
+                        </span>
+                    )}
                 </div>
                 <ol className="grid grid-cols-2 gap-2" aria-label="시즌 진행 단계">
                     {phases.map((p) => <Phase key={p.name} {...p} now={now}/>)}

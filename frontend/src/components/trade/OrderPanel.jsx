@@ -1,4 +1,5 @@
 import {useEffect, useState} from 'react';
+import {useCurrentSeason} from '../../hooks/useCurrentSeason.js';
 import {placeOrder, placeReserveOrder} from '../../api/orderApi.js';
 import {getErrorMessage} from '../../api/apiError.js';
 import {useToast} from '../toastContext.js';
@@ -131,7 +132,28 @@ function NumberField({label, unit, value, onChange, onBlur, readOnly = false, pa
  * 매수·매도 주문 (시장가 / 예약 주문)
  * 시장가 매수는 주문 총액, 시장가 매도는 수량, 예약 주문은 가격과 수량으로 낸다.
  */
+// 시즌 종료 시각 전후의 거래 마감 안내 (서버도 종료 시각부터 정산이 끝날 때까지 주문을 받지 않는다)
+function SettlementNotice({closed, closingSoon, endsAt, now}) {
+    if (closed) {
+        return (
+            <p role="status" className="rounded-[10px] bg-up/10 px-3 py-2.5 text-[13px] font-semibold text-up">
+                시즌 정산 중이라 거래할 수 없어요. 새 시즌이 시작되면 바로 다시 열려요 (보통 1분 안).
+            </p>
+        );
+    }
+    if (closingSoon) {
+        const minutes = Math.max(1, Math.ceil((endsAt - now) / 60_000));
+        return (
+            <p role="status" className="rounded-[10px] bg-brand-soft px-3 py-2.5 text-[13px] font-semibold text-brand-fg">
+                {minutes}분 뒤 시즌이 끝나요. 종료 시각부터 정산이 끝날 때까지 거래가 멈추고, 체결되지 않은 예약 주문은 취소돼요.
+            </p>
+        );
+    }
+    return null;
+}
+
 export default function OrderPanel({market, currentPrice, cash, holdings, onOrderPlaced, initialSide = 'BUY', className = ''}) {
+    const {closed, closingSoon, endsAt, now} = useCurrentSeason();
     const {infoAlert, errorAlert} = useToast();
     const [side, setSide] = useState(initialSide);
     const [mode, setMode] = useState('market');
@@ -273,6 +295,8 @@ export default function OrderPanel({market, currentPrice, cash, holdings, onOrde
                 >
                     <SegmentedTabs label="주문 방식" items={MODES} value={mode} onChange={setMode} fill className="[&>button]:h-8 [&>button]:text-[13px]"/>
 
+                    <SettlementNotice closed={closed} closingSoon={closingSoon} endsAt={endsAt} now={now}/>
+
                     <div className="flex items-center justify-between text-[13px]">
                         <span className="text-fg-3">주문 가능</span>
                         <span className="num font-semibold">{isBuy ? `${formatKRW(cash)} KRW` : `${formatAmount(holdings)} ${symbol}`}</span>
@@ -313,8 +337,8 @@ export default function OrderPanel({market, currentPrice, cash, holdings, onOrde
                         </div>
                     )}
 
-                    <Button type="submit" variant={isBuy ? 'buy' : 'sell'} disabled={loading} className="mt-1 h-12 rounded-[10px]">
-                        {loading ? '주문 처리 중…' : `${isReserve ? '예약 ' : '시장가 '}${isBuy ? '매수' : '매도'}`}
+                    <Button type="submit" variant={isBuy ? 'buy' : 'sell'} disabled={loading || closed} className="mt-1 h-12 rounded-[10px]">
+                        {closed ? '정산 중 · 거래 마감' : loading ? '주문 처리 중…' : `${isReserve ? '예약 ' : '시장가 '}${isBuy ? '매수' : '매도'}`}
                     </Button>
                 </form>
             )}

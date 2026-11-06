@@ -37,6 +37,7 @@ public class OrderService {
 
     private final OrderRepository orderRepository;
     private final SeasonRepository seasonRepository;
+    private final TradingWindow tradingWindow;
     private final ReservedOrderBook orderBook;
     private final CoinRepository coinRepository;
     private final UserSseEmitters userSseEmitters;
@@ -144,6 +145,7 @@ public class OrderService {
     @Loggable("예약 주문 접수")
     public Order createReserveOrder(Integer userId, CreateOrderRequest request) {
         validateOrderRequest(request);
+        tradingWindow.ensureOpen(); // 시즌 종료 시각부터 정산이 끝날 때까지 거래 마감
 
         // 동시에 들어온 예약 주문이 같은 잔액을 중복 사용하지 않도록 사용자 행을 잠금
         User user = userRepository.findByIdWithPessimisticLock(userId)
@@ -233,6 +235,8 @@ public class OrderService {
     @Loggable("시즌 갱신")
     public void seasonUpdate(String seasonFlag) {
         // 대부분의 로직은 go serverless로 처리, 나머지 것들을 수행하자
+        // 새 시즌이 생겼으면 거래 마감을 바로 풀도록 기억해 둔 종료 시각을 다시 읽는다
+        tradingWindow.refresh();
 
         if (seasonFlag.equals("season")) {
             // 스케줄러가 이전 시즌 미체결 주문을 DB에서 지웠으므로 Redis 대기열을 DB 기준으로 다시 만든다

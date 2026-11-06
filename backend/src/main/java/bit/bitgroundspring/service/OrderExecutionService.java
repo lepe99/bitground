@@ -58,12 +58,15 @@ public class OrderExecutionService {
     private final String executionQueue;
 
     private final AtomicBoolean isShuttingDown = new AtomicBoolean(false);
+    private final TradingWindow tradingWindow;
 
     public OrderExecutionService(OrderRepository orderRepository, UserRepository userRepository,
                                  UserAssetRepository userAssetRepository, ReservedOrderBook orderBook,
                                  StringRedisTemplate redis, ObjectMapper objectMapper,
                                  TransactionTemplate transactionTemplate, ApplicationEventPublisher eventPublisher,
+                                 TradingWindow tradingWindow,
                                  @Value("${upbit.order.execution.queue}") String executionQueue) {
+        this.tradingWindow = tradingWindow;
         this.orderRepository = orderRepository;
         this.userRepository = userRepository;
         this.userAssetRepository = userAssetRepository;
@@ -99,6 +102,11 @@ public class OrderExecutionService {
         // 요청이 아닌 스케줄러 작업이므로 주문 단위로 traceId를 붙여 체결 로그를 묶는다
         MDC.put(TraceIdFilter.TRACE_ID, "exec-" + request.orderId());
         try {
+            // 시즌 종료 시각이 지나면 체결하지 않는다. 남은 예약 주문은 정산이 이전 시즌 미체결 주문으로 지운다
+            if (tradingWindow.isClosed()) {
+                log.info("Order {} not executed: season settling", request.orderId());
+                return;
+            }
             long lag = System.currentTimeMillis() - request.requestedAt();
             if (lag > LAG_WARN_MILLIS) {
                 log.warn("Order {} execution delayed {} ms in queue", request.orderId(), lag);

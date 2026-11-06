@@ -28,6 +28,7 @@ public class TradeService {
     private final UserAssetRepository assetRepository;
     private final OrderRepository orderRepository;
     private final SeasonRepository seasonRepository;
+    private final TradingWindow tradingWindow;
     private final ApplicationEventPublisher eventPublisher;
     private final UpbitClient upbitClient;
 
@@ -38,6 +39,7 @@ public class TradeService {
     @Loggable("시장가 주문")
     public OrderResponseDto placeOrder(Integer userId, OrderRequestDto req) {
         validateRequest(req);
+        tradingWindow.ensureOpen(); // 시즌 종료 시각부터 정산이 끝날 때까지 거래 마감
         BigDecimal qty;
         // 1) 사용자 & 코인 엔티티 로드 (락 모드로 동시성 방어)
         User user = userRepository.findByIdWithPessimisticLock(userId)
