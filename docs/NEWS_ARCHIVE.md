@@ -81,6 +81,19 @@
 
 Pinecone 키가 없거나 검색이 실패하면 배경 없이 만든다. 아카이브를 막 시작하면 24시간보다 오래된 기사가 없어 배경이 비어 있고, 매시간 수집이 하루 넘게 쌓이면 채워진다.
 
+## 다시 임베딩 (모델이나 입력 형식을 바꿨을 때)
+
+예전 벡터와 새 벡터가 섞이면 검색 품질이 고르지 않으므로 한꺼번에 맞춘다. 원문 대신 메타데이터의 제목·요약으로 임베딩하고, id·메타데이터는 그대로 둔다.
+
+```bash
+# 먼저 몇 건으로 확인
+docker compose --profile app --profile scheduler run --rm -e RUN_HOURLY= -e NEWS_REEMBED=3 scheduler
+# 전체 (매시 실행의 임베딩과 겹치지 않게 분당 횟수를 낮춘다)
+docker compose --profile app --profile scheduler run --rm -e RUN_HOURLY= -e NEWS_REEMBED=all -e NEWS_EMBED_RPM=60 scheduler
+```
+
+- 2026-11-06: gemini-embedding-2가 taskType을 받지 않아 입력 형식을 `title: … | text: …` / `task: search result | query: …`로 바꾸고 전체(약 1,500건)를 다시 임베딩
+
 ## 확인할 것
 
 - **네이버 검색 API 이용약관**: 검색 결과(제목·요약·링크)를 저장·재가공해도 되는지 확인. 본문은 저장하지 않는다.

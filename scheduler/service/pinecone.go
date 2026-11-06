@@ -139,12 +139,15 @@ func (c *pineconeClient) upsert(ctx context.Context, namespace string, vectors [
 	return nil
 }
 
-// listIDs id 접두어로 목록 (서버리스 인덱스에서 지원). 보관 기간이 지난 날짜의 기사를 지울 때 쓴다
+// listIDs id 접두어로 목록 (서버리스 인덱스에서 지원). 보관 기간이 지난 날짜의 기사를 지울 때 쓴다. prefix가 비면 전체
 func (c *pineconeClient) listIDs(ctx context.Context, namespace, prefix string) ([]string, error) {
 	var ids []string
 	token := ""
 	for {
-		q := url.Values{"namespace": {namespace}, "prefix": {prefix}, "limit": {"100"}}
+		q := url.Values{"namespace": {namespace}, "limit": {"100"}}
+		if prefix != "" {
+			q.Set("prefix", prefix)
+		}
 		if token != "" {
 			q.Set("paginationToken", token)
 		}

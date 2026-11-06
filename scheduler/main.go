@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strconv"
 	"sync"
 	"time"
 
@@ -43,6 +44,10 @@ func main() {
 	}
 	if os.Getenv("RUN_HOURLY") == "1" {
 		runHourly()
+		return
+	}
+	if os.Getenv("NEWS_REEMBED") != "" {
+		reembedNews()
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
@@ -175,16 +180,7 @@ func run(ctx context.Context, db *sql.DB, cfg config.Config, now time.Time, jobs
 			return service.UpdateMarketIndex(ctx, db, cfg.CoinGeckoAPIKey)
 		})
 	})
-	newsCfg := service.NewsArchiveConfig{
-		GeminiAPIKey:      cfg.GeminiAPIKey,
-		EmbedModel:        cfg.NewsEmbedModel,
-		EmbedDimension:    cfg.NewsEmbedDimension,
-		NaverClientID:     cfg.NaverClientID,
-		NaverClientSecret: cfg.NaverClientSecret,
-		PineconeAPIKey:    cfg.PineconeAPIKey,
-		PineconeIndex:     cfg.PineconeIndex,
-		EmbedPerMinute:    cfg.NewsEmbedPerMinute,
-	}
+	newsCfg := newsArchiveConfig(cfg)
 	if newsCfg.Enabled() {
 		// 매시간 새 기사를 쌓고, 0시에는 보관 기간이 지난 기사도 지운다
 		wg.Go(func() {
@@ -299,4 +295,38 @@ func (j *jobRunner) failedNames() []string {
 	j.mu.Lock()
 	defer j.mu.Unlock()
 	return append([]string(nil), j.failed...)
+}
+
+func newsArchiveConfig(cfg config.Config) service.NewsArchiveConfig {
+	return service.NewsArchiveConfig{
+		GeminiAPIKey:      cfg.GeminiAPIKey,
+		EmbedModel:        cfg.NewsEmbedModel,
+		EmbedDimension:    cfg.NewsEmbedDimension,
+		NaverClientID:     cfg.NaverClientID,
+		NaverClientSecret: cfg.NaverClientSecret,
+		PineconeAPIKey:    cfg.PineconeAPIKey,
+		PineconeIndex:     cfg.PineconeIndex,
+		EmbedPerMinute:    cfg.NewsEmbedPerMinute,
+	}
+}
+
+// reembedNews 뉴스 아카이브 전체를 지금 임베딩 형식으로 다시 임베딩한다 (한 번씩 손으로 실행).
+// NEWS_REEMBED=all이면 전체, 숫자면 그 개수만 (먼저 몇 건으로 확인할 때)
+//
+//	docker compose --profile app --profile scheduler run --rm -e RUN_HOURLY= -e NEWS_REEMBED=all scheduler
+func reembedNews() {
+	ctx := applog.With(context.Background(), slog.String("run_id", runID(context.Background())), slog.String("job", "뉴스 다시 임베딩"))
+	cfg, err := config.Load()
+	if err != nil {
+		slog.ErrorContext(ctx, "설정 오류", "error", err)
+		os.Exit(1)
+	}
+	limit, _ := strconv.Atoi(os.Getenv("NEWS_REEMBED")) // all이면 0 → 전체
+	started := time.Now()
+	done, failed, err := service.ReembedNews(ctx, newsArchiveConfig(cfg), limit)
+	if err != nil {
+		slog.ErrorContext(ctx, "다시 임베딩 실패", "done", done, "failed", failed, "error", err)
+		os.Exit(1)
+	}
+	slog.InfoContext(ctx, "다시 임베딩 완료", "done", done, "failed", failed, "duration_ms", time.Since(started).Milliseconds())
 }
