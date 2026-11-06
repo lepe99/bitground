@@ -102,7 +102,7 @@ services:
 
   # ── scheduler 프로필: Go 스케줄러를 로컬에서 매시 실행 (운영의 Lambda + EventBridge 대신)
   #   docker compose --profile app --profile scheduler up -d --build scheduler
-  #   TYPE=dev(scheduler/.env)면 6시간마다 시즌 정산(0·6·12·18시), 3·9·15·21시에 스플릿이 로컬 DB에 실제로 실행된다
+  #   DB의 시즌 일정(관리자 페이지에서 변경)에 맞춰 시즌 정산·스플릿이 로컬 DB에 실제로 실행된다
   scheduler:
     logging: *default-logging
     profiles: ["scheduler"]

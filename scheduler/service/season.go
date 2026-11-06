@@ -70,7 +70,7 @@ func settleSeason(ctx context.Context, tx *sql.Tx, cfg config.Config, base time.
 		return fmt.Errorf("시즌 %d은 이미 종료됨 (status=%s)", seasonID, status)
 	}
 
-	startAt, endAt, splitAt, endsAt := nextSeasonSchedule(base, cfg.Mode)
+	startAt, endAt, splitAt, endsAt := nextSeasonSchedule(base)
 	newSeasonName := nextSeasonName(base, ogSeasonName)
 
 	steps := []struct {

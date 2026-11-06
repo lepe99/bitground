@@ -80,15 +80,12 @@ func parseDBTime(v sql.NullString, loc *time.Location) (time.Time, error) {
 }
 
 // nextSeasonSchedule 정산 시각(base, 이전 시즌 종료 = 새 시즌 시작)으로 새 시즌의 기본 일정을 정한다.
-//   - prod: 1일·16일 0시 경계 중 base에서 7일 이상 남은 첫 경계에 종료, 시작 7일 뒤 0시(기간이 짧으면 절반)에 스플릿.
-//     평소 일정(1일·16일 시작)이면 8일·23일 스플릿, 16일·다음 달 1일 종료. 관리자가 종료를 옮겨도 다음 시즌부터 경계에 다시 맞춘다
-//   - dev: 3시간 뒤 스플릿, 6시간 뒤 종료
+// 1일·16일 0시 경계 중 base에서 7일 이상 남은 첫 경계에 종료, 시작 7일 뒤 0시(기간이 짧으면 절반)에 스플릿.
+// 평소 일정(1일·16일 시작)이면 8일·23일 스플릿, 16일·다음 달 1일 종료. 관리자가 종료를 옮겨도 다음 시즌부터 경계에 다시 맞춘다.
+// 더 짧게 확인하려면 관리자 페이지에서 진행 중인 시즌의 일정을 당긴다.
 //
 // startAt·endAt은 화면·기록용 날짜(시작일, 종료 전날)
-func nextSeasonSchedule(base time.Time, mode string) (startAt, endAt, splitAt, endsAt time.Time) {
-	if mode == "dev" {
-		return base, base, base.Add(3 * time.Hour), base.Add(6 * time.Hour)
-	}
+func nextSeasonSchedule(base time.Time) (startAt, endAt, splitAt, endsAt time.Time) {
 	day := time.Date(base.Year(), base.Month(), base.Day(), 0, 0, 0, 0, base.Location())
 	endsAt = nextBoundary(base.AddDate(0, 0, 7))
 	days := int(endsAt.Sub(day).Hours() / 24)

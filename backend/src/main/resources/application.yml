@@ -223,10 +223,6 @@ gemini:
   season-review:
     prompt-version: ${GEMINI_SEASON_REVIEW_PROMPT:season-review-v2}
 
-# dev: 6시간 주기 시즌/스플릿, prod: 월 2회 시즌
-scheduler:
-  setting: ${SCHEDULER_SETTING:dev}
-
 upbit:
   api:
     ticker-url: https://api.upbit.com/v1/ticker?markets={symbol}

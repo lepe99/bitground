@@ -35,20 +35,18 @@ func TestNextSeasonSchedule(t *testing.T) {
 	tests := []struct {
 		name                                    string
 		base                                    time.Time
-		mode                                    string
 		wantStart, wantEnd, wantSplit, wantEnds time.Time
 	}{
-		{"1일 시작: 8일 스플릿, 16일 종료", at(11, 1, 0), "prod", at(11, 1, 0), at(11, 15, 0), at(11, 8, 0), at(11, 16, 0)},
-		{"16일 시작: 23일 스플릿, 다음 달 1일 종료", at(11, 16, 0), "prod", at(11, 16, 0), at(11, 30, 0), at(11, 23, 0), at(12, 1, 0)},
-		{"12월 16일: 해를 넘겨 1월 1일 종료", at(12, 16, 0), "prod", at(12, 16, 0), at(12, 31, 0), at(12, 23, 0), time.Date(2027, 1, 1, 0, 0, 0, 0, kst)},
-		{"관리자가 종료를 20일로 옮김: 다음 경계(1일)에 다시 맞춤", at(11, 20, 0), "prod", at(11, 20, 0), at(11, 30, 0), at(11, 25, 0), at(12, 1, 0)},
-		{"9일 15시 종료: 7일 뒤가 16일 경계 이후라 다음 달 1일", at(11, 9, 15), "prod", at(11, 9, 0), at(11, 30, 0), at(11, 16, 0), at(12, 1, 0)},
-		{"10일 시작: 16일까지 7일이 안 남아 다음 달 1일", at(11, 10, 0), "prod", at(11, 10, 0), at(11, 30, 0), at(11, 17, 0), at(12, 1, 0)},
-		{"dev: 3시간 뒤 스플릿, 6시간 뒤 종료", at(11, 4, 18), "dev", at(11, 4, 18), at(11, 4, 18), at(11, 4, 21), at(11, 5, 0)},
+		{"1일 시작: 8일 스플릿, 16일 종료", at(11, 1, 0), at(11, 1, 0), at(11, 15, 0), at(11, 8, 0), at(11, 16, 0)},
+		{"16일 시작: 23일 스플릿, 다음 달 1일 종료", at(11, 16, 0), at(11, 16, 0), at(11, 30, 0), at(11, 23, 0), at(12, 1, 0)},
+		{"12월 16일: 해를 넘겨 1월 1일 종료", at(12, 16, 0), at(12, 16, 0), at(12, 31, 0), at(12, 23, 0), time.Date(2027, 1, 1, 0, 0, 0, 0, kst)},
+		{"관리자가 종료를 20일로 옮김: 다음 경계(1일)에 다시 맞춤", at(11, 20, 0), at(11, 20, 0), at(11, 30, 0), at(11, 25, 0), at(12, 1, 0)},
+		{"9일 15시 종료: 7일 뒤가 16일 경계 이후라 다음 달 1일", at(11, 9, 15), at(11, 9, 0), at(11, 30, 0), at(11, 16, 0), at(12, 1, 0)},
+		{"10일 시작: 16일까지 7일이 안 남아 다음 달 1일", at(11, 10, 0), at(11, 10, 0), at(11, 30, 0), at(11, 17, 0), at(12, 1, 0)},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			start, end, split, ends := nextSeasonSchedule(tt.base, tt.mode)
+			start, end, split, ends := nextSeasonSchedule(tt.base)
 			if !start.Equal(tt.wantStart) || !end.Equal(tt.wantEnd) || !split.Equal(tt.wantSplit) || !ends.Equal(tt.wantEnds) {
 				t.Errorf("nextSeasonSchedule() = %s ~ %s, split %s, ends %s", start, end, split, ends)
 			}

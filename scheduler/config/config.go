@@ -1,7 +1,6 @@
 package config
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -14,9 +13,6 @@ import (
 type Config struct {
 	DB DBConfig
 
-	// Mode 새 시즌의 기본 일정. dev: 6시간 시즌(3시간째 스플릿), prod: 매월 1·16일 시작(7일 뒤 스플릿).
-	// 정산·스플릿 시각은 DB의 시즌 일정이 기준이다 (service.SeasonSchedule)
-	Mode string
 	// TestTime 기준 시각 고정(테스트용). 비어 있거나 "0000-00-00 00:00:00"이면 현재 시각 사용
 	TestTime string
 	// Location 시즌·일일 작업을 판정하는 기준 시간대
@@ -59,7 +55,6 @@ func Load() (Config, error) {
 			DBName:   os.Getenv("DB_NAME"),
 			Charset:  "utf8mb4",
 		},
-		Mode:         getEnv("TYPE", "prod"),
 		TestTime:     os.Getenv("TEST_TIME"),
 		GeminiAPIKey: os.Getenv("GEMINI_API_KEY"),
 		GeminiModel:  getEnv("GEMINI_MODEL", "gemini-3.5-flash-lite"),
@@ -114,9 +109,6 @@ func Load() (Config, error) {
 	}
 	if len(missing) > 0 {
 		return Config{}, fmt.Errorf("필수 환경변수가 없습니다: %s", strings.Join(missing, ", "))
-	}
-	if cfg.Mode != "dev" && cfg.Mode != "prod" {
-		return Config{}, errors.New("TYPE은 dev 또는 prod여야 합니다")
 	}
 
 	return cfg, nil

@@ -44,12 +44,6 @@ func TestLoadRequiresEnv(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "SEASON_UPDATE_KEY") || !strings.Contains(err.Error(), "BACKEND_URL") {
 		t.Fatalf("빠진 환경변수를 모두 알려야 함: %v", err)
 	}
-
-	setRequiredEnv(t)
-	t.Setenv("TYPE", "staging")
-	if _, err := Load(); err == nil {
-		t.Fatal("TYPE은 dev/prod만 허용")
-	}
 }
 
 func TestNow(t *testing.T) {
