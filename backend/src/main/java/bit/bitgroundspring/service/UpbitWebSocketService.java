@@ -6,7 +6,7 @@ import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.event.ContextRefreshedEvent;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.scheduling.TaskScheduler;
@@ -68,6 +68,10 @@ public class UpbitWebSocketService {
     private final AtomicInteger reconnectAttempts = new AtomicInteger(0);
     /** 끊긴 시각 (다시 붙으면 얼마나 끊겼는지 남긴다) */
     private final AtomicReference<Instant> disconnectedAt = new AtomicReference<>();
+    /** 연결을 시작해 결과를 기다리는 중 (상태 점검이 연결을 하나 더 만들지 않게) */
+    private volatile boolean connecting;
+    /** 지금 연결의 핸들러. 이보다 예전 연결의 이벤트는 무시하고 세션은 닫는다 */
+    private volatile Object currentHandler;
     /** 재연결이 이만큼 연달아 실패하면 WARN (약 7초), 이만큼이면 ERROR (약 2분 이상 시세 없음) */
     private static final int WARN_AFTER_FAILURES = 3;
     private static final int ERROR_AFTER_FAILURES = 7;
@@ -85,8 +89,13 @@ public class UpbitWebSocketService {
         this.taskScheduler = taskScheduler;
     }
 
-    @EventListener(ContextRefreshedEvent.class)
+    /**
+     * 기동이 끝나면 한 번 연결한다. ContextRefreshedEvent는 액추에이터 전용 포트의 하위 컨텍스트 때문에 두 번 와서
+     * 업비트 연결이 두 개 생기고 시세를 두 번씩 처리했다 → 한 번만 오는 ApplicationReadyEvent로 바꿈
+     */
+    @EventListener(ApplicationReadyEvent.class)
     public void onApplicationReady() {
+        connecting = true;
         webSocketTaskExecutor.execute(this::connectToUpbit);
     }
 
@@ -109,10 +118,10 @@ public class UpbitWebSocketService {
         log.info("UpbitWebSocketService has been shut down.");
     }
 
-    @Scheduled(fixedDelay = 30000) // 30초마다 연결 상태 체크
+    @Scheduled(fixedDelay = 30000, initialDelay = 30000) // 30초마다 연결 상태 체크
     public void checkConnectionHealth() {
-        // 이미 재연결을 기다리는 중이면 끊김은 이미 알고 있다 (같은 끊김을 두 번 알리지 않음)
-        if (!isShuttingDown.get() && !isConnected() && !isReconnecting) {
+        // 연결 중이거나 재연결을 기다리는 중이면 이미 알고 있다 (연결을 하나 더 만들거나 같은 끊김을 두 번 알리지 않음)
+        if (!isShuttingDown.get() && !isConnected() && !isReconnecting && !connecting) {
             // 끊김 알림(종료·전송 오류) 없이 연결이 죽은 경우라 드물다
             log.warn("Upbit WebSocket found dead without a close event, reconnecting");
             markDisconnected();
@@ -165,6 +174,8 @@ public class UpbitWebSocketService {
             client.getUserProperties().put("org.apache.tomcat.websocket.IO_TIMEOUT_MS", String.valueOf(connectionTimeout));
 
             UpbitWebSocketHandler handler = new UpbitWebSocketHandler();
+            currentHandler = handler;
+            connecting = true;
             connectionManager = new WebSocketConnectionManager(client, handler, websocketUrl);
             connectionManager.setAutoStartup(false);
             connectionManager.start();
@@ -175,6 +186,7 @@ public class UpbitWebSocketService {
             log.debug("WebSocketConnectionManager started for Upbit WebSocket");
 
         } catch (Exception e) {
+            connecting = false;
             log.atLevel(disconnectLevel()).log("Failed to connect to Upbit WebSocket (attempt {}): {}",
                     reconnectAttempts.get(), e.toString());
             if (!isShuttingDown.get()) {
@@ -212,15 +224,17 @@ public class UpbitWebSocketService {
 
         @Override
         public void afterConnectionEstablished(WebSocketSession session) {
-            if (isShuttingDown.get()) {
+            // 종료 중이거나, 이 연결을 시작한 뒤 새 연결을 시작했으면 닫는다 (연결이 두 개 남아 시세를 두 번 처리하지 않게)
+            if (isShuttingDown.get() || this != currentHandler) {
                 try {
                     session.close();
                 } catch (Exception e) {
-                    log.warn("Error closing session during shutdown", e);
+                    log.debug("Error closing superseded session", e);
                 }
                 return;
             }
 
+            connecting = false;
             UpbitWebSocketService.this.session = session;
             Instant downSince = disconnectedAt.getAndSet(null);
             int attempts = reconnectAttempts.getAndSet(0);
@@ -289,6 +303,10 @@ public class UpbitWebSocketService {
 
         @Override
         public void handleTransportError(WebSocketSession session, Throwable exception) {
+            if (this != currentHandler) {
+                return; // 이미 새 연결로 바꾼 예전 연결
+            }
+            connecting = false;
             if (!isShuttingDown.get()) {
                 // 네트워크·TLS 오류로 끊김. 곧 다시 붙으므로 끊김과 같은 수준으로 남긴다 (스택은 DEBUG)
                 markDisconnected();
@@ -304,6 +322,10 @@ public class UpbitWebSocketService {
 
         @Override
         public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
+            if (this != currentHandler) {
+                return; // 이미 새 연결로 바꾼 예전 연결 (닫아도 재연결하지 않음)
+            }
+            connecting = false;
             if (!isShuttingDown.get()) {
                 markDisconnected();
                 log.atLevel(disconnectLevel()).log("WebSocket connection closed: code={}, reason={}",
