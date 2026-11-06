@@ -95,7 +95,7 @@ export default function Investments() {
                 favoriteMarkets={favorites}
                 onToggleFav={toggleFav}
                 initialFilter="owned"
-                className="sticky top-[64px] h-[calc(100dvh-72px)] min-w-0 flex-[1_1_320px] overflow-hidden rounded-xl border border-line max-md:hidden"
+                className="sticky top-[64px] h-[calc(100dvh-72px)] min-w-0 flex-[1_1_420px] overflow-hidden rounded-xl border border-line max-md:hidden"
             />
         </div>
     );

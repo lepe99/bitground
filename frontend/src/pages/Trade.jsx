@@ -136,7 +136,7 @@ export default function Trade() {
                     <RecentTrades symbol={selectedMarket} className="h-[468px] min-w-0 flex-[1_1_340px]"/>
                 </div>
             </div>
-            {list("sticky top-[64px] h-[calc(100dvh-72px)] min-w-0 flex-[1_1_340px] overflow-hidden rounded-xl border border-line")}
+            {list("sticky top-[64px] h-[calc(100dvh-72px)] min-w-0 flex-[1_1_420px] overflow-hidden rounded-xl border border-line")}
         </div>
     );
 }
