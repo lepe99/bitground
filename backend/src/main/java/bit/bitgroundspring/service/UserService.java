@@ -34,9 +34,13 @@ public class UserService {
     // 탈퇴하지 않은 사용자 조회 (없으면 USER_NOT_FOUND)
     @Transactional(readOnly = true)
     public User getActiveUser(Integer userId) {
-        return userRepository.findById(userId)
-                .filter(user -> !user.getIsDeleted())
+        User user = userRepository.findById(userId)
+                .filter(u -> !u.getIsDeleted())
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+        if (user.isSuspended()) {
+            throw new BusinessException(ErrorCode.USER_SUSPENDED);
+        }
+        return user;
     }
 
     private static final Pattern EMAIL = Pattern.compile("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$");

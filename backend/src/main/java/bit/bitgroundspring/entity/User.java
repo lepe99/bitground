@@ -68,6 +68,17 @@ public class User {
     @Builder.Default
     private Boolean isOnboarded = false;
     
+    // 관리자가 이용 정지한 시각 (null이면 정상). 정지되면 로그인과 API 이용이 막힌다
+    @Column(name = "suspended_at")
+    private LocalDateTime suspendedAt;
+
+    @Column(name = "suspended_reason", length = 200)
+    private String suspendedReason;
+
+    public boolean isSuspended() {
+        return suspendedAt != null;
+    }
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, columnDefinition = "datetime(6) DEFAULT CURRENT_TIMESTAMP(6)")
     private LocalDateTime createdAt;

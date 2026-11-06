@@ -39,6 +39,8 @@ public enum ErrorCode {
 
     // 사용자
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."),
+    USER_SUSPENDED(HttpStatus.FORBIDDEN, "이용이 정지된 계정입니다. 문의는 화면 아래 문의 메일로 부탁드립니다."),
+    CANNOT_SUSPEND_ADMIN(HttpStatus.BAD_REQUEST, "관리자 계정은 정지할 수 없습니다."),
 
     // 커뮤니티·공지
     POST_NOT_FOUND(HttpStatus.NOT_FOUND, "게시글을 찾을 수 없습니다."),

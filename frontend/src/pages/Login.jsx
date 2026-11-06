@@ -47,6 +47,7 @@ export default function Login() {
     // 로그인 실패 시 서버가 ?error=OAUTH_CANCELLED | OAUTH_FAILED 로 돌려보낸다
     useEffect(() => {
         if (errorCode === 'OAUTH_CANCELLED') errorAlert('로그인이 취소되었습니다.');
+        else if (errorCode === 'SUSPENDED') errorAlert('이용이 정지된 계정입니다. 문의는 화면 아래 문의 메일로 부탁드립니다.');
         else if (errorCode) errorAlert('로그인 중 오류가 발생했습니다. 다시 시도해주세요.');
     }, [errorCode, errorAlert]);
 

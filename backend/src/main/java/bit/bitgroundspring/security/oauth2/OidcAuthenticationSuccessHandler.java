@@ -55,6 +55,12 @@ public class OidcAuthenticationSuccessHandler extends SimpleUrlAuthenticationSuc
         
         User user = userOptional.get();
         int userId = user.getId();
+        // 관리자가 이용 정지한 계정은 토큰을 주지 않는다
+        if (user.isSuspended()) {
+            log.info("[login] suspended user blocked. - userId: {}", userId);
+            response.sendRedirect(UriComponentsBuilder.fromUriString(reactHost + "/login").queryParam("error", "SUSPENDED").build().toUriString());
+            return;
+        }
         
         // JWT 토큰, Refresh 토큰 생성 후 쿠키에 저장
         AuthTokenService.Tokens tokens = authTokenService.issue(user);

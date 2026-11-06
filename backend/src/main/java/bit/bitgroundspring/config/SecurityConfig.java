@@ -60,7 +60,9 @@ public class SecurityConfig {
                         .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/prometheus").permitAll()
                         .requestMatchers("/api/docs/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.POST, "/notices").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/notices/*").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/notices/*").hasRole("ADMIN")
+                        .requestMatchers("/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated()
                 )
                 .oauth2Login(oauth2Login -> oauth2Login

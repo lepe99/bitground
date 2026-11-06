@@ -38,9 +38,16 @@ public class NoticeController {
         return PageResponse.of(noticeService.searchNotices(keyword, pageable));
     }
 
+    @PutMapping("/{id}")
+    public ResponseEntity<Void> updateNotice(@AuthenticationPrincipal AuthUser authUser, @PathVariable Integer id,
+                                             @Valid @RequestBody NoticeRequestDto dto) {
+        noticeService.updateNotice(authUser.id(), id, dto);
+        return ResponseEntity.noContent().build();
+    }
+
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteNotice(@PathVariable Integer id) {
-        noticeService.deleteNotice(id);
+    public ResponseEntity<Void> deleteNotice(@AuthenticationPrincipal AuthUser authUser, @PathVariable Integer id) {
+        noticeService.deleteNotice(authUser.id(), id);
         return ResponseEntity.noContent().build();
     }
 }
