@@ -50,7 +50,7 @@ export default function PostWrite() {
                         <SegmentedTabs label="문의 유형" items={INQUIRY_TYPES} value={inquiryType} onChange={setInquiryType} className="w-fit"/>
                         <p className="text-xs leading-relaxed text-fg-2">
                             문의는 나와 관리자만 볼 수 있고, 답변은 댓글로 달려요.<br/>
-                            첨부한 사진은 주소를 아는 사람이면 볼 수 있으니 개인정보가 보이지 않게 가려 주세요.
+                            첨부한 사진에 개인정보가 보이지 않게 가려 주세요.
                         </p>
                     </div>
                 )}
