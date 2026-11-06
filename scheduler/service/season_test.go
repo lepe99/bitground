@@ -5,27 +5,27 @@ import (
 	"time"
 )
 
-func TestProcessSeasonStrings(t *testing.T) {
+func TestNextSeasonName(t *testing.T) {
+	kst := time.FixedZone("KST", 9*60*60)
+	day := func(y int, m time.Month, d int) time.Time { return time.Date(y, m, d, 0, 0, 0, 0, kst) }
 	tests := []struct {
-		seasonName, ogSeasonName, want string
+		name  string
+		start time.Time
+		prev  string
+		want  string
 	}{
-		{"데브 시즌", "데브 시즌 3", "데브 시즌 4"}, // 같은 이름이면 번호 +1
-		{"데브 시즌", "시즌 1", "데브 시즌 1"},    // 이름이 바뀌면 1부터
-		{"정규 시즌", "정규 시즌", "정규 시즌 1"},   // 이전 이름에 번호가 없으면 1
-		{"정규 시즌", "초기화 시즌 1", "정규 시즌 1"},
+		{"같은 해 다음 시즌", day(2026, 2, 1), "26년 1시즌", "26년 2시즌"},
+		{"두 자리 번호", day(2026, 12, 16), "26년 23시즌", "26년 24시즌"},
+		{"해가 바뀌면 1부터", day(2027, 1, 1), "26년 24시즌", "27년 1시즌"},
+		{"예전 이름 다음은 1부터", day(2026, 11, 16), "데브 시즌 8", "26년 1시즌"},
+		{"2030년대도 두 자리", day(2031, 1, 1), "", "31년 1시즌"},
 	}
 	for _, tt := range tests {
-		got, err := processSeasonStrings(tt.seasonName, tt.ogSeasonName)
-		if err != nil {
-			t.Fatalf("processSeasonStrings(%q, %q) error: %v", tt.seasonName, tt.ogSeasonName, err)
-		}
-		if got != tt.want {
-			t.Errorf("processSeasonStrings(%q, %q) = %q, want %q", tt.seasonName, tt.ogSeasonName, got, tt.want)
-		}
-	}
-
-	if _, err := processSeasonStrings("이름 없음", "시즌 1"); err == nil {
-		t.Error("'시즌'이 없는 이름은 에러여야 함")
+		t.Run(tt.name, func(t *testing.T) {
+			if got := nextSeasonName(tt.start, tt.prev); got != tt.want {
+				t.Errorf("nextSeasonName(%s, %q) = %q, want %q", tt.start.Format(time.DateOnly), tt.prev, got, tt.want)
+			}
+		})
 	}
 }
 

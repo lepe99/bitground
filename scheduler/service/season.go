@@ -70,11 +70,8 @@ func settleSeason(ctx context.Context, tx *sql.Tx, cfg config.Config, base time.
 		return fmt.Errorf("시즌 %d은 이미 종료됨 (status=%s)", seasonID, status)
 	}
 
-	newSeasonName, err := processSeasonStrings(cfg.SeasonName, ogSeasonName)
-	if err != nil {
-		return fmt.Errorf("시즌 이름 처리 실패: %w", err)
-	}
 	startAt, endAt, splitAt, endsAt := nextSeasonSchedule(base, cfg.Mode)
+	newSeasonName := nextSeasonName(base, ogSeasonName)
 
 	steps := []struct {
 		name  string
@@ -132,59 +129,22 @@ func runPeriod(now time.Time) string {
 	return now.Format("2006-01-02T15")
 }
 
-// processSeasonStrings 함수는 문자열 a와 b를 비교하여 새로운 문자열 c를 반환합니다.
-func processSeasonStrings(seasonName, ogSeasonName string) (string, error) {
-	// "시즌" 앞의 문자열과 "시즌" 자체를 캡쳐하는 정규 표현식 (예: "### 시즌", "시즌")
-	reSeasonPrefix := regexp.MustCompile(`^(.*시즌)`)
-	// "시즌 " 뒤의 숫자를 캡쳐하는 정규 표현식
-	reNumber := regexp.MustCompile(`시즌 (\d+)$`)
+// seasonNamePattern "26년 3시즌" 형식의 이름
+var seasonNamePattern = regexp.MustCompile(`^(\d{2})년 (\d+)시즌$`)
 
-	// 문자열 a에서 "시즌" 부분을 포함한 앞부분을 추출합니다.
-	matchesNewPrefix := reSeasonPrefix.FindStringSubmatch(seasonName)
-	var seasonPrefixNew string
-	if len(matchesNewPrefix) > 1 {
-		seasonPrefixNew = matchesNewPrefix[1] // 예: "### 시즌" 또는 "시즌"
-	} else {
-		return "", fmt.Errorf("문자열 '%s'에서 '시즌' 부분을 찾을 수 없습니다", seasonName)
-	}
-
-	// 문자열 b에서 "시즌" 부분을 포함한 앞부분을 추출합니다.
-	matchesOgPrefix := reSeasonPrefix.FindStringSubmatch(ogSeasonName)
-	var seasonPrefixOg string
-	if len(matchesOgPrefix) > 1 {
-		seasonPrefixOg = matchesOgPrefix[1] // 예: "~~~ 시즌" 또는 "시즌"
-	} else {
-		return "", fmt.Errorf("문자열 '%s'에서 '시즌' 부분을 찾을 수 없습니다", ogSeasonName)
-	}
-
-	// 문자열 b에서 숫자를 추출합니다.
-	matchesOgNumber := reNumber.FindStringSubmatch(ogSeasonName)
-	var numberOg int
-	if len(matchesOgNumber) > 1 {
-		num, err := strconv.Atoi(matchesOgNumber[1])
-		if err != nil {
-			return "", fmt.Errorf("문자열 '%s'에서 숫자를 파싱할 수 없습니다: %w", ogSeasonName, err)
+// nextSeasonName 새 시즌 이름: "{시작 연도 두 자리}년 {그해 몇 번째}시즌" (예: 26년 1시즌, 26년 2시즌, 27년 1시즌).
+// 이전 시즌이 같은 해의 이 형식이면 번호 +1, 해가 바뀌었거나 형식이 다르면(예전 이름) 1부터
+func nextSeasonName(start time.Time, prevName string) string {
+	year := start.Year() % 100
+	n := 1
+	if m := seasonNamePattern.FindStringSubmatch(prevName); m != nil {
+		prevYear, _ := strconv.Atoi(m[1])
+		prevN, _ := strconv.Atoi(m[2])
+		if prevYear == year {
+			n = prevN + 1
 		}
-		numberOg = num
-	} else {
-		// 숫자가 없는 경우 (예: "시즌"만 있는 경우) 기본값을 0으로 설정하여 로직에서 1이 되도록 함
-		numberOg = 0
 	}
-
-	// 문자열 a의 "### 시즌" 부분과 문자열 b의 "~~~ 시즌" 부분을 비교합니다.
-	// 즉, '시즌'을 포함한 앞부분이 완전히 같은지 비교합니다.
-	if seasonPrefixNew == seasonPrefixOg {
-		// 같다면 ** 값을 1 증가시킵니다.
-		numberOg++
-	} else {
-		// 다르다면 ** 값을 1로 만듭니다.
-		numberOg = 1
-	}
-
-	// 문자열 c를 "### 시즌 **" 양식으로 출력합니다.
-	// 이때, 문자열 c의 "### 시즌" 부분은 문자열 a에서 추출한 seasonPrefixA를 사용합니다.
-	c := fmt.Sprintf("%s %d", seasonPrefixNew, numberOg)
-	return c, nil
+	return fmt.Sprintf("%02d년 %d시즌", year, n)
 }
 
 // NotifySeasonUpdate 백엔드에 시즌/스플릿 완료를 알립니다. (예약 주문 정리, 사용자 알림)

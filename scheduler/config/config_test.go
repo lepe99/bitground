@@ -10,7 +10,7 @@ func setRequiredEnv(t *testing.T) {
 	t.Helper()
 	for k, v := range map[string]string{
 		"DB_HOST": "localhost:3306", "DB_USER": "u", "DB_NAME": "bitground",
-		"SEASON_NAME": "정규 시즌", "BACKEND_URL": "https://api.example.com/", "SEASON_UPDATE_KEY": "k",
+		"BACKEND_URL": "https://api.example.com/", "SEASON_UPDATE_KEY": "k",
 		"TYPE": "prod", "TEST_TIME": "", "TIMEZONE": "",
 	} {
 		t.Setenv(k, v)

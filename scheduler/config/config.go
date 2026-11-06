@@ -40,8 +40,6 @@ type Config struct {
 	NewsEmbedDimension int
 	NewsEmbedPerMinute int
 
-	SeasonName string
-
 	// CoinGeckoAPIKey 마켓 인덱스용 무료 Demo 키 (COINGECKO_DEMO_API_KEY). 비우면 키 없이 호출
 	CoinGeckoAPIKey string
 
@@ -73,7 +71,6 @@ func Load() (Config, error) {
 		PineconeAPIKey:       os.Getenv("PINECONE_API_KEY"),
 		PineconeIndex:        getEnv("PINECONE_INDEX", "bitground-news"),
 		NewsEmbedModel:       getEnv("NEWS_EMBED_MODEL", "gemini-embedding-2"),
-		SeasonName:           os.Getenv("SEASON_NAME"),
 		CoinGeckoAPIKey:      os.Getenv("COINGECKO_DEMO_API_KEY"),
 		BackendURL:           strings.TrimRight(os.Getenv("BACKEND_URL"), "/"),
 		SchedulerKey:         os.Getenv("SEASON_UPDATE_KEY"),
@@ -108,7 +105,6 @@ func Load() (Config, error) {
 		"DB_HOST":           cfg.DB.Host,
 		"DB_USER":           cfg.DB.User,
 		"DB_NAME":           cfg.DB.DBName,
-		"SEASON_NAME":       cfg.SeasonName,
 		"BACKEND_URL":       cfg.BackendURL,
 		"SEASON_UPDATE_KEY": cfg.SchedulerKey,
 	} {
