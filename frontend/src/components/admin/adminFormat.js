@@ -21,4 +21,5 @@ export const ACTIONS = {
     NOTICE_CREATE: '공지 등록',
     NOTICE_UPDATE: '공지 수정',
     NOTICE_DELETE: '공지 삭제',
+    SEASON_SCHEDULE: '시즌 일정 변경',
 };

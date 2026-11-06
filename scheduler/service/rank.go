@@ -169,28 +169,6 @@ func getAllCoinsCurrentPrice(ctx context.Context, symbolMap map[string]int) (map
 	return coinPrices, coinPriceHistory, nil
 }
 
-// GetCurrentSeasonID 진행중인 시즌 ID 가져오기
-func GetCurrentSeasonID(ctx context.Context, db *sql.DB) (int, error) {
-	// 쿼리 타임아웃 설정 (10초)
-	queryCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-
-	query := `
-		SELECT id
-		FROM seasons
-		WHERE status = 'PENDING'
-		LIMIT 1
-	`
-
-	// 쿼리 실행
-	var seasonID int
-	err := db.QueryRowContext(queryCtx, query).Scan(&seasonID)
-	if err != nil {
-		return 0, fmt.Errorf("쿼리 실행 에러: %w", err)
-	}
-
-	return seasonID, nil
-}
 
 // GetActiveCoinsSymbols 데이터베이스에서 활성화된 코인 심볼들을 가져오는 함수
 func GetActiveCoinsSymbols(ctx context.Context, db *sql.DB) (map[string]int, error) {

@@ -6,12 +6,14 @@ import AdminOverview from './AdminOverview.jsx';
 import AdminUsers from './AdminUsers.jsx';
 import AdminCommunity from './AdminCommunity.jsx';
 import AdminNotices from './AdminNotices.jsx';
+import AdminSeason from './AdminSeason.jsx';
 import AdminAuditLog from './AdminAuditLog.jsx';
 
 const SECTIONS = [
     {value: 'overview', label: '현황', Component: AdminOverview},
     {value: 'users', label: '사용자', Component: AdminUsers},
     {value: 'community', label: '커뮤니티', Component: AdminCommunity},
+    {value: 'season', label: '시즌', Component: AdminSeason},
     {value: 'notices', label: '공지', Component: AdminNotices},
     {value: 'audit', label: '작업 기록', Component: AdminAuditLog},
 ];

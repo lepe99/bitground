@@ -154,23 +154,28 @@ func runID(ctx context.Context) string {
 
 func run(ctx context.Context, db *sql.DB, cfg config.Config, now time.Time, jobs *jobRunner) error {
 	step := func(name string, fn func(ctx context.Context) error) error { return jobs.run(ctx, name, fn) }
-	flags := util.TimeCheck(now, cfg.Mode)
+	flags := util.TimeCheck(now)
 	if cfg.InsightEveryHour && !flags.Insight {
 		// 로컬 테스트용: 0시까지 기다리지 않고 매번 인사이트를 다시 만든다 (같은 날짜 행을 덮어씀)
 		flags.Insight = true
 	}
-	slog.InfoContext(ctx, "실행 시작", "base_time", now.Format(time.DateTime),
-		"season", flags.Season, "split", flags.Split, "coin", flags.Coin, "insight", flags.Insight)
 
 	// 이후 작업이 모두 필요로 하는 값. 실패하면 더 진행하지 않는다
 	symbolMap, err := service.GetActiveCoinsSymbols(ctx, db)
 	if err != nil {
 		return fmt.Errorf("활성화된 코인 심볼 조회 실패: %w", err)
 	}
-	seasonID, err := service.GetCurrentSeasonID(ctx, db)
+	// 시즌 정산·스플릿은 DB의 시즌 일정으로 정한다 (관리자가 바꾸면 다음 정각에 반영)
+	schedule, err := service.GetSeasonSchedule(ctx, db, cfg.Location)
 	if err != nil {
-		return fmt.Errorf("현재 시즌 ID 조회 실패: %w", err)
+		return fmt.Errorf("현재 시즌 일정 조회 실패: %w", err)
 	}
+	seasonID := schedule.ID
+	flags.Season = schedule.SeasonDue(now)
+	flags.Split = schedule.SplitDue(now)
+	slog.InfoContext(ctx, "실행 시작", "base_time", now.Format(time.DateTime), "season_id", seasonID,
+		"split_starts_at", formatTime(schedule.SplitAt), "ends_at", formatTime(schedule.EndsAt),
+		"season", flags.Season, "split", flags.Split, "coin", flags.Coin, "insight", flags.Insight)
 
 	// 서로 독립적인 외부 API 작업은 병렬로 돌리고, 각자 자기 에러 변수에만 쓴다
 	var marketErr, insightErr, newsErr error
@@ -223,7 +228,7 @@ func run(ctx context.Context, db *sql.DB, cfg config.Config, now time.Time, jobs
 	}
 	if flags.Split {
 		errs = append(errs, step("스플릿(현금 지급)", func(ctx context.Context) error {
-			return service.UpdateSplit(ctx, db, cfg, now)
+			return service.UpdateSplit(ctx, db, cfg, schedule.SplitAt)
 		}))
 	}
 
@@ -248,14 +253,26 @@ func run(ctx context.Context, db *sql.DB, cfg config.Config, now time.Time, jobs
 			errs = append(errs, jobs.skip(ctx, "시즌 정산", "랭킹 계산 실패로 시즌 정산을 건너뜀"))
 		} else {
 			errs = append(errs, step("시즌 정산", func(ctx context.Context) error {
-				return service.UpdateSeason(ctx, db, cfg, now, seasonID, coinPrices)
+				return service.UpdateSeason(ctx, db, cfg, schedule, coinPrices)
 			}))
 		}
 	}
 
+	// 이전 실행에서 정산은 됐지만 백엔드에 알리지 못한 기록 (예약 주문 정리·사용자 알림이 빠지지 않게)
+	errs = append(errs, step("백엔드 알림 재시도", func(ctx context.Context) error {
+		return service.RetryPendingNotifications(ctx, db, cfg.BackendURL, cfg.SchedulerKey)
+	}))
+
 	wg.Wait()
 	errs = append(errs, marketErr, insightErr, newsErr)
 	return errors.Join(errs...)
+}
+
+func formatTime(t time.Time) string {
+	if t.IsZero() {
+		return ""
+	}
+	return t.Format(time.DateTime)
 }
 
 // jobRunner 작업을 실행하며 시작·완료·실패와 소요 시간을 남기고, 실패한 작업 이름을 모은다 (작업은 병렬로도 실행됨)

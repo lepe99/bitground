@@ -14,7 +14,8 @@ import (
 type Config struct {
 	DB DBConfig
 
-	// Mode dev: 6시간 주기 시즌/스플릿, prod: 매월 1·16일 시즌, 8·23일 스플릿
+	// Mode 새 시즌의 기본 일정. dev: 6시간 시즌(3시간째 스플릿), prod: 매월 1·16일 시작(7일 뒤 스플릿).
+	// 정산·스플릿 시각은 DB의 시즌 일정이 기준이다 (service.SeasonSchedule)
 	Mode string
 	// TestTime 기준 시각 고정(테스트용). 비어 있거나 "0000-00-00 00:00:00"이면 현재 시각 사용
 	TestTime string

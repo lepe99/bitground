@@ -3,11 +3,15 @@ package bit.bitgroundspring.controller;
 import bit.bitgroundspring.common.response.PageResponse;
 import bit.bitgroundspring.dto.response.AdminDtos.*;
 import bit.bitgroundspring.security.token.AuthUser;
+import bit.bitgroundspring.dto.response.CurrentSeasonDto;
+import bit.bitgroundspring.service.AdminSeasonService;
 import bit.bitgroundspring.service.AdminService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+
+import java.time.LocalDateTime;
 
 /**
  * 관리자 페이지 API. 모두 ROLE_ADMIN만 (SecurityConfig의 /admin/**).
@@ -21,6 +25,7 @@ public class AdminController {
     private static final int MAX_PAGE_SIZE = 50;
 
     private final AdminService adminService;
+    private final AdminSeasonService adminSeasonService;
 
     @GetMapping("/overview")
     public Overview overview() {
@@ -75,6 +80,16 @@ public class AdminController {
     public ResponseEntity<Void> deleteComment(@AuthenticationPrincipal AuthUser admin, @PathVariable int id) {
         adminService.deleteComment(admin, id);
         return ResponseEntity.noContent().build();
+    }
+
+    public record SeasonScheduleRequest(LocalDateTime splitStartsAt, LocalDateTime endsAt) {
+    }
+
+    /** 진행 중인 시즌 일정 바꾸기 (정각 단위). 스케줄러가 다음 정각 실행에 반영한다 */
+    @PutMapping("/season/schedule")
+    public CurrentSeasonDto updateSeasonSchedule(@AuthenticationPrincipal AuthUser admin,
+                                                 @RequestBody SeasonScheduleRequest request) {
+        return adminSeasonService.updateSchedule(admin, request.splitStartsAt(), request.endsAt());
     }
 
     @GetMapping("/audit-logs")

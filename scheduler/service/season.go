@@ -22,10 +22,11 @@ const seasonStartCash = 10000000
 //
 // 각 단계가 앞 단계 결과에 의존하고 같은 테이블(users, orders, user_assets)을 고치므로
 // 하나의 트랜잭션에서 순서대로 실행한다. 중간에 실패하면 전부 롤백되어 절반만 정산된 상태가 남지 않는다.
-// 같은 기준 시각(period)의 정산은 scheduler_runs로 한 번만 실행된다.
-func UpdateSeason(ctx context.Context, db *sql.DB, cfg config.Config, now time.Time, seasonID int, coinPrices map[int]float64) error {
+// 같은 종료 시각(period)의 정산은 scheduler_runs로 한 번만 실행된다.
+// 새 시즌은 이전 시즌의 종료 시각부터 시작한다 (실행이 늦어져도 일정이 밀리지 않는다).
+func UpdateSeason(ctx context.Context, db *sql.DB, cfg config.Config, schedule SeasonSchedule, coinPrices map[int]float64) error {
 	const kind = "season"
-	period := runPeriod(now)
+	period := runPeriod(schedule.EndsAt)
 
 	prices, err := pricesJSON(coinPrices)
 	if err != nil {
@@ -44,7 +45,7 @@ func UpdateSeason(ctx context.Context, db *sql.DB, cfg config.Config, now time.T
 			slog.InfoContext(ctx, "시즌 정산은 이미 처리되어 건너뜀", "run_period", period)
 			return nil
 		}
-		return settleSeason(txCtx, tx, cfg, now, seasonID, prices)
+		return settleSeason(txCtx, tx, cfg, schedule.EndsAt, schedule.ID, prices)
 	})
 	if err != nil {
 		return err
@@ -55,7 +56,7 @@ func UpdateSeason(ctx context.Context, db *sql.DB, cfg config.Config, now time.T
 	})
 }
 
-func settleSeason(ctx context.Context, tx *sql.Tx, cfg config.Config, now time.Time, seasonID int, prices string) error {
+func settleSeason(ctx context.Context, tx *sql.Tx, cfg config.Config, base time.Time, seasonID int, prices string) error {
 	// 1. 이전 시즌 확인 (정산 중 다른 실행이 같은 시즌을 건드리지 못하도록 행 락)
 	var ogSeasonName, status string
 	err := tx.QueryRowContext(ctx, `SELECT name, status FROM seasons WHERE id = ? FOR UPDATE`, seasonID).
@@ -73,11 +74,7 @@ func settleSeason(ctx context.Context, tx *sql.Tx, cfg config.Config, now time.T
 	if err != nil {
 		return fmt.Errorf("시즌 이름 처리 실패: %w", err)
 	}
-	startAt, endAt, err := seasonPeriod(now, cfg.Mode)
-	if err != nil {
-		return err
-	}
-	splitAt, endsAt := seasonMilestones(now, cfg.Mode, endAt)
+	startAt, endAt, splitAt, endsAt := nextSeasonSchedule(base, cfg.Mode)
 
 	steps := []struct {
 		name  string
@@ -126,43 +123,13 @@ func settleSeason(ctx context.Context, tx *sql.Tx, cfg config.Config, now time.T
 	}
 
 	slog.InfoContext(ctx, "시즌 정산 완료", "from_season", ogSeasonName, "to_season", newSeasonName,
-		"start_at", startAt.Format(time.DateOnly), "end_at", endAt.Format(time.DateOnly))
+		"split_starts_at", splitAt.Format(time.DateTime), "ends_at", endsAt.Format(time.DateTime))
 	return nil
 }
 
 // runPeriod 정산 작업의 중복 실행을 막는 기간 키 (기준 시각, 시간 단위)
 func runPeriod(now time.Time) string {
 	return now.Format("2006-01-02T15")
-}
-
-// seasonPeriod 새 시즌의 시작일과 종료일을 계산합니다.
-//   - prod: 1일 시작 → 15일 종료, 16일 시작 → 말일 종료
-//   - dev: 6시간 주기라 시작일과 종료일이 같다
-func seasonPeriod(now time.Time, mode string) (time.Time, time.Time, error) {
-	if mode == "dev" {
-		return now, now, nil
-	}
-	switch now.Day() {
-	case 1:
-		return now, now.AddDate(0, 0, 14), nil
-	case 16:
-		firstOfNextMonth := time.Date(now.Year(), now.Month()+1, 1, 0, 0, 0, 0, now.Location())
-		return now, firstOfNextMonth.AddDate(0, 0, -1), nil
-	default:
-		return time.Time{}, time.Time{}, fmt.Errorf("시즌 종료일 설정 실패: %d일은 시즌 시작일이 아님", now.Day())
-	}
-}
-
-// seasonMilestones 새 시즌의 스플릿 2 시작 시각과 시즌 종료(다음 시즌 시작) 시각. 화면이 남은 시간을 보여줄 때 쓴다.
-// TimeCheck와 같은 일정이어야 한다: prod는 시작 7일 뒤 0시(8일·23일)에 스플릿, 종료일 다음 날 0시에 정산.
-// dev는 6시간 시즌(0·6·12·18시)의 3시간째에 스플릿. 문자열로 넣어 DB 연결 시간대와 상관없이 한국 시각 그대로 저장된다
-func seasonMilestones(now time.Time, mode string, endAt time.Time) (time.Time, time.Time) {
-	if mode == "dev" {
-		return now.Add(3 * time.Hour), now.Add(6 * time.Hour)
-	}
-	day := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
-	end := time.Date(endAt.Year(), endAt.Month(), endAt.Day(), 0, 0, 0, 0, endAt.Location())
-	return day.AddDate(0, 0, 7), end.AddDate(0, 0, 1)
 }
 
 // processSeasonStrings 함수는 문자열 a와 b를 비교하여 새로운 문자열 c를 반환합니다.

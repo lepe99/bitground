@@ -21,3 +21,7 @@ export const deleteAdminPost = (id) => api.delete(`/admin/posts/${id}`);
 export const deleteAdminComment = (id) => api.delete(`/admin/comments/${id}`);
 
 export const fetchAuditLogs = async ({page = 0, size = 20}) => (await api.get('/admin/audit-logs', {params: {page, size}})).data;
+
+// 진행 중인 시즌 일정 (정각 단위, 'YYYY-MM-DDTHH:00:00'). 바뀐 시즌 일정을 돌려준다
+export const updateSeasonSchedule = async ({splitStartsAt, endsAt}) =>
+    (await api.put('/admin/season/schedule', {splitStartsAt, endsAt})).data;

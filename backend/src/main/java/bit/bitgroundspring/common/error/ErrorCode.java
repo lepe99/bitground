@@ -54,6 +54,7 @@ public enum ErrorCode {
     SEASON_NOT_FOUND(HttpStatus.NOT_FOUND, "시즌을 찾을 수 없습니다."),
     NO_ACTIVE_SEASON(HttpStatus.CONFLICT, "진행 중인 시즌이 없습니다."),
     SEASON_NOT_COMPLETED(HttpStatus.CONFLICT, "종료된 시즌에서만 요청할 수 있습니다."),
+    INVALID_SEASON_SCHEDULE(HttpStatus.BAD_REQUEST, "시즌 일정이 올바르지 않습니다."),
     AI_INSIGHT_NOT_FOUND(HttpStatus.NOT_FOUND, "오늘의 AI 인사이트가 없습니다."),
     AI_ADVICE_UNAVAILABLE(HttpStatus.UNPROCESSABLE_ENTITY, "AI 조언을 생성할 수 없습니다."),
 
