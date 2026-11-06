@@ -26,7 +26,7 @@ public class TestFixtures {
 
     // FK 순서와 무관하게 비우기 위해 FOREIGN_KEY_CHECKS 를 끄고 TRUNCATE
     private static final List<String> TABLES = List.of(
-            "admin_audit_logs", "reactions", "comments", "posts", "notices", "notifications", "favorite_coins", "orders",
+            "admin_audit_logs", "outbox_events", "reactions", "comments", "posts", "notices", "notifications", "favorite_coins", "orders",
             "user_assets", "user_rankings", "user_daily_balances", "ai_advices", "ai_insights",
             "coin_price_history", "market_indices", "coins", "seasons", "users");
 

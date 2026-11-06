@@ -6,15 +6,17 @@ import bit.bitgroundspring.dto.response.NotificationResponse;
 import bit.bitgroundspring.entity.Notification;
 import bit.bitgroundspring.entity.User;
 import bit.bitgroundspring.service.NotificationService;
+import bit.bitgroundspring.event.RealtimeBus;
+import bit.bitgroundspring.event.RealtimeListener;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.http.MediaType;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import jakarta.annotation.PreDestroy;
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -26,6 +28,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class UserSseEmitters {
     private final NotificationService notificationService;
+    // 실시간 전송은 모든 서버를 거쳐 사용자가 붙어 있는 서버가 보낸다 (서버가 여러 대일 때)
+    private final RealtimeBus realtimeBus;
     
     // 사용자별 SSE 연결 관리
     private final Map<Integer, List<EmitterWrapper>> userEmitters = new ConcurrentHashMap<>();
@@ -68,7 +72,22 @@ public class UserSseEmitters {
         log.debug("사용자 {} 연결됨. 총 연결: {}", userId, getUserConnectionCount(userId));
     }
     
+    /** 이 서버에 연결된 사용자에게 보낸다 (다른 서버 연결은 {@link RealtimeBus}를 거쳐 그 서버가 보냄) */
     public boolean sendToUser(Integer userId, NotificationResponse data) {
+        return send(userId, data, null);
+    }
+
+    /** 이미 JSON으로 만든 알림을 이 서버에 연결된 사용자에게 보낸다 ({@link RealtimeListener}) */
+    public boolean sendJsonToUser(Integer userId, String json) {
+        return send(userId, json, MediaType.APPLICATION_JSON);
+    }
+
+    /** 이 서버에 연결된 모든 사용자에게 */
+    public void sendJsonToAllLocal(String json) {
+        getOnlineUsers().forEach(userId -> sendJsonToUser(userId, json));
+    }
+
+    private boolean send(Integer userId, Object data, MediaType mediaType) {
         List<EmitterWrapper> wrappers = userEmitters.get(userId);
         if (wrappers == null || wrappers.isEmpty()) {
             return false;
@@ -80,7 +99,7 @@ public class UserSseEmitters {
         
         for (EmitterWrapper wrapper : wrappersCopy) {
             try {
-                wrapper.getEmitter().send(SseEmitter.event().data(data));
+                wrapper.getEmitter().send(mediaType == null ? SseEmitter.event().data(data) : SseEmitter.event().data(data, mediaType));
                 wrapper.updateHeartbeat();
                 hasSuccessfulSend = true;
             } catch (Exception e) {
@@ -96,21 +115,12 @@ public class UserSseEmitters {
         return hasSuccessfulSend;
     }
     
-    /**
-     * 예약 주문 체결 알림: 알림 목록에 먼저 저장하고, 접속 중이면 실시간으로도 보낸다.
-     * (기존: SSE 전송에 성공했을 때만 저장해서, 접속하지 않은 사이 체결된 주문은 알림이 남지 않음)
-     */
-    public void notifyOrderExecution(Integer userId, NotificationResponse data) {
-        saveNotification(userId, data, Message.ORDER_EXECUTION);
-        sendToUser(userId, data);
-    }
-    
-    /** 저장해 둔 알림을 접속 중이면 실시간으로 보낸다 (댓글 알림: 문구는 저장한 것을 그대로 쓴다) */
+    /** 저장해 둔 알림을 접속 중이면 실시간으로 보낸다 (댓글 알림: 문구는 저장한 것을 그대로 쓴다). 어느 서버에 접속했든 전달된다 */
     public void sendSaved(Notification notification) {
         Map<String, Object> data = new HashMap<>();
         data.put("text", notification.getMessage());
         data.put("postId", notification.getPostId());
-        sendToUser(notification.getUser().getId(), NotificationResponse.builder()
+        realtimeBus.toUser(notification.getUser().getId(), NotificationResponse.builder()
                 .messageType(MessageType.INFO)
                 .message(notification.getMessageType())
                 .data(data)
@@ -205,59 +215,15 @@ public class UserSseEmitters {
         }
     }
     
-    // 알림 저장 메서드
-    private void saveNotification(Integer userId, NotificationResponse data, Message messageType) {
-        try {
-            Map<String, Object> dataMap = data.getData();
-            String message = "";
-            
-            if (messageType == Message.ORDER_EXECUTION) {
-                String orderType = dataMap.get("orderType").equals("BUY") ? "매수" : "매도";
-                String symbol = (String) dataMap.get("symbol");
-                String cutSymbol = symbol.split("-")[1];
-                BigDecimal amount = (BigDecimal) dataMap.get("amount");
-                BigDecimal tradePrice = (BigDecimal) dataMap.get("tradePrice");
-                String formattedPrice = formatPrice(tradePrice);
-                message = String.format("예약 %s 주문이 체결되었습니다.\n수량 : %.7f %s\n체결 : 개당 %s원",
-                        orderType, amount, cutSymbol, formattedPrice);
-            }
-            
-            Notification notification = Notification.builder()
-                    .user(User.builder().id(userId).build())
-                    .messageType(messageType)
-                    .message(message)
-                    .build();
-            notificationService.saveNotification(notification);
-            
-        } catch (Exception e) {
-            log.error("알림 저장 실패 - 사용자: {}, 오류: {}", userId, e.getMessage());
-        }
-    }
-    
-    // 병렬 처리로 성능 개선
-    public Map<String, Integer> sendToAll(NotificationResponse request) {
+    /** 모든 사용자 알림 (공지·시즌): 저장한 뒤 접속 중인 사용자에게 보낸다 (모든 서버) */
+    public void sendToAll(NotificationResponse request) {
         // 시스템 알림 저장 (접속 여부와 무관). 받은 화면이 곧바로 읽지 않은 개수를 다시 읽으므로 보내기 전에 저장한다
         if (request.getMessage() == Message.SEASON_UPDATE || request.getMessage() == Message.NOTICE) {
             saveSystemNotification(request);
         }
-
-        Set<Integer> userIds = getOnlineUsers();
-        
-        Map<Boolean, List<Integer>> results = userIds.parallelStream()
-                .collect(Collectors.partitioningBy(userId -> sendToUser(userId, request)));
-        
-        int successCount = results.get(true).size();
-        int failureCount = results.get(false).size();
-        
-        Map<String, Integer> result = new HashMap<>();
-        result.put("success", successCount);
-        result.put("failure", failureCount);
-        
-        log.info("모든 사용자에게 알림 전송 완료. 성공: {}, 실패: {}", successCount, failureCount);
-        
-        return result;
+        realtimeBus.toAll(request);
     }
-    
+
     // 시스템 알림 저장
     private void saveSystemNotification(NotificationResponse request) {
         try {
@@ -316,18 +282,6 @@ public class UserSseEmitters {
             return String.format("🚀 %s 스플릿 2 🚀\n새로운 스플릿이 시작되었습니다!\n10,000,000원의 추가 자금이 지급됩니다.", seasonName);
         }
         return "";
-    }
-    
-    // 가격 형식 지정 메소드 - 불필요한 0 제거
-    private String formatPrice(BigDecimal price) {
-        if (price == null) return "0";
-
-        // 정수인 경우 소수점 표시 안 함, 소수점이 있으면 불필요한 0 제거 (천 단위 구분)
-        BigDecimal stripped = price.stripTrailingZeros();
-        if (stripped.scale() <= 0) {
-            return String.format("%,d", stripped.longValueExact());
-        }
-        return String.format("%,." + stripped.scale() + "f", stripped);
     }
     
     // 🔄 애플리케이션 종료 시 모든 연결 정리

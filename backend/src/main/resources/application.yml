@@ -238,6 +238,16 @@ upbit:
       stream: order-execution-stream
       group: order-executors
 
+# 이벤트 스트림 (Redis Stream)
+events:
+  # 도메인 이벤트: 아웃박스 → 구독 그룹으로 서버 중 한 곳이 처리 (체결 알림 저장 등)
+  domain:
+    stream: events-domain
+    group: event-handlers
+  # 실시간 전송: 모든 서버가 전부 읽고 자기에게 연결된 사용자에게 보냄 (SSE·WebSocket)
+  realtime:
+    stream: events-realtime
+
 # 스케줄러(Go)가 시즌 갱신 알림을 보낼 때 쓰는 공유 키
 season:
   update:

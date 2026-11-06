@@ -4,10 +4,10 @@ import bit.bitgroundspring.common.error.BusinessException;
 import bit.bitgroundspring.common.error.ErrorCode;
 import bit.bitgroundspring.common.logging.TraceIdFilter;
 import bit.bitgroundspring.common.money.Money;
-import bit.bitgroundspring.dto.response.TradeDto;
 import bit.bitgroundspring.entity.*;
-import bit.bitgroundspring.event.ReserveOrderExecutedEvent;
-import bit.bitgroundspring.event.TradeExecutedEvent;
+import bit.bitgroundspring.event.OrderExecutedEvent;
+import bit.bitgroundspring.event.OutboxEvents;
+import bit.bitgroundspring.event.RedisStreamGroup;
 import bit.bitgroundspring.repository.OrderRepository;
 import bit.bitgroundspring.repository.UserAssetRepository;
 import bit.bitgroundspring.repository.UserRepository;
@@ -16,23 +16,16 @@ import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
-import org.springframework.data.domain.Range;
-import org.springframework.data.redis.connection.stream.*;
-import org.springframework.data.redis.core.RedisCallback;
+import org.springframework.data.redis.connection.stream.MapRecord;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
-import java.net.InetAddress;
-import java.net.UnknownHostException;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -69,24 +62,17 @@ public class OrderExecutionService {
     private final UserRepository userRepository;
     private final UserAssetRepository userAssetRepository;
     private final ReservedOrderBook orderBook;
-    private final StringRedisTemplate redis;
     private final TransactionTemplate transactionTemplate;
-    private final ApplicationEventPublisher eventPublisher;
-    private final String executionStream;
-    private final String group;
-    /** 이 서버의 구독자 이름 (확인하지 못한 요청을 누가 들고 있는지 구분) */
-    private final String consumer;
-    /** 가져간 뒤 이만큼 확인이 없으면 처리하던 서버가 죽은 것으로 보고 다시 처리 */
-    private final Duration reclaimIdle;
+    private final OutboxEvents outbox;
+    private final RedisStreamGroup requests;
 
     private final AtomicBoolean isShuttingDown = new AtomicBoolean(false);
     private final TradingWindow tradingWindow;
 
     public OrderExecutionService(OrderRepository orderRepository, UserRepository userRepository,
                                  UserAssetRepository userAssetRepository, ReservedOrderBook orderBook,
-                                 StringRedisTemplate redis,
-                                 TransactionTemplate transactionTemplate, ApplicationEventPublisher eventPublisher,
-                                 TradingWindow tradingWindow,
+                                 StringRedisTemplate redis, TransactionTemplate transactionTemplate,
+                                 OutboxEvents outbox, TradingWindow tradingWindow,
                                  @Value("${upbit.order.execution.stream}") String executionStream,
                                  @Value("${upbit.order.execution.group}") String group,
                                  @Value("${upbit.order.execution.reclaim-idle:30s}") Duration reclaimIdle) {
@@ -95,30 +81,19 @@ public class OrderExecutionService {
         this.userRepository = userRepository;
         this.userAssetRepository = userAssetRepository;
         this.orderBook = orderBook;
-        this.redis = redis;
         this.transactionTemplate = transactionTemplate;
-        this.eventPublisher = eventPublisher;
-        this.executionStream = executionStream;
-        this.group = group;
-        this.consumer = consumerName();
-        this.reclaimIdle = reclaimIdle;
-    }
-
-    private static String consumerName() {
-        String host = System.getenv("HOSTNAME");
-        if (host == null || host.isBlank()) {
-            try {
-                host = InetAddress.getLocalHost().getHostName();
-            } catch (UnknownHostException e) {
-                host = "backend";
-            }
-        }
-        return host + "-" + ProcessHandle.current().pid();
+        this.outbox = outbox;
+        // 넘겨받고도 계속 처리하지 못하는 요청은 버린다. 주문은 DB에 PENDING으로 남아 대조 작업이 대기열에 되돌린다
+        this.requests = new RedisStreamGroup(redis, executionStream, group, reclaimIdle, MAX_DELIVERIES);
     }
 
     @EventListener(ApplicationReadyEvent.class)
     public void createGroupOnStartup() {
         ensureGroup();
+    }
+
+    public void ensureGroup() {
+        requests.ensureGroup();
     }
 
     @PreDestroy
@@ -131,11 +106,15 @@ public class OrderExecutionService {
     public void processExecutionQueue() {
         int handled = 0;
         while (handled < MAX_BATCH && !isShuttingDown.get()) {
-            List<MapRecord<String, Object, Object>> records = readNew();
+            List<MapRecord<String, Object, Object>> records = requests.readNew(READ_COUNT);
             if (records.isEmpty()) {
                 return;
             }
-            records.forEach(this::handle);
+            for (MapRecord<String, Object, Object> record : records) {
+                if (handle(record)) {
+                    requests.finish(record.getId());
+                }
+            }
             handled += records.size();
         }
     }
@@ -147,97 +126,15 @@ public class OrderExecutionService {
      */
     @Scheduled(fixedDelay = 10_000, initialDelay = 10_000)
     public void reclaimStale() {
-        if (isShuttingDown.get()) {
-            return;
-        }
-        try {
-            PendingMessages pending = redis.opsForStream().pending(executionStream, group, Range.unbounded(), MAX_BATCH);
-            List<RecordId> stale = new ArrayList<>();
-            for (PendingMessage message : pending) {
-                if (message.getElapsedTimeSinceLastDelivery().compareTo(reclaimIdle) < 0) {
-                    continue;
-                }
-                if (message.getTotalDeliveryCount() >= MAX_DELIVERIES) {
-                    // 계속 처리하지 못하는 요청은 버린다. 주문은 DB에 PENDING으로 남아 대조 작업이 대기열에 되돌린다
-                    log.error("Execution request {} dropped after {} deliveries", message.getId(), message.getTotalDeliveryCount());
-                    finish(message.getId());
-                    continue;
-                }
-                stale.add(message.getId());
-            }
-            if (stale.isEmpty()) {
-                return;
-            }
-            List<MapRecord<String, Object, Object>> claimed = redis.opsForStream()
-                    .claim(executionStream, group, consumer, reclaimIdle, stale.toArray(RecordId[]::new));
-            log.warn("Reclaimed {} unacknowledged execution requests", claimed.size());
-            claimed.forEach(this::handle);
-        } catch (RuntimeException e) {
-            if (!isMissingGroup(e)) {
-                log.error("Failed to reclaim execution requests", e);
-            }
+        if (!isShuttingDown.get()) {
+            requests.reclaimStale(MAX_BATCH, this::handle);
         }
     }
 
-    /** 이 서버 앞으로 새로 들어온 체결 요청 (구독 그룹이 없으면 만든다: 첫 기동, Redis 재시작) */
-    @SuppressWarnings("unchecked")
-    private List<MapRecord<String, Object, Object>> readNew() {
-        try {
-            List<MapRecord<String, Object, Object>> records = redis.opsForStream().read(
-                    Consumer.from(group, consumer),
-                    StreamReadOptions.empty().count(READ_COUNT),
-                    StreamOffset.create(executionStream, ReadOffset.lastConsumed()));
-            return records == null ? List.of() : records;
-        } catch (RuntimeException e) {
-            if (isMissingGroup(e)) {
-                ensureGroup();
-            } else {
-                log.error("Failed to read execution requests", e);
-            }
-            return List.of();
-        }
-    }
-
-    /**
-     * 요청 하나를 체결하고, 체결(또는 실패 처리)이 끝난 뒤에 확인한다.
-     * 확인 전에 서버가 죽으면 요청이 남아 {@link #reclaimStale()}이 다시 처리한다
-     */
-    private void handle(MapRecord<String, Object, Object> record) {
+    /** 요청 하나를 체결한다. 체결(또는 실패 처리)이 끝나 확인해도 되면 true */
+    private boolean handle(MapRecord<String, Object, Object> record) {
         ExecutionRequest request = parse(record.getValue());
-        if (request == null || process(request)) {
-            finish(record.getId());
-        }
-    }
-
-    private void finish(RecordId id) {
-        redis.opsForStream().acknowledge(executionStream, group, id);
-        redis.opsForStream().delete(executionStream, id);
-    }
-
-    public void ensureGroup() {
-        try {
-            redis.execute((RedisCallback<Object>) c -> c.streamCommands().xGroupCreate(
-                    executionStream.getBytes(StandardCharsets.UTF_8), group, ReadOffset.from("0"), true));
-            log.info("Execution stream group created: {}/{}", executionStream, group);
-        } catch (RuntimeException e) {
-            if (!causedBy(e, "BUSYGROUP")) { // 이미 있음 (다른 서버나 앞선 호출이 만듦)
-                log.error("Failed to create execution stream group", e);
-            }
-        }
-    }
-
-    private static boolean isMissingGroup(RuntimeException e) {
-        return causedBy(e, "NOGROUP");
-    }
-
-    /** Redis 오류 코드는 감싼 예외의 원인 쪽 메시지에 있다 */
-    private static boolean causedBy(Throwable e, String redisError) {
-        for (Throwable t = e; t != null; t = t.getCause()) {
-            if (String.valueOf(t.getMessage()).contains(redisError)) {
-                return true;
-            }
-        }
-        return false;
+        return request == null || process(request);
     }
 
     /** 체결 요청을 처리한다. 확인(ack)해도 되면 true, 다시 처리해야 하면 false (대기열 복구 실패) */
@@ -346,12 +243,8 @@ public class OrderExecutionService {
                     .build());
         }
 
-        // 커밋 후에만 리스너가 실행된다 (체결 내역 방송, 사용자 알림)
-        Coin coin = order.getCoin();
-        eventPublisher.publishEvent(new TradeExecutedEvent(new TradeDto(coin.getSymbol(), coin.getKoreanName(),
-                orderType, amount, price, order.getCreatedAt(), order.getUpdatedAt())));
-        eventPublisher.publishEvent(new ReserveOrderExecutedEvent(orderId, userId, coin.getSymbol(), orderType,
-                amount, price));
+        // 체결과 같은 트랜잭션에 이벤트를 남긴다: 커밋되면 반드시 전달된다 (체결 내역 방송, 체결 알림)
+        outbox.append(OrderExecutedEvent.of(order, true));
 
         log.info("Order executed: {} at price {} for user {}", orderId, price.toPlainString(), userId);
     }

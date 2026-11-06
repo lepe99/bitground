@@ -18,7 +18,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 종목별 실시간 체결 내역 WebSocket (/ws/trades)
- * 방송은 체결 트랜잭션 커밋 후 별도 스레드에서 실행된다({@link TradeBroadcastListener}).
+ * 방송은 체결이 커밋된 뒤 이벤트 스트림을 거쳐, 구독자가 연결된 서버에서 실행된다({@link bit.bitgroundspring.event.RealtimeListener}).
  * WebSocketSession.sendMessage는 스레드 안전하지 않으므로 세션을 ConcurrentWebSocketSessionDecorator로 감싼다.
  */
 @Slf4j
@@ -84,7 +84,7 @@ public class OrderHistoryWebSocketHandler extends TextWebSocketHandler {
         // 그 외(action 잘못 들어오거나 symbol 누락 등)는 무시
     }
 
-    /** 체결 내역을 해당 종목 구독자에게 보낸다 ({@link TradeBroadcastListener}가 커밋 후 호출) */
+    /** 체결 내역을 이 서버에 연결된 해당 종목 구독자에게 보낸다 (RealtimeListener가 호출) */
     public void broadcast(TradeDto trade) {
         Set<String> sessionIds = subscribers.get(trade.getSymbol());
         if (sessionIds == null || sessionIds.isEmpty()) {
