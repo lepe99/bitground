@@ -38,7 +38,9 @@ import software.amazon.awssdk.services.s3.S3Client;
         "storage.endpoint=http://storage.test",
         "storage.access-key=test",
         "storage.secret-key=test",
-        "management.server.port=" // 액추에이터 별도 포트 비활성화
+        "management.server.port=", // 액추에이터 별도 포트 비활성화
+        "upbit.order.execution.reclaim-idle=1s", // 확인 못 한 체결 요청 넘겨받기를 테스트에서 오래 기다리지 않게
+        "order-book.watchdog.enabled=false" // Redis 감시·대조는 테스트가 직접 부른다 (주기 실행이 테스트 중 대기열을 바꾸지 않게)
 })
 public abstract class IntegrationTest {
 

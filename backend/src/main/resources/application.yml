@@ -234,7 +234,9 @@ upbit:
       max-delay: 60000
   order:
     execution:
-      queue: order-execution-queue
+      # 체결 요청 스트림 (Redis Stream). 구독 그룹으로 읽고 체결 커밋 뒤 확인(ack)
+      stream: order-execution-stream
+      group: order-executors
 
 # 스케줄러(Go)가 시즌 갱신 알림을 보낼 때 쓰는 공유 키
 season:

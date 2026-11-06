@@ -51,8 +51,8 @@ class TradingWindowTest extends IntegrationTest {
     OrderExecutionService orderExecutionService;
     @Autowired
     StringRedisTemplate redis;
-    @Value("${upbit.order.execution.queue}")
-    String queue;
+    @Value("${upbit.order.execution.stream}")
+    String stream;
 
     private Season season;
     private Cookie cookie;
@@ -99,8 +99,8 @@ class TradingWindowTest extends IntegrationTest {
         int orderId = JsonPath.read(body, "$.orderId");
 
         endsAt(LocalDateTime.now().minusSeconds(1));
-        redis.opsForList().leftPush(queue, "{\"orderId\":%d,\"price\":49000000,\"requestedAt\":%d}"
-                .formatted(orderId, System.currentTimeMillis()));
+        redis.opsForStream().add(stream, Map.of("orderId", String.valueOf(orderId), "price", "49000000",
+                "requestedAt", String.valueOf(System.currentTimeMillis())));
         orderExecutionService.processExecutionQueue();
 
         assertThat(orderRepository.findById(orderId).orElseThrow().getStatus()).isEqualTo(Status.PENDING);

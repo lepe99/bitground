@@ -16,10 +16,14 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.redis.connection.stream.*;
+import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Duration;
+import java.util.List;
+import java.util.Map;
 import java.util.function.BooleanSupplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -28,7 +32,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * 예약 주문 흐름: 접수 → Redis 대기열 → 시세 매칭 → 체결 큐 → 체결 → 알림
+ * 예약 주문 흐름: 접수 → Redis 대기열 → 시세 매칭 → 체결 스트림 → 체결 → 알림,
+ * 그리고 Redis 데이터가 사라지거나 처리 중 서버가 죽었을 때의 복구
  */
 class ReservedOrderFlowTest extends IntegrationTest {
 
@@ -52,8 +57,10 @@ class ReservedOrderFlowTest extends IntegrationTest {
     StringRedisTemplate redis;
     @Autowired
     TransactionTemplate transactionTemplate;
-    @Value("${upbit.order.execution.queue}")
-    String queue;
+    @Value("${upbit.order.execution.stream}")
+    String stream;
+    @Value("${upbit.order.execution.group}")
+    String group;
 
     private User user;
     private Coin btc;
@@ -115,8 +122,7 @@ class ReservedOrderFlowTest extends IntegrationTest {
         Order order = reserveBuy(0.01, 50_000_000f);
         long tenMinutesAgo = System.currentTimeMillis() - Duration.ofMinutes(10).toMillis();
         redis.opsForZSet().remove(BUY_KEY, String.valueOf(order.getId()));
-        redis.opsForList().leftPush(queue,
-                "{\"orderId\":%d,\"price\":49000000,\"requestedAt\":%d}".formatted(order.getId(), tenMinutesAgo));
+        enqueue(order, 49_000_000, tenMinutesAgo);
 
         orderExecutionService.processExecutionQueue();
 
@@ -129,13 +135,13 @@ class ReservedOrderFlowTest extends IntegrationTest {
         Order a = reserveBuy(0.001, 50_000_000f);
         Order b = reserveBuy(0.001, 50_000_000f);
         Order c = reserveBuy(0.001, 50_000_000f);
-        redis.opsForList().leftPush(queue, "1:2:3"); // 이전 버전 형식
+        redis.opsForStream().add(stream, Map.of("garbage", "1:2:3")); // 형식이 다른 메시지
 
         orderBook.claimMatches("KRW-BTC", 49_000_000);
         orderExecutionService.processExecutionQueue();
 
         await(() -> orderStatus(a) == Status.COMPLETED && orderStatus(b) == Status.COMPLETED && orderStatus(c) == Status.COMPLETED);
-        assertThat(redis.opsForList().size(queue)).isZero();
+        await(() -> redis.opsForStream().size(stream) == 0);
     }
 
     @Test
@@ -187,6 +193,104 @@ class ReservedOrderFlowTest extends IntegrationTest {
                 .andExpect(status().isNoContent());
 
         assertThat(inBook(order)).isFalse();
+    }
+
+    @Test
+    @DisplayName("Redis 데이터가 통째로 사라지면 DB의 PENDING 주문으로 대기열을 되살리고, 다음 시세에 체결한다")
+    void recoversAfterRedisDataLoss() {
+        Order waiting = reserveBuy(0.01, 50_000_000f);
+        Order claimed = reserveBuy(0.01, 45_000_000f);
+        orderBook.rebuild(); // 기동 시 상태 (표시 키 생성)
+        assertThat(orderBook.rebuildIfReset()).isFalse();
+
+        // 체결 대기 중이던 주문까지 함께 사라진 상황 (Redis 재시작, 백업 없음)
+        redis.opsForZSet().remove(BUY_KEY, String.valueOf(claimed.getId()));
+        enqueue(claimed, 44_000_000, System.currentTimeMillis());
+        flushRedis();
+
+        assertThat(orderBook.rebuildIfReset()).isTrue();
+        assertThat(inBook(waiting)).isTrue();
+        assertThat(inBook(claimed)).isTrue();
+        assertThat(orderBook.rebuildIfReset()).isFalse(); // 한 번만 다시 만든다
+
+        orderBook.claimMatches("KRW-BTC", 44_000_000);
+        orderExecutionService.processExecutionQueue();
+        await(() -> orderStatus(waiting) == Status.COMPLETED && orderStatus(claimed) == Status.COMPLETED);
+    }
+
+    @Test
+    @DisplayName("체결 요청을 가져간 서버가 확인 전에 죽으면, 잠시 뒤 다른 서버가 넘겨받아 체결한다")
+    void reclaimsUnacknowledgedRequest() {
+        Order order = reserveBuy(0.01, 50_000_000f);
+        orderExecutionService.ensureGroup();
+        orderBook.claimMatches("KRW-BTC", 49_000_000);
+        // 다른 서버가 읽기만 하고 죽음 (확인 없음)
+        List<MapRecord<String, Object, Object>> taken = redis.opsForStream().read(Consumer.from(group, "dead-server"),
+                StreamReadOptions.empty().count(10), StreamOffset.create(stream, ReadOffset.lastConsumed()));
+        assertThat(taken).hasSize(1);
+        assertThat(orderStatus(order)).isEqualTo(Status.PENDING);
+
+        sleep(1_200); // 넘겨받기 대기 시간(테스트 1초)이 지남
+        orderExecutionService.reclaimStale();
+
+        await(() -> orderStatus(order) == Status.COMPLETED);
+        assertThat(redis.opsForStream().pending(stream, group).getTotalPendingMessages()).isZero();
+    }
+
+    @Test
+    @DisplayName("같은 체결 요청이 두 번 와도 한 번만 체결한다")
+    void duplicateRequestExecutesOnce() {
+        Order order = reserveBuy(0.01, 50_000_000f);
+        redis.opsForZSet().remove(BUY_KEY, String.valueOf(order.getId()));
+        enqueue(order, 49_000_000, System.currentTimeMillis());
+        enqueue(order, 48_000_000, System.currentTimeMillis());
+
+        orderExecutionService.processExecutionQueue();
+
+        await(() -> redis.opsForStream().size(stream) == 0);
+        assertThat(orderStatus(order)).isEqualTo(Status.COMPLETED);
+        assertThat(userRepository.findById(user.getId()).orElseThrow().getCash()).isEqualTo(1_000_000 - 490_000);
+        assertThat(orderRepository.findById(order.getId()).orElseThrow().getTradePrice()).isEqualByComparingTo("49000000");
+    }
+
+    @Test
+    @DisplayName("대조: DB엔 PENDING인데 Redis에 없는 주문은 채우고, 끝난 주문은 대기열에서 지운다")
+    void reconcileFixesDrift() {
+        Order missing = reserveBuy(0.01, 50_000_000f);
+        Order inFlight = reserveBuy(0.01, 40_000_000f);
+        redis.opsForZSet().remove(BUY_KEY, String.valueOf(missing.getId()));
+        redis.opsForZSet().remove(BUY_KEY, String.valueOf(inFlight.getId()));
+        enqueue(inFlight, 39_000_000, System.currentTimeMillis()); // 체결 대기 중: 대기열에 없어도 정상
+        redis.opsForZSet().add(BUY_KEY, "999999", 1); // DB에 없는 주문
+
+        ReservedOrderBook.ReconcileResult result = orderBook.reconcile();
+
+        assertThat(result.restored()).isEqualTo(1);
+        assertThat(result.removed()).isEqualTo(1);
+        assertThat(inBook(missing)).isTrue();
+        assertThat(inBook(inFlight)).isFalse();
+        assertThat(redis.opsForZSet().score(BUY_KEY, "999999")).isNull();
+    }
+
+    private void enqueue(Order order, double price, long requestedAt) {
+        redis.opsForStream().add(stream, Map.of("orderId", String.valueOf(order.getId()),
+                "price", String.valueOf(price), "requestedAt", String.valueOf(requestedAt)));
+    }
+
+    private void flushRedis() {
+        redis.execute((RedisCallback<Object>) c -> {
+            c.serverCommands().flushAll();
+            return null;
+        });
+    }
+
+    private static void sleep(long millis) {
+        try {
+            Thread.sleep(millis);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new AssertionError(e);
+        }
     }
 
     private static void await(BooleanSupplier condition) {
