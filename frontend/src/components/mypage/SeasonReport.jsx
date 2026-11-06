@@ -369,16 +369,17 @@ export default function SeasonReport() {
                                             <span className={`text-xs ${changeColor(Math.round(s.profit))}`}>{formatSignedKRW(s.profit)}</span>
                                         </div>
                                     </div>
-                                    <dl className="grid grid-cols-2 gap-x-4 gap-y-1 rounded-xl bg-surface-2 px-3 py-2.5 text-[13px]">
+                                    <dl className="grid grid-cols-2 gap-x-4 gap-y-2 rounded-xl bg-surface-2 px-3 py-2.5 text-[13px]">
                                         {[
                                             ['총 매수', formatKRW(s.buyAmount)],
                                             ['총 매도', formatKRW(s.sellAmount)],
                                             ['평균 매수가', formatPrice(s.avgBuy)],
                                             ['평균 매도가', s.avgSell ? formatPrice(s.avgSell) : '—'],
                                         ].map(([label, value]) => (
-                                            <div key={label} className="flex min-w-0 justify-between gap-2">
-                                                <dt className="shrink-0 text-fg-3">{label}</dt>
-                                                <dd className="truncate text-right font-medium">{value}</dd>
+                                            // 이름을 값 위에 두어 1억 단위 가격도 잘리지 않게
+                                            <div key={label} className="flex min-w-0 flex-col">
+                                                <dt className="text-xs text-fg-3">{label}</dt>
+                                                <dd className="truncate font-medium">{value}</dd>
                                             </div>
                                         ))}
                                     </dl>
