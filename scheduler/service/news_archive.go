@@ -271,7 +271,9 @@ func embedArchiveNews(ctx context.Context, cfg NewsArchiveConfig, news []archive
 				slog.WarnContext(ctx, "기사 임베딩 실패, 건너뜀", "news_id", n.ID, "error", err)
 				return
 			}
-			results[i] = &pineconeVector{ID: n.ID, Values: values, Metadata: newsMetadata(n, now.Location())}
+			meta := newsMetadata(n, now.Location())
+			meta["embed_format"] = embeddingFormat(cfg.EmbedModel)
+			results[i] = &pineconeVector{ID: n.ID, Values: values, Metadata: meta}
 		})
 	}
 	wg.Wait()

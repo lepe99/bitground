@@ -44,6 +44,14 @@ func embeddingRequest(model string, dimension int, task, title, text string) map
 	return req
 }
 
+// embeddingFormat 벡터를 만든 방식 (모델 + 입력 형식). 기사 메타데이터에 남겨, 방식이 바뀌면 다시 임베딩할 기사를 고른다
+func embeddingFormat(model string) string {
+	if strings.HasPrefix(model, "gemini-embedding-2") {
+		return model + "/task-prefix"
+	}
+	return model + "/task-type"
+}
+
 // embedText 글 하나를 임베딩한다. 검색어는 title을 비운다
 func embedText(ctx context.Context, apiKey, model string, dimension int, task, title, text string) ([]float32, error) {
 	body, err := json.Marshal(embeddingRequest(model, dimension, task, title, text))
