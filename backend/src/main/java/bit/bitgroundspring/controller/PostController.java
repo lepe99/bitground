@@ -33,9 +33,11 @@ public class PostController {
         return ResponseEntity.created(URI.create("/posts/" + post.getId())).body(new IdResponse(post.getId()));
     }
 
-    // 게시글 목록 (category 생략 시 전체, 잘못된 값이면 400)
+    // 게시글 목록 (category 생략 시 문의를 뺀 전체, 잘못된 값이면 400). answered는 문의 탭의 답변 대기(false)·완료(true)
     @GetMapping("/list")
     public PageResponse<PostDto> getPostList(
+            @AuthenticationPrincipal AuthUser authUser,
+            @RequestParam(required = false) Boolean answered,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(required = false) Category category,
@@ -46,13 +48,14 @@ public class PostController {
             case "views" -> Sort.by("views").descending();
             default -> Sort.by("createdAt").descending();
         };
-        return PageResponse.of(postService.getPostList(category, PageRequest.of(page, Math.min(size, 50), sorting)));
+        return PageResponse.of(postService.getPostList(category, answered, authUser,
+                PageRequest.of(page, Math.min(size, 50), sorting)));
     }
 
     // 게시글 상세보기 (조회수는 서버가 사용자 기준으로 중복을 걸러 올림)
     @GetMapping("/{id}")
     public PostDto getPostDetail(@AuthenticationPrincipal AuthUser authUser, @PathVariable Integer id) {
-        return postService.getPostDetail(id, authUser.id());
+        return postService.getPostDetail(id, authUser);
     }
 
     @DeleteMapping("/{id}")

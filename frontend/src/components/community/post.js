@@ -4,15 +4,33 @@ export const CATEGORIES = [
     {value: 'CHAT', label: '잡담'},
     {value: 'QUESTION', label: '질문'},
     {value: 'INFO', label: '정보'},
+    {value: 'INQUIRY', label: '문의'},
 ];
 
-export const CATEGORY_LABEL = {CHAT: '잡담', QUESTION: '질문', INFO: '정보'};
+export const CATEGORY_LABEL = {CHAT: '잡담', QUESTION: '질문', INFO: '정보', INQUIRY: '문의'};
+
+// 문의: 작성자와 관리자만 보는 비공개 글 (전체 목록에 섞이지 않음)
+export const INQUIRY = 'INQUIRY';
+export const INQUIRY_TYPES = [
+    {value: 'BUG', label: '버그 제보'},
+    {value: 'ACCOUNT', label: '계정·이용'},
+    {value: 'SUGGESTION', label: '건의'},
+    {value: 'ETC', label: '기타'},
+];
+export const INQUIRY_TYPE_LABEL = Object.fromEntries(INQUIRY_TYPES.map((t) => [t.value, t.label]));
+// 문의 탭의 답변 상태 거르기 (주소의 answered 값)
+export const ANSWER_FILTERS = [
+    {value: 'all', label: '전체'},
+    {value: 'false', label: '답변 대기'},
+    {value: 'true', label: '답변 완료'},
+];
 
 // 분류 표시 색 (Tailwind 클래스 이름을 그대로 써야 빌드에 포함된다)
 export const CATEGORY_STYLE = {
     CHAT: 'bg-surface-2 text-fg-2',
     QUESTION: 'bg-down/10 text-down',
     INFO: 'bg-brand-soft text-brand-fg',
+    INQUIRY: 'bg-fg/10 text-fg',
 };
 
 /** 오늘 쓴 글은 시각(14:05), 그 전은 날짜(11.02) */

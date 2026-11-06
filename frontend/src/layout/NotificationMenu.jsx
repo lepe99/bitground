@@ -11,7 +11,8 @@ const TARGETS = {
     ORDER_EXECUTION: '/investments',
     SEASON_UPDATE: '/rank',
 };
-const targetOf = (item) => (item.messageType === 'COMMENT' && item.postId ? `/community/${item.postId}` : TARGETS[item.messageType]);
+const targetOf = (item) => ((item.messageType === 'COMMENT' || item.messageType === 'INQUIRY') && item.postId
+    ? `/community/${item.postId}` : TARGETS[item.messageType]);
 
 /** 헤더의 알림 버튼 + 펼침 목록. 열면 모두 읽음 처리하고, 끝까지 내리면 다음 쪽을 불러온다 */
 export default function NotificationMenu() {

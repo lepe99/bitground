@@ -10,8 +10,9 @@ public final class AdminDtos {
     }
 
     /** 운영 현황 */
+    /** @param pendingInquiries 답변 대기 문의 수 */
     public record Overview(Users users, Trades trades, CurrentSeasonDto season, long participants,
-                           List<SchedulerRun> schedulerRuns, Ai ai) {
+                           List<SchedulerRun> schedulerRuns, Ai ai, long pendingInquiries) {
     }
 
     public record Users(long total, long joinedToday, long activeToday, long suspended, long withdrawn) {

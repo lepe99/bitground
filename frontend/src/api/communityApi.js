@@ -1,13 +1,15 @@
 import api from './axiosConfig.js';
 
 // 게시글
-export const fetchPosts = async ({page, size, category, sort}) =>
-    (await api.get('/posts/list', {params: {page, size, category, sort}})).data;
+// answered: 문의 탭의 답변 완료(true)·대기(false). 비우면 전체
+export const fetchPosts = async ({page, size, category, sort, answered}) =>
+    (await api.get('/posts/list', {params: {page, size, category, sort, answered}})).data;
 
 export const fetchPost = async (postId) => (await api.get(`/posts/${postId}`)).data;
 
-export const createPost = async ({title, content, category}) =>
-    (await api.post('/posts/form', {title, content, category})).data;
+// inquiryType: 문의 글만 (BUG·ACCOUNT·SUGGESTION·ETC)
+export const createPost = async ({title, content, category, inquiryType}) =>
+    (await api.post('/posts/form', {title, content, category, inquiryType})).data;
 
 export const deletePost = (postId) => api.delete(`/posts/${postId}`);
 

@@ -12,6 +12,10 @@ import java.util.Optional;
 public interface UserRepository extends JpaRepository<User, Integer> {
     Optional<User> findByProviderAndProviderId(String provider, String providerId);
 
+    /** 관리자 (문의 알림 대상) */
+    @Query("SELECT u.id FROM User u WHERE u.role = bit.bitgroundspring.entity.Role.ROLE_ADMIN AND u.isDeleted = false")
+    java.util.List<Integer> findAdminIds();
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT u FROM User u WHERE u.id = :id")
     Optional<User> findByIdWithPessimisticLock(@Param("id") Integer id);

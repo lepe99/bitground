@@ -2,6 +2,7 @@ package bit.bitgroundspring.dto.response;
 
 import bit.bitgroundspring.dto.projection.PastSeasonTierProjection;
 import bit.bitgroundspring.entity.Category;
+import bit.bitgroundspring.entity.InquiryType;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -29,6 +30,9 @@ public class PostDto {
     private int views;
     private Long commentCount;
     private boolean hasImage;
+    // 문의 글만: 유형(BUG·ACCOUNT·SUGGESTION·ETC)과 관리자 답변 여부
+    private String inquiryType;
+    private boolean answered;
 
     // 이 두 개는 상세 보기용에서만 사용
     private int highestTier;
@@ -38,9 +42,17 @@ public class PostDto {
     public PostDto(Integer id, Integer userId, String name, String profileImage,
                     String title, Integer tier, Integer likes, Integer dislikes,
                     Boolean isDeleted, LocalDateTime createdAt, LocalDateTime updatedAt,
-                    Category category, Integer views, Long commentCount, Boolean hasImage) {
+                    Category category, Integer views, Long commentCount, Boolean hasImage,
+                    InquiryType inquiryType, LocalDateTime answeredAt) {
         this(id, userId, name, profileImage, title, null, tier, likes, dislikes, Boolean.TRUE.equals(isDeleted),
                 createdAt, updatedAt, category.name(), views, commentCount, Boolean.TRUE.equals(hasImage));
+        setInquiry(inquiryType, answeredAt);
+    }
+
+    /** 문의 유형·답변 여부 (문의 글이 아니면 비워 둠) */
+    public void setInquiry(InquiryType inquiryType, LocalDateTime answeredAt) {
+        this.inquiryType = inquiryType == null ? null : inquiryType.name();
+        this.answered = answeredAt != null;
     }
 
     // 상세 조회용 생성자 (기본 필드만)

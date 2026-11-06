@@ -30,8 +30,9 @@ public class CommentController {
 
     // 특정 게시글의 댓글 전체 조회 (PostDetail 페이지에서 사용)
     @GetMapping("/post/{postId}")
-    public ResponseEntity<List<CommentResponseDto>> getCommentsByPostId(@PathVariable Integer postId) {
-        List<CommentResponseDto> comments = commentService.getCommentsByPostId(postId);
+    public ResponseEntity<List<CommentResponseDto>> getCommentsByPostId(@AuthenticationPrincipal AuthUser authUser,
+                                                                        @PathVariable Integer postId) {
+        List<CommentResponseDto> comments = commentService.getCommentsByPostId(postId, authUser);
         return ResponseEntity.ok(comments);
     }
 
@@ -45,8 +46,8 @@ public class CommentController {
     }
 
     @GetMapping("/post/{postId}/count")
-    public ResponseEntity<Long> getCommentCount(@PathVariable Integer postId) {
-        long count = commentService.countByPostId(postId);
+    public ResponseEntity<Long> getCommentCount(@AuthenticationPrincipal AuthUser authUser, @PathVariable Integer postId) {
+        long count = commentService.countByPostId(postId, authUser);
         return ResponseEntity.ok(count);
     }
 }

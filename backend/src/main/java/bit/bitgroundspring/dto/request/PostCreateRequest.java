@@ -1,6 +1,7 @@
 package bit.bitgroundspring.dto.request;
 
 import bit.bitgroundspring.entity.Category;
+import bit.bitgroundspring.entity.InquiryType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -11,6 +12,7 @@ import jakarta.validation.constraints.Size;
 public record PostCreateRequest(
         @NotNull(message = "카테고리를 선택해주세요.") Category category,
         @NotBlank(message = "제목을 입력해주세요.") @Size(max = 255, message = "제목은 255자 이하로 입력해주세요.") String title,
-        @NotBlank(message = "내용을 입력해주세요.") String content
+        @NotBlank(message = "내용을 입력해주세요.") String content,
+        InquiryType inquiryType // 문의 글만 (버그 제보·계정·건의·기타)
 ) {
 }

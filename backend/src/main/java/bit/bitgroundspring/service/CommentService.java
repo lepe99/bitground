@@ -8,6 +8,7 @@ import bit.bitgroundspring.entity.Comment;
 import bit.bitgroundspring.entity.Message;
 import bit.bitgroundspring.entity.Notification;
 import bit.bitgroundspring.entity.Post;
+import bit.bitgroundspring.entity.Role;
 import bit.bitgroundspring.entity.User;
 import bit.bitgroundspring.repository.NotificationRepository;
 import bit.bitgroundspring.repository.PostRepository;
@@ -34,18 +35,19 @@ public class CommentService {
     private final UserRepository userRepository;
     private final NotificationRepository notificationRepository;
     private final UserSseEmitters userSseEmitters;
+    private final InquiryNotifier inquiryNotifier;
 
     // 알림 문구에 넣는 댓글·제목 길이 (notifications.message는 255자)
     private static final int SNIPPET_LENGTH = 40;
     private static final int TITLE_LENGTH = 30;
 
-    //댓글 저장
+    /** 댓글 저장. 볼 수 없는 글(남의 문의, 삭제된 글)에는 달 수 없다 */
     @Transactional
     public void save(Integer userId, CommentRequestDto dto) {
-        Post post = postRepository.findById(dto.getPostId())
-                .orElseThrow(() -> new BusinessException(ErrorCode.POST_NOT_FOUND));
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+        boolean admin = user.getRole() == Role.ROLE_ADMIN;
+        Post post = PostAccess.requireReadable(postRepository.findById(dto.getPostId()).orElse(null), userId, admin);
 
         Comment comment = Comment.builder()
                 .post(post)
@@ -66,7 +68,15 @@ public class CommentService {
         }
 
         commentRepository.save(comment);
-        notifyNewComment(post, comment.getParent(), user, dto.getContent());
+        if (post.getCategory().isPrivate()) {
+            // 문의: 관리자가 처음 답하면 답변 완료로 표시하고, 작성자·관리자 사이에만 알린다
+            if (admin && post.getAnsweredAt() == null) {
+                post.setAnsweredAt(LocalDateTime.now());
+            }
+            inquiryNotifier.onComment(post, user, admin, dto.getContent());
+        } else {
+            notifyNewComment(post, comment.getParent(), user, dto.getContent());
+        }
     }
 
     /**
@@ -113,7 +123,8 @@ public class CommentService {
      * (기존: 댓글마다 작성자·자식 댓글을 지연 로딩하며 재귀로 순회해 댓글 수만큼 쿼리가 나감)
      */
     @Transactional(readOnly = true)
-    public List<CommentResponseDto> getCommentsByPostId(Integer postId) {
+    public List<CommentResponseDto> getCommentsByPostId(Integer postId, AuthUser viewer) {
+        requireReadable(postId, viewer);
         List<Comment> comments = commentRepository.findAllWithUserByPostId(postId);
 
         Map<Integer, CommentResponseDto> byId = new LinkedHashMap<>();
@@ -153,8 +164,14 @@ public class CommentService {
         commentRepository.delete(comment); // 부모 댓글 삭제
     }
 
-    public long countByPostId(Integer postId) {
+    @Transactional(readOnly = true)
+    public long countByPostId(Integer postId, AuthUser viewer) {
+        requireReadable(postId, viewer);
         return commentRepository.countByPostId(postId);
+    }
+
+    private void requireReadable(Integer postId, AuthUser viewer) {
+        PostAccess.requireReadable(postRepository.findById(postId).orElse(null), viewer.id(), viewer.admin());
     }
 
     private CommentResponseDto toDto(Comment comment) {

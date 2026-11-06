@@ -1,6 +1,7 @@
 package bit.bitgroundspring.service;
 
 import bit.bitgroundspring.dto.request.CommentRequestDto;
+import bit.bitgroundspring.entity.Category;
 import bit.bitgroundspring.entity.Comment;
 import bit.bitgroundspring.entity.Message;
 import bit.bitgroundspring.entity.Notification;
@@ -47,9 +48,10 @@ class CommentServiceTest {
         userRepository = mock(UserRepository.class);
         userSseEmitters = mock(UserSseEmitters.class);
         PostRepository postRepository = mock(PostRepository.class);
-        commentService = new CommentService(commentRepository, postRepository, userRepository, notificationRepository, userSseEmitters);
+        commentService = new CommentService(commentRepository, postRepository, userRepository, notificationRepository, userSseEmitters,
+                mock(InquiryNotifier.class));
 
-        post = Post.builder().id(10).title("비트코인 전망").user(POST_AUTHOR).build();
+        post = Post.builder().id(10).title("비트코인 전망").category(Category.CHAT).user(POST_AUTHOR).build();
         when(postRepository.findById(10)).thenReturn(Optional.of(post));
         for (User u : List.of(POST_AUTHOR, COMMENTER, REPLIER)) {
             when(userRepository.findById(u.getId())).thenReturn(Optional.of(u));

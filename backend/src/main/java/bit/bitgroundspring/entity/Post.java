@@ -40,6 +40,13 @@ public class Post {
     @Enumerated(EnumType.STRING)
     @Column(name = "category", nullable = false)
     private Category category;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "inquiry_type")
+    private InquiryType inquiryType; // 문의 글만
+
+    @Column(name = "answered_at")
+    private LocalDateTime answeredAt; // 문의에 관리자가 처음 답한 시각 (비면 답변 대기)
     
     @Column(name = "views", nullable = false, columnDefinition = "int default 0")
     @Builder.Default

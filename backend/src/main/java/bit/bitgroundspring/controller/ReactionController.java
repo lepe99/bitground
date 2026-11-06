@@ -21,6 +21,7 @@ public class ReactionController {
                                             @Valid @RequestBody ReactionDto dto) {
         reactionService.toggleReaction(
                 authUser.id().longValue(),
+                authUser.admin(),
                 dto.getTargetType(),
                 dto.getTargetId(),
                 dto.getLiked()

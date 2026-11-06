@@ -14,17 +14,37 @@ import java.util.Optional;
 
 public interface PostRepository extends JpaRepository<Post, Integer> {
 
-    // 게시글 목록: 본문(content)은 읽지 않고 목록에 필요한 값만 DTO로 바로 조회
+    /**
+     * 게시글 목록: 본문(content)은 읽지 않고 목록에 필요한 값만 DTO로 바로 조회.
+     * category가 없으면(전체) 비공개 분류(문의)는 뺀다. ownerId가 있으면 그 사용자의 글만(일반 사용자의 문의 탭),
+     * answered가 있으면 답변 여부로 거른다(문의 탭의 답변 대기·완료)
+     */
     @Query(value = """
             SELECT new bit.bitgroundspring.dto.response.PostDto(
                 p.id, u.id, u.name, u.profileImage, p.title, p.tier, p.likes, p.dislikes,
                 p.isDeleted, p.createdAt, p.updatedAt, p.category, p.views,
-                (SELECT COUNT(c) FROM Comment c WHERE c.post = p), p.hasImage)
+                (SELECT COUNT(c) FROM Comment c WHERE c.post = p), p.hasImage, p.inquiryType, p.answeredAt)
             FROM Post p JOIN p.user u
-            WHERE p.isDeleted = false AND (:category IS NULL OR p.category = :category)
+            WHERE p.isDeleted = false
+              AND (:category IS NULL OR p.category = :category)
+              AND (:category IS NOT NULL OR p.category <> :hidden)
+              AND (:ownerId IS NULL OR u.id = :ownerId)
+              AND (:answered IS NULL OR (:answered = true AND p.answeredAt IS NOT NULL) OR (:answered = false AND p.answeredAt IS NULL))
             """,
-            countQuery = "SELECT COUNT(p) FROM Post p WHERE p.isDeleted = false AND (:category IS NULL OR p.category = :category)")
-    Page<PostDto> findPostList(@Param("category") Category category, Pageable pageable);
+            countQuery = """
+            SELECT COUNT(p) FROM Post p
+            WHERE p.isDeleted = false
+              AND (:category IS NULL OR p.category = :category)
+              AND (:category IS NOT NULL OR p.category <> :hidden)
+              AND (:ownerId IS NULL OR p.user.id = :ownerId)
+              AND (:answered IS NULL OR (:answered = true AND p.answeredAt IS NOT NULL) OR (:answered = false AND p.answeredAt IS NULL))
+            """)
+    Page<PostDto> findPostList(@Param("category") Category category, @Param("hidden") Category hidden,
+                               @Param("ownerId") Integer ownerId, @Param("answered") Boolean answered, Pageable pageable);
+
+    /** 답변 대기 문의 수 (관리자 현황) */
+    @Query("SELECT COUNT(p) FROM Post p WHERE p.isDeleted = false AND p.category = :category AND p.answeredAt IS NULL")
+    long countUnanswered(@Param("category") Category category);
 
     //게시글 상세보기
     @Query("SELECT p FROM Post p JOIN FETCH p.user WHERE p.id = :id AND p.isDeleted = false")

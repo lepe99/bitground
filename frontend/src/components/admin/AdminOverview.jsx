@@ -1,4 +1,5 @@
 import {useEffect, useState} from 'react';
+import {Link} from 'react-router-dom';
 import Card from '../ui/Card.jsx';
 import {fetchAdminOverview} from '../../api/adminApi.js';
 import {formatNumber} from '../../utils/format.js';
@@ -43,7 +44,7 @@ export default function AdminOverview() {
 
     if (failed) return <p className="py-10 text-center text-sm text-fg-3">현황을 불러오지 못했어요.</p>;
     if (!data) return <p className="py-10 text-center text-sm text-fg-3">불러오는 중…</p>;
-    const {users, trades, season, participants, schedulerRuns, ai} = data;
+    const {users, trades, season, participants, schedulerRuns, ai, pendingInquiries} = data;
 
     return (
         <div className="flex flex-col gap-4">
@@ -54,6 +55,12 @@ export default function AdminOverview() {
                     <Stat label="이용 정지" value={formatNumber(users.suspended)}/>
                     <Stat label="탈퇴" value={formatNumber(users.withdrawn)}/>
                 </div>
+            </Section>
+
+            <Section title="문의">
+                <Link to="/community?category=INQUIRY&answered=false" className="block rounded-xl hover:bg-surface-2">
+                    <Stat label="답변 대기" value={formatNumber(pendingInquiries ?? 0)} sub="눌러서 답변하기"/>
+                </Link>
             </Section>
 
             <Section title="거래 (오늘)">

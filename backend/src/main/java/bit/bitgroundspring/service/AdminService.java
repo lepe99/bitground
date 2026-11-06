@@ -5,6 +5,7 @@ import bit.bitgroundspring.common.error.ErrorCode;
 import bit.bitgroundspring.common.response.PageResponse;
 import bit.bitgroundspring.dto.response.AdminDtos.*;
 import bit.bitgroundspring.dto.response.CurrentSeasonDto;
+import bit.bitgroundspring.entity.Category;
 import bit.bitgroundspring.entity.Comment;
 import bit.bitgroundspring.entity.Post;
 import bit.bitgroundspring.entity.User;
@@ -90,7 +91,8 @@ public class AdminService {
                 ORDER BY created_at DESC LIMIT :limit""", Map.of("limit", SCHEDULER_RUNS), (rs, i) -> new SchedulerRun(
                 rs.getString("kind"), rs.getString("period"), time(rs, "created_at"), time(rs, "notified_at")));
 
-        return new Overview(users, trades, season, participants, runs, ai());
+        return new Overview(users, trades, season, participants, runs, ai(),
+                postRepository.countUnanswered(Category.INQUIRY));
     }
 
     private Ai ai() {

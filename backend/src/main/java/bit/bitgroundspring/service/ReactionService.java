@@ -19,8 +19,21 @@ public class ReactionService {
     private final PostRepository postRepository;
     private final CommentRepository commentRepository;
 
+    /**
+     * 좋아요·싫어요 토글. 문의 글과 그 댓글에는 반응할 수 없다 (볼 수 없는 문의면 없는 글로 응답)
+     */
     @Transactional
-    public void toggleReaction(Long userId, ReactionTargetType type, Long targetId, boolean liked) {
+    public void toggleReaction(Long userId, boolean admin, ReactionTargetType type, Long targetId, boolean liked) {
+        Post post = type == ReactionTargetType.POST
+                ? postRepository.findById(targetId.intValue()).orElse(null)
+                : commentRepository.findById(targetId.intValue()).map(Comment::getPost).orElse(null);
+        if (post == null) {
+            throw new BusinessException(type == ReactionTargetType.POST ? ErrorCode.POST_NOT_FOUND : ErrorCode.COMMENT_NOT_FOUND);
+        }
+        PostAccess.requireReadable(post, userId.intValue(), admin);
+        if (post.getCategory().isPrivate()) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT, "문의 글에는 반응할 수 없어요.");
+        }
         Reaction existing = reactionRepository
                 .findByUserIdAndTargetTypeAndTargetIdAndLiked(userId.intValue(), type, targetId, liked)
                 .orElse(null);
