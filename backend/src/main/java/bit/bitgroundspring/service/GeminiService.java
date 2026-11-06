@@ -95,7 +95,7 @@ public class GeminiService {
      * @param score   코드가 계산한 점수와 구성 요소
      * @throws IOException 호출 실패(재시도 후) 또는 쓸 수 있는 응답을 못 받음
      */
-    @Loggable("Gemini 호출")
+    @Loggable(value = "Gemini 호출", slowMs = 30_000) // 보통 2~20초, 요청 제한 60초
     public SeasonReviewContent generateSeasonReview(InvestmentSummaryDto summary, SeasonReviewScorer.Score score)
             throws IOException, InterruptedException {
         String userPrompt = buildPrompt(summary, score);

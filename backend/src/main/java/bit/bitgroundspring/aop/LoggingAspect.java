@@ -4,6 +4,7 @@ import bit.bitgroundspring.common.error.BusinessException;
 import jakarta.servlet.ServletRequest;
 import jakarta.servlet.ServletResponse;
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.event.Level;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
@@ -23,7 +24,9 @@ import java.util.regex.Pattern;
  *
  * <ul>
  *   <li>INFO  : 호출 결과와 실행 시간 — {@code [주문 접수] OrderService.createReserveOrder 12ms}</li>
- *   <li>WARN  : 느린 호출(logging.aop.slow-threshold-ms 이상)과 비즈니스 예외(에러 코드 포함)</li>
+ *   <li>WARN  : 느린 호출(logging.aop.slow-threshold-ms 또는 {@link Loggable#slowMs()} 이상)과 서버 쪽 비즈니스 예외(5xx)</li>
+ *   <li>INFO  : 예상된 클라이언트 쪽 실패(4xx: 잔액 부족, 리프레시 토큰 없음 등) — 에러 코드는 그대로 남겨 집계한다.
+ *               GlobalExceptionHandler와 같은 기준 (로그인하지 않은 방문자의 토큰 재발급 시도까지 WARN이 되던 문제)</li>
  *   <li>ERROR : 예상하지 못한 예외 (스택트레이스는 GlobalExceptionHandler가 한 번만 남김)</li>
  *   <li>DEBUG : 인자·반환값 — 토큰·비밀번호 등 민감 값과 파일 내용은 마스킹</li>
  * </ul>
@@ -51,7 +54,9 @@ public class LoggingAspect {
     public Object log(ProceedingJoinPoint joinPoint) throws Throwable {
         MethodSignature signature = (MethodSignature) joinPoint.getSignature();
         String target = joinPoint.getTarget().getClass().getSimpleName() + "." + signature.getName();
-        String label = label(signature, joinPoint.getTarget().getClass());
+        Loggable loggable = loggable(signature, joinPoint.getTarget().getClass());
+        String label = loggable == null || loggable.value().isEmpty() ? "" : "[" + loggable.value() + "] ";
+        long threshold = loggable != null && loggable.slowMs() > 0 ? loggable.slowMs() : slowThresholdMs;
 
         if (log.isDebugEnabled()) {
             log.debug("{}{} args={}", label, target, formatArguments(signature.getParameterNames(), joinPoint.getArgs()));
@@ -61,8 +66,8 @@ public class LoggingAspect {
         try {
             Object result = joinPoint.proceed();
             long elapsed = elapsedMs(start);
-            if (elapsed >= slowThresholdMs) {
-                log.warn("{}{} {}ms (SLOW, threshold {}ms)", label, target, elapsed, slowThresholdMs);
+            if (elapsed >= threshold) {
+                log.warn("{}{} {}ms (SLOW, threshold {}ms)", label, target, elapsed, threshold);
             } else {
                 log.info("{}{} {}ms", label, target, elapsed);
             }
@@ -71,8 +76,9 @@ public class LoggingAspect {
             }
             return result;
         } catch (BusinessException e) {
-            // 잔액 부족 등 예상된 실패: 에러 코드로 집계할 수 있게 남긴다
-            log.warn("{}{} {}ms FAILED code={} detail={}", label, target, elapsedMs(start), e.getErrorCode(), e.getMessage());
+            // 잔액 부족 등 예상된 실패: 에러 코드로 집계할 수 있게 남긴다 (4xx는 INFO, 5xx는 WARN)
+            log.atLevel(failureLevel(e)).log("{}{} {}ms FAILED code={} detail={}",
+                    label, target, elapsedMs(start), e.getErrorCode(), e.getMessage());
             throw e;
         } catch (Throwable e) {
             log.error("{}{} {}ms ERROR {}: {}", label, target, elapsedMs(start), e.getClass().getSimpleName(), e.getMessage());
@@ -81,12 +87,13 @@ public class LoggingAspect {
     }
 
     // 메서드에 붙은 값 우선, 없으면 클래스에 붙은 값
-    private String label(MethodSignature signature, Class<?> targetClass) {
+    private Loggable loggable(MethodSignature signature, Class<?> targetClass) {
         Loggable loggable = AnnotatedElementUtils.findMergedAnnotation(signature.getMethod(), Loggable.class);
-        if (loggable == null || loggable.value().isEmpty()) {
-            loggable = AnnotatedElementUtils.findMergedAnnotation(targetClass, Loggable.class);
-        }
-        return loggable == null || loggable.value().isEmpty() ? "" : "[" + loggable.value() + "] ";
+        return loggable != null ? loggable : AnnotatedElementUtils.findMergedAnnotation(targetClass, Loggable.class);
+    }
+
+    static Level failureLevel(BusinessException e) {
+        return e.getErrorCode().getStatus().is5xxServerError() ? Level.WARN : Level.INFO;
     }
 
     private long elapsedMs(long startNanos) {

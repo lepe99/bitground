@@ -59,7 +59,7 @@ public class AiAdviceService {
      * @param seasonId 조언을 생성할 시즌의 ID
      * @return 생성되거나 조회된 AiAdviceDto
      */
-    @Loggable("AI 조언")
+    @Loggable(value = "AI 조언", slowMs = 30_000) // 모델 응답은 보통 2~20초
     public AiAdviceDto generateOrGetAiAdviceForUserAndSeason(Integer userId, Integer seasonId) {
         String key = userId + ":" + seasonId;
         CompletableFuture<AiAdviceDto> mine = new CompletableFuture<>();
