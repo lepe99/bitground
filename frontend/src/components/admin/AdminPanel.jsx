@@ -25,7 +25,7 @@ export default function AdminPanel() {
     return (
         <div className="flex flex-col gap-4">
             <h2 className="text-lg font-extrabold md:text-[22px]">관리자</h2>
-            <div role="tablist" aria-label="관리 영역" className="-mx-1 flex gap-1.5 overflow-x-auto px-1 [scrollbar-width:none]">
+            <div role="tablist" aria-label="관리 영역" className="flex flex-wrap gap-1.5">
                 {SECTIONS.map((s) => (
                     <button
                         key={s.value}

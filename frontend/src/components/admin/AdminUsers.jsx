@@ -38,6 +38,7 @@ function UserDetail({id, onClose, onChanged}) {
         try {
             await fn();
             infoAlert(done);
+            setReason('');
             setDetail(await fetchAdminUser(id));
             onChanged();
         } catch (e) {
