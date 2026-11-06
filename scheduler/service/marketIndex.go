@@ -14,9 +14,10 @@ type GeckoCoin struct {
 }
 
 // UpdateMarketIndex 함수는 상위 10개 코인의 마켓 캡 정보를 가져와서 마켓 인덱스와 알트 인덱스를 계산하고, 이를 데이터베이스에 삽입합니다.
-func UpdateMarketIndex(ctx context.Context, db *sql.DB) error {
+// coingeckoKey 무료 Demo 키(비우면 키 없이 호출). 키 없는 호출은 IP 기준 제한이라 Lambda처럼 IP를 나눠 쓰면 막힐 수 있다
+func UpdateMarketIndex(ctx context.Context, db *sql.DB, coingeckoKey string) error {
 	// 1. CoinGecko API를 사용하여 상위 10개 코인의 마켓 캡 정보를 가져옵니다.
-	coinCaps, err := getMarketCap(ctx)
+	coinCaps, err := getMarketCap(ctx, coingeckoKey)
 	if err != nil {
 		return fmt.Errorf("getMarketCap 에러: %w", err)
 	}
@@ -33,7 +34,7 @@ func UpdateMarketIndex(ctx context.Context, db *sql.DB) error {
 }
 
 // getMarketCap 함수는 CoinGecko API를 사용하여 상위 10개 코인의 마켓 캡 정보를 가져옵니다.
-func getMarketCap(ctx context.Context) ([]GeckoCoin, error) {
+func getMarketCap(ctx context.Context, apiKey string) ([]GeckoCoin, error) {
 	apiURL := "https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=50"
 
 	// 제외할 종목 심볼 목록 (string 배열)
@@ -63,7 +64,11 @@ func getMarketCap(ctx context.Context) ([]GeckoCoin, error) {
 	}
 
 	var coins []GeckoCoin
-	if err := getJSON(ctx, apiURL, 30*time.Second, &coins); err != nil {
+	var headers map[string]string
+	if apiKey != "" {
+		headers = map[string]string{"x-cg-demo-api-key": apiKey} // https://docs.coingecko.com/docs/keyless-public-api
+	}
+	if err := getJSONWithHeaders(ctx, apiURL, 30*time.Second, headers, &coins); err != nil {
 		return nil, err
 	}
 

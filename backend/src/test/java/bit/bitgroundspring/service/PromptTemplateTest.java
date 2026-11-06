@@ -12,13 +12,12 @@ class PromptTemplateTest {
     private final ObjectMapper mapper = new ObjectMapper();
 
     @Test
-    @DisplayName("버전 폴더의 규칙·temperature·응답 스키마를 읽는다")
+    @DisplayName("버전 폴더의 규칙·응답 스키마를 읽는다")
     void loadsVersion() {
         PromptTemplate t = PromptTemplate.load(GeminiService.DEFAULT_PROMPT_VERSION, mapper);
 
         assertThat(t.version()).isEqualTo("season-review-v2");
         assertThat(t.system()).startsWith("너는 모의투자 게임 Bitground의 시즌 회고 코치다.");
-        assertThat(t.temperature()).isEqualTo(0.3);
         assertThat(t.responseSchema()).containsEntry("type", "OBJECT").containsKey("required");
     }
 

@@ -172,7 +172,7 @@ func run(ctx context.Context, db *sql.DB, cfg config.Config, now time.Time, jobs
 	var wg sync.WaitGroup
 	wg.Go(func() {
 		marketErr = step("마켓 인덱스 업데이트", func(ctx context.Context) error {
-			return service.UpdateMarketIndex(ctx, db)
+			return service.UpdateMarketIndex(ctx, db, cfg.CoinGeckoAPIKey)
 		})
 	})
 	newsCfg := service.NewsArchiveConfig{

@@ -127,7 +127,9 @@ spring:
           kakao:
             authorization-uri: https://kauth.kakao.com/oauth/authorize
             token-uri: https://kauth.kakao.com/oauth/token
-            user-info-uri: https://kapi.kakao.com/v2/user/me
+            # OIDC 표준 userinfo (https://kauth.kakao.com/.well-known/openid-configuration). /v2/user/me는 카카오 고유 형식이라 sub가 없다
+            user-info-uri: https://kapi.kakao.com/v1/oidc/userinfo
+            user-name-attribute: sub
             jwk-set-uri: https://kauth.kakao.com/.well-known/jwks.json
             issuer-uri: https://kauth.kakao.com
 

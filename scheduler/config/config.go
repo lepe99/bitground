@@ -41,6 +41,9 @@ type Config struct {
 
 	SeasonName string
 
+	// CoinGeckoAPIKey 마켓 인덱스용 무료 Demo 키 (COINGECKO_DEMO_API_KEY). 비우면 키 없이 호출
+	CoinGeckoAPIKey string
+
 	// BackendURL 시즌·스플릿 완료를 알릴 백엔드 주소 (예: https://api.bitground.kr)
 	BackendURL string
 	// SchedulerKey 백엔드 내부 API 호출용 공유 키
@@ -70,6 +73,7 @@ func Load() (Config, error) {
 		PineconeIndex:        getEnv("PINECONE_INDEX", "bitground-news"),
 		NewsEmbedModel:       getEnv("NEWS_EMBED_MODEL", "gemini-embedding-2"),
 		SeasonName:           os.Getenv("SEASON_NAME"),
+		CoinGeckoAPIKey:      os.Getenv("COINGECKO_DEMO_API_KEY"),
 		BackendURL:           strings.TrimRight(os.Getenv("BACKEND_URL"), "/"),
 		SchedulerKey:         os.Getenv("SEASON_UPDATE_KEY"),
 	}

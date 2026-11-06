@@ -100,7 +100,7 @@ func TestValidateInsight(t *testing.T) {
 
 func TestLoadInsightPrompt(t *testing.T) {
 	p, err := loadInsightPrompt("")
-	if err != nil || p.Version != DefaultInsightPromptVersion || p.CoinSystem == "" || p.MarketSystem == "" || p.Schema["type"] != "OBJECT" || p.Temperature != 0.3 {
+	if err != nil || p.Version != DefaultInsightPromptVersion || p.CoinSystem == "" || p.MarketSystem == "" || p.Schema["type"] != "OBJECT" {
 		t.Fatalf("기본 버전 로드 실패: %+v, %v", p.Version, err)
 	}
 	if strings.HasSuffix(p.CoinSystem, "\n") {

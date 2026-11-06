@@ -20,7 +20,7 @@
 | | 시즌 AI 리뷰 | 일일 AI 인사이트 |
 |---|---|---|
 | 위치 | `backend/src/main/resources/prompts/{버전}/` | `scheduler/service/prompts/{버전}/` (바이너리에 포함) |
-| 파일 | `system.txt`, `generation.json`(temperature·스키마) | `coin_system.txt`, `market_system.txt`, `generation.json` |
+| 파일 | `system.txt`, `generation.json`(응답 스키마) | `coin_system.txt`, `market_system.txt`, `generation.json` |
 | 운영 버전 설정 | `GEMINI_SEASON_REVIEW_PROMPT` (기본 `season-review-v2`) | `INSIGHT_PROMPT_VERSION` (기본 `daily-insight-v4`) |
 | 평가 버전 지정 | `./gradlew aiEval -PpromptVersion=…` | `EVAL_PROMPT_VERSION=…` |
 

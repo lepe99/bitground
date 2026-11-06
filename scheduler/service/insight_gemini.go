@@ -275,8 +275,8 @@ func callGemini(ctx context.Context, apiKey, model string, p insightPrompt, syst
 	body, err := json.Marshal(map[string]any{
 		"systemInstruction": map[string]any{"parts": []map[string]string{{"text": system}}},
 		"contents":          []map[string]any{{"role": "user", "parts": []map[string]string{{"text": prompt}}}},
+		// temperature는 보내지 않는다: Gemini 3 계열은 무시하며 다음 세대부터 400 오류
 		"generationConfig": map[string]any{
-			"temperature":      p.Temperature,
 			"responseMimeType": "application/json",
 			"responseSchema":   p.Schema,
 		},

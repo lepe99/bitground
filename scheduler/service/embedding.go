@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 )
 
@@ -18,12 +19,34 @@ const (
 	embedTaskQuery    = "RETRIEVAL_QUERY"
 )
 
-func embedText(ctx context.Context, apiKey, model string, dimension int, taskType, text string) ([]float32, error) {
-	body, err := json.Marshal(map[string]any{
-		"content":              map[string]any{"parts": []map[string]string{{"text": text}}},
-		"taskType":             taskType,
-		"outputDimensionality": dimension,
-	})
+// embeddingRequest 모델에 맞는 요청 본문.
+// gemini-embedding-2는 taskType을 받지 않고 용도를 글 앞에 적는다 (https://ai.google.dev/gemini-api/docs/embeddings):
+// 문서 "title: {제목} | text: {본문}", 검색어 "task: search result | query: {검색어}".
+// 그 전 모델(gemini-embedding-001)은 taskType 필드로 알린다
+func embeddingRequest(model string, dimension int, task, title, text string) map[string]any {
+	req := map[string]any{"outputDimensionality": dimension}
+	if strings.HasPrefix(model, "gemini-embedding-2") {
+		if task == embedTaskQuery {
+			text = "task: search result | query: " + text
+		} else {
+			if title == "" {
+				title = "none"
+			}
+			text = "title: " + title + " | text: " + text
+		}
+	} else {
+		req["taskType"] = task
+		if title != "" {
+			text = title + "\n" + text
+		}
+	}
+	req["content"] = map[string]any{"parts": []map[string]string{{"text": text}}}
+	return req
+}
+
+// embedText 글 하나를 임베딩한다. 검색어는 title을 비운다
+func embedText(ctx context.Context, apiKey, model string, dimension int, task, title, text string) ([]float32, error) {
+	body, err := json.Marshal(embeddingRequest(model, dimension, task, title, text))
 	if err != nil {
 		return nil, err
 	}
@@ -35,7 +58,7 @@ func embedText(ctx context.Context, apiKey, model string, dimension int, taskTyp
 		status, respBody, err := postJSON(ctx, apiURL, apiKey, body)
 		if err == nil && status == http.StatusOK {
 			// 한 번 실행에 100번 가까이 불러 기본(INFO)에서는 남기지 않는다 (LOG_LEVEL=debug)
-			slog.DebugContext(ctx, "임베딩 호출", "model", model, "task", taskType, "attempts", attempt+1,
+			slog.DebugContext(ctx, "임베딩 호출", "model", model, "task", task, "attempts", attempt+1,
 				"latency_ms", time.Since(started).Milliseconds())
 			var res struct {
 				Embedding struct {

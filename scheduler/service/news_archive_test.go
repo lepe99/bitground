@@ -97,7 +97,9 @@ func TestPineconeClient(t *testing.T) {
 		}
 		switch {
 		case r.URL.Path == "/indexes/bitground-news":
-			_ = json.NewEncoder(w).Encode(map[string]any{"host": strings.TrimPrefix(srvURL, "https://"), "dimension": 768, "status": map[string]any{"ready": true}})
+			// API 2026-07 응답: 차원이 schema.fields 안에 있다
+			_ = json.NewEncoder(w).Encode(map[string]any{"host": strings.TrimPrefix(srvURL, "https://"), "status": map[string]any{"ready": true},
+				"schema": map[string]any{"fields": map[string]any{"_values": map[string]any{"type": "dense_vector", "dimension": 768, "metric": "cosine"}}}})
 		case r.URL.Path == "/indexes/wrong-dim":
 			_ = json.NewEncoder(w).Encode(map[string]any{"host": "x", "dimension": 3072, "status": map[string]any{"ready": true}})
 		case r.URL.Path == "/vectors/fetch":
@@ -172,3 +174,23 @@ func TestPineconeClient(t *testing.T) {
 }
 
 var srvURL string
+
+func TestEmbeddingRequest(t *testing.T) {
+	text := func(req map[string]any) string {
+		return req["content"].(map[string]any)["parts"].([]map[string]string)[0]["text"]
+	}
+	// gemini-embedding-2: taskType 없이 용도를 글 앞에 적는다
+	doc := embeddingRequest("gemini-embedding-2", 768, embedTaskDocument, "비트코인 급등", "본문")
+	if _, ok := doc["taskType"]; ok || text(doc) != "title: 비트코인 급등 | text: 본문" || doc["outputDimensionality"] != 768 {
+		t.Errorf("문서 요청 = %v", doc)
+	}
+	query := embeddingRequest("gemini-embedding-2", 768, embedTaskQuery, "", "비트코인 전망")
+	if _, ok := query["taskType"]; ok || text(query) != "task: search result | query: 비트코인 전망" {
+		t.Errorf("검색어 요청 = %v", query)
+	}
+	// 이전 모델은 taskType 필드
+	old := embeddingRequest("gemini-embedding-001", 768, embedTaskQuery, "", "비트코인 전망")
+	if old["taskType"] != embedTaskQuery || text(old) != "비트코인 전망" {
+		t.Errorf("gemini-embedding-001 요청 = %v", old)
+	}
+}

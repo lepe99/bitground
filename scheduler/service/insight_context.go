@@ -54,7 +54,7 @@ func (r *contextRetriever) related(ctx context.Context, query, symbol string, to
 	if r == nil {
 		return nil
 	}
-	vector, err := embedText(ctx, r.apiKey, r.model, r.dimension, embedTaskQuery, query)
+	vector, err := embedText(ctx, r.apiKey, r.model, r.dimension, embedTaskQuery, "", query)
 	if err != nil {
 		slog.WarnContext(ctx, "배경 자료 검색어 임베딩 실패", "symbol", symbol, "error", err)
 		return nil

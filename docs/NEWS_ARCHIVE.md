@@ -12,7 +12,7 @@
     - 제목에 가상자산 단어가 있거나, 요약에 서로 다른 가상자산 단어가 2개 이상
  3. 같은 기사 합치기: id = n-{발행일 KST}-{링크 sha1 16자}
  4. Pinecone에 이미 있는 id는 건너뜀 (다시 임베딩하지 않음)
- 5. 새 기사 '제목 + 요약'을 임베딩 (taskType RETRIEVAL_DOCUMENT, 동시 3개, 분당 80회 이하, 실행당 최대 100건)
+ 5. 새 기사를 `title: {제목} | text: {요약}` 형식으로 임베딩 (gemini-embedding-2는 taskType을 받지 않아 용도를 글 앞에 적는다. 동시 3개, 분당 80회 이하, 실행당 최대 100건)
  6. 업서트 (namespace: news)
 0시에는 추가로: 90~96일 전 날짜 접두어(n-YYYYMMDD-)로 목록을 찾아 삭제
 ```
@@ -73,7 +73,7 @@
 
 인사이트를 만들 때 대상마다 (`scheduler/service/insight_context.go`):
 
-1. 검색어 = 대상 이름 + 오늘 기사 제목 → `gemini-embedding-2` (taskType `RETRIEVAL_QUERY`)
+1. 검색어 = 대상 이름 + 오늘 기사 제목 → `gemini-embedding-2` (`task: search result | query: {검색어}` 형식)
 2. Pinecone 검색: 코인은 `symbols`에 그 코인이 있는 기사만, 발행 시각은 **30일 전 ~ 24시간 전** (오늘 기사는 `<news>`로 따로 들어가므로 배경은 그 이전 흐름만)
 3. 유사도 0.65 이상, 오늘 기사와 링크·제목이 겹치지 않는 기사 최대 4건 → 프롬프트 `<context>` 블록
 4. 모델은 `background`에 지난 흐름 1~2문장을 날짜와 함께 쓴다. 오늘 움직임과 인과로 잇지 않는다 (코드가 인과 표현·인용 누락을 검증)

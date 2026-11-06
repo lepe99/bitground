@@ -266,7 +266,7 @@ func embedArchiveNews(ctx context.Context, cfg NewsArchiveConfig, news []archive
 				return
 			}
 			values, err := embedText(ctx, cfg.GeminiAPIKey, cfg.EmbedModel, cfg.EmbedDimension, embedTaskDocument,
-				n.Article.Title+"\n"+n.Article.Description)
+				n.Article.Title, n.Article.Description)
 			if err != nil {
 				slog.WarnContext(ctx, "기사 임베딩 실패, 건너뜀", "news_id", n.ID, "error", err)
 				return

@@ -115,8 +115,9 @@ public class GeminiService {
         Map<String, Object> requestBody = Map.of(
                 "systemInstruction", Map.of("parts", List.of(Map.of("text", prompt.system()))),
                 "contents", List.of(Map.of("role", "user", "parts", List.of(Map.of("text", userPrompt)))),
+                // temperature는 보내지 않는다: Gemini 3 계열(3.5 Flash-Lite 포함)은 무시하며 다음 세대부터 400 오류
+                // (https://ai.google.dev/gemini-api/docs/generate-content/whats-new-gemini-3.6). 일관성은 systemInstruction 규칙과 응답 스키마로 잡는다
                 "generationConfig", Map.of(
-                        "temperature", prompt.temperature(),
                         "responseMimeType", "application/json",
                         "responseSchema", prompt.responseSchema()
                 )

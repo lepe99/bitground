@@ -23,6 +23,15 @@ const sendSubscription = () => {
     sentCodes = key;
 };
 
+// 화면이 열릴 때 카드 여러 개가 거의 동시에 구독하므로, 잠깐 모았다가 요청 한 번으로 보낸다
+// (업비트 WebSocket 메시지 제한: 연결당 초당 5회·분당 100회)
+const SEND_DEBOUNCE_MS = 50;
+let sendTimer = null;
+const scheduleSubscription = () => {
+    clearTimeout(sendTimer);
+    sendTimer = setTimeout(sendSubscription, SEND_DEBOUNCE_MS);
+};
+
 const connect = () => {
     clearTimeout(reconnectTimer);
     const socket = new WebSocket(UPBIT_WS_URL);
@@ -51,12 +60,12 @@ export function subscribeTickers(codes, onTick) {
     listeners.add(listener);
     clearTimeout(idleTimer);
     if (!ws) connect();
-    else sendSubscription();
+    else scheduleSubscription();
 
     return () => {
         listeners.delete(listener);
         if (listeners.size) {
-            sendSubscription();
+            scheduleSubscription();
             return;
         }
         idleTimer = setTimeout(() => {

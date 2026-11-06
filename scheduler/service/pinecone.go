@@ -18,7 +18,8 @@ import (
 var pineconeControlURL = "https://api.pinecone.io"
 
 const (
-	pineconeAPIVersion = "2025-04"
+	// 분기마다 새 안정 버전이 나오고 각 버전은 최소 12개월 지원된다 (https://docs.pinecone.io/reference/api/versioning)
+	pineconeAPIVersion = "2026-07"
 	// upsert·delete 한 번에 보내는 최대 개수 (API 제한 100 이하)
 	pineconeBatch = 100
 	// fetch는 id를 쿼리 문자열로 보내므로 URL이 너무 길어지지 않게 나눈다
@@ -42,8 +43,15 @@ func newPineconeClient(ctx context.Context, apiKey, index string, dimension int)
 	c := &pineconeClient{apiKey: apiKey}
 	var desc struct {
 		Host      string `json:"host"`
-		Dimension int    `json:"dimension"`
-		Status    struct {
+		Dimension int    `json:"dimension"` // 2025-10 이전 버전
+		// 2026-07부터 차원은 schema.fields의 dense_vector 필드에 있다
+		Schema struct {
+			Fields map[string]struct {
+				Type      string `json:"type"`
+				Dimension int    `json:"dimension"`
+			} `json:"fields"`
+		} `json:"schema"`
+		Status struct {
 			Ready bool `json:"ready"`
 		} `json:"status"`
 	}
@@ -59,6 +67,13 @@ func newPineconeClient(ctx context.Context, apiKey, index string, dimension int)
 	}
 	if err := json.Unmarshal(body, &desc); err != nil {
 		return nil, fmt.Errorf("Pinecone 인덱스 응답 해석 실패: %w", err)
+	}
+	if desc.Dimension == 0 {
+		for _, f := range desc.Schema.Fields {
+			if f.Type == "dense_vector" {
+				desc.Dimension = f.Dimension
+			}
+		}
 	}
 	if desc.Dimension != dimension {
 		return nil, fmt.Errorf("Pinecone 인덱스 차원(%d)이 임베딩 차원(%d)과 다릅니다", desc.Dimension, dimension)
