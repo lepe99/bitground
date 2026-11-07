@@ -2,6 +2,7 @@
 export const formatNotification = ({message, data}) => {
     switch (message) {
         case 'ORDER_EXECUTION': {
+            if (data.text) return data.text; // 서버가 저장한 문구 (예약 주문 취소 안내 등)
             const {orderType, symbol, amount, tradePrice} = data;
             const cutSymbol = symbol.split('-')[1];
             return `예약 ${orderType === 'BUY' ? '매수' : '매도'} 주문이 체결되었습니다.\n`

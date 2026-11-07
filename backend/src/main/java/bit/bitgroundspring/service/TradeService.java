@@ -10,7 +10,7 @@ import bit.bitgroundspring.entity.*;
 import bit.bitgroundspring.event.OrderExecutedEvent;
 import bit.bitgroundspring.event.OutboxEvents;
 import bit.bitgroundspring.repository.*;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -29,14 +29,33 @@ public class TradeService {
     private final TradingWindow tradingWindow;
     private final OutboxEvents outbox;
     private final MarketPriceService marketPriceService;
+    private final TransactionTemplate transactionTemplate;
 
-    @Transactional
+    /**
+     * 시장가 주문. 현재가는 트랜잭션·잠금 밖에서 먼저 구한다
+     * (기존: 사용자 행을 잠근 채 조회해, 업비트 REST로 넘어가면 응답을 기다리는 동안 그 사용자의 다른 주문·예약 체결이 밀렸다)
+     */
     @Loggable("시장가 주문")
     public OrderResponseDto placeOrder(Integer userId, OrderRequestDto req) {
         validateRequest(req);
         tradingWindow.ensureOpen(); // 시즌 종료 시각부터 정산이 끝날 때까지 거래 마감
+        ensureTradable(req.getSymbol());
+        BigDecimal marketPrice = marketPriceService.currentPrice(req.getSymbol());
+        return transactionTemplate.execute(status -> execute(userId, req, marketPrice));
+    }
+
+    /** 없는 종목이나 상장 폐지된 종목은 사고팔 수 없다 (실제 거래소도 거래지원이 끝나면 매수·매도 모두 막힌다) */
+    private void ensureTradable(String symbol) {
+        Coin coin = coinRepository.findBySymbol(symbol)
+                .orElseThrow(() -> new BusinessException(ErrorCode.COIN_NOT_FOUND));
+        if (Boolean.TRUE.equals(coin.getIsDeleted())) {
+            throw new BusinessException(ErrorCode.COIN_DELISTED);
+        }
+    }
+
+    private OrderResponseDto execute(Integer userId, OrderRequestDto req, BigDecimal execPrice) {
         BigDecimal qty;
-        // 1) 사용자 & 코인 엔티티 로드 (락 모드로 동시성 방어)
+        // 사용자 행을 잠가 같은 사용자의 주문·예약 체결과 동시에 처리되지 않게 한다
         User user = userRepository.findByIdWithPessimisticLock(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
@@ -45,12 +64,7 @@ public class TradeService {
 
         Season season = seasonRepository.findByStatus(Status.PENDING)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NO_ACTIVE_SEASON));
-        
-        // 2) 현재 시장가 (실시간 시세로 받아 둔 값, 없으면 업비트 REST)
-        BigDecimal marketPrice = marketPriceService.currentPrice(req.getSymbol());
 
-        // 3) 시장가 주문은 항상 현재가로 체결한다
-        BigDecimal execPrice = marketPrice;
         LocalDateTime now = LocalDateTime.now();
 
         boolean isBuy = req.getOrderType() == OrderType.BUY;

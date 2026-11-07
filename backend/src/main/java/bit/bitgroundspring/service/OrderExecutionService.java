@@ -8,6 +8,8 @@ import bit.bitgroundspring.entity.*;
 import bit.bitgroundspring.event.OrderExecutedEvent;
 import bit.bitgroundspring.event.OutboxEvents;
 import bit.bitgroundspring.event.RedisStreamGroup;
+import bit.bitgroundspring.common.tx.AfterCommit;
+import bit.bitgroundspring.repository.NotificationRepository;
 import bit.bitgroundspring.repository.OrderRepository;
 import bit.bitgroundspring.repository.UserAssetRepository;
 import bit.bitgroundspring.repository.UserRepository;
@@ -68,15 +70,24 @@ public class OrderExecutionService {
 
     private final AtomicBoolean isShuttingDown = new AtomicBoolean(false);
     private final TradingWindow tradingWindow;
+    private final NotificationRepository notificationRepository;
+    private final NotificationSettingService notificationSettingService;
+    private final UserSseEmitters userSseEmitters;
 
     public OrderExecutionService(OrderRepository orderRepository, UserRepository userRepository,
                                  UserAssetRepository userAssetRepository, ReservedOrderBook orderBook,
                                  StringRedisTemplate redis, TransactionTemplate transactionTemplate,
                                  OutboxEvents outbox, TradingWindow tradingWindow,
+                                 NotificationRepository notificationRepository,
+                                 NotificationSettingService notificationSettingService,
+                                 UserSseEmitters userSseEmitters,
                                  @Value("${upbit.order.execution.stream}") String executionStream,
                                  @Value("${upbit.order.execution.group}") String group,
                                  @Value("${upbit.order.execution.reclaim-idle:30s}") Duration reclaimIdle) {
         this.tradingWindow = tradingWindow;
+        this.notificationRepository = notificationRepository;
+        this.notificationSettingService = notificationSettingService;
+        this.userSseEmitters = userSseEmitters;
         this.orderRepository = orderRepository;
         this.userRepository = userRepository;
         this.userAssetRepository = userAssetRepository;
@@ -169,6 +180,30 @@ public class OrderExecutionService {
         }
     }
 
+    /** 체결 순간 잔액·수량이 모자라 취소된 예약 주문을 알린다 (같은 트랜잭션에 저장, 커밋 뒤 실시간 전송) */
+    private void notifyCancelled(User user, Order order) {
+        if (notificationSettingService.receivers(Message.ORDER_EXECUTION, List.of(user.getId())).isEmpty()) {
+            return; // 체결 알림을 끈 사용자
+        }
+        boolean buy = order.getOrderType() == OrderType.BUY;
+        String message = String.format("%s 예약 %s 주문이 취소됐어요.\n%s %s개 · 예약가 %s원",
+                buy ? "잔액이 부족해" : "보유 수량이 부족해", buy ? "매수" : "매도",
+                order.getCoin().getKoreanName(), order.getAmount().stripTrailingZeros().toPlainString(),
+                formatPrice(order.getReservePrice()));
+        Notification saved = notificationRepository.save(Notification.builder()
+                .user(user)
+                .messageType(Message.ORDER_EXECUTION)
+                .message(message)
+                .build());
+        AfterCommit.run(() -> userSseEmitters.sendSaved(saved));
+    }
+
+    private static String formatPrice(BigDecimal price) {
+        return price.compareTo(BigDecimal.valueOf(100)) >= 0
+                ? String.format("%,d", price.setScale(0, java.math.RoundingMode.DOWN).longValueExact())
+                : price.stripTrailingZeros().toPlainString();
+    }
+
     private ExecutionRequest parse(Map<Object, Object> fields) {
         try {
             return new ExecutionRequest(Integer.parseInt(String.valueOf(fields.get("orderId"))),
@@ -212,6 +247,7 @@ public class OrderExecutionService {
             orderRepository.delete(order);
             log.warn("Order {} cancelled at execution: insufficient {} for user {}",
                     orderId, orderType == OrderType.BUY ? "cash" : "asset", userId);
+            notifyCancelled(user, order); // 기존: 로그만 남아 사용자는 예약 주문이 사라진 이유를 알 수 없었다
             return;
         }
 

@@ -69,7 +69,7 @@ export const NotificationProvider = ({children}) => {
             const notification = JSON.parse(event.data);
             if (!notification.message) return;
 
-            if (notification.message === 'ORDER_EXECUTION') {
+            if (notification.message === 'ORDER_EXECUTION' && notification.data?.cash != null) {
                 setUserCash(notification.data.cash);
             }
             const text = formatNotification(notification);

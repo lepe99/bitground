@@ -2,6 +2,8 @@ package bit.bitgroundspring.order;
 
 import bit.bitgroundspring.common.error.ErrorCode;
 import bit.bitgroundspring.entity.*;
+import bit.bitgroundspring.repository.CoinRepository;
+import bit.bitgroundspring.repository.NotificationRepository;
 import bit.bitgroundspring.repository.OrderRepository;
 import bit.bitgroundspring.repository.UserAssetRepository;
 import bit.bitgroundspring.repository.UserRepository;
@@ -48,6 +50,10 @@ class OrderValidationTest extends IntegrationTest {
     UserAssetRepository userAssetRepository;
     @Autowired
     OrderRepository orderRepository;
+    @Autowired
+    CoinRepository coinRepository;
+    @Autowired
+    NotificationRepository notificationRepository;
     @Autowired
     OrderExecutionService orderExecutionService;
     @Autowired
@@ -103,6 +109,20 @@ class OrderValidationTest extends IntegrationTest {
                     .andExpect(problem(ErrorCode.INVALID_ORDER));
             assertThat(orderRepository.findAll()).hasSize(1)
                     .allSatisfy(o -> assertThat(o.getTradePrice()).isEqualByComparingTo(String.valueOf(PRICE)));
+        }
+
+        @Test
+        void 상장_폐지된_코인은_시장가로_사지도_팔지도_못한다() throws Exception {
+            fixtures.asset(user, btc, 0.01, PRICE);
+            btc.setIsDeleted(true);
+            coinRepository.save(btc);
+
+            marketOrder("{\"symbol\":\"KRW-BTC\",\"orderType\":\"BUY\",\"totalPrice\":100000}")
+                    .andExpect(problem(ErrorCode.COIN_DELISTED));
+            marketOrder("{\"symbol\":\"KRW-BTC\",\"orderType\":\"SELL\",\"amount\":0.001}")
+                    .andExpect(problem(ErrorCode.COIN_DELISTED));
+            assertThat(cash()).isEqualTo(CASH);
+            assertThat(orderRepository.findAll()).isEmpty();
         }
 
         @Test
@@ -205,12 +225,16 @@ class OrderValidationTest extends IntegrationTest {
         }
 
         @Test
-        void 현금이_부족해진_예약_매수는_취소된다() {
+        void 현금이_부족해진_예약_매수는_취소되고_사용자에게_알린다() {
             Order order = pendingOrder(OrderType.BUY, 1.0); // 1억 원 필요
             execute(order);
 
             assertThat(orderRepository.findById(order.getId())).isEmpty();
             assertThat(cash()).isEqualTo(CASH);
+            // 앞 테스트의 비동기 이벤트 처리가 남긴 알림이 섞일 수 있어 이 사용자 것만 본다
+            assertThat(notificationRepository.findAll()).filteredOn(n -> n.getUser().getId().equals(user.getId()))
+                    .singleElement()
+                    .satisfies(n -> assertThat(n.getMessage()).startsWith("잔액이 부족해 예약 매수 주문이 취소됐어요."));
         }
 
         @Test
