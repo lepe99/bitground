@@ -113,3 +113,11 @@
 .rich-editor .ql-snow .ql-tooltip input[type=text] { background: var(--c-surface-2); border-color: var(--c-line); color: var(--c-fg); }
 .rich-editor .ql-snow button:hover .ql-stroke, .rich-editor .ql-snow .ql-active .ql-stroke { stroke: var(--c-brand-fg); }
 .rich-editor .ql-snow button:hover .ql-fill, .rich-editor .ql-snow .ql-active .ql-fill { fill: var(--c-brand-fg); }
+
+/* 알림 배지: 개수가 늘면 한 번 튄다 */
+@keyframes badge-bump {
+    0% { transform: scale(1); }
+    35% { transform: scale(1.35); }
+    65% { transform: scale(0.92); }
+    100% { transform: scale(1); }
+}

@@ -3,7 +3,10 @@ import {NotificationContext} from './NotificationContext.js';
 import {formatNotification} from './formatNotification.js';
 import {useAuth} from '../auth/useAuth.js';
 import {useToast} from '../components/toastContext.js';
-import {fetchUnreadNotificationCount} from '../api/notificationApi.js';
+import {fetchUnreadNotificationCount, markNotificationsRead} from '../api/notificationApi.js';
+import {groupKey} from './groupNotifications.js';
+import {targetOf} from './notificationKinds.js';
+import {router} from '../routes/router.jsx';
 
 const SSE_URL = `${import.meta.env.VITE_API_URL}/notifications/subscribe`;
 const RECONNECT_BASE_MS = 3000;
@@ -18,7 +21,7 @@ const MAX_RECONNECT_DELAY_MS = 30000;
  */
 export const NotificationProvider = ({children}) => {
     const {isLoggedIn} = useAuth();
-    const {addToast} = useToast();
+    const {addToast, showNotification} = useToast();
     const [userCash, setUserCash] = useState(0);
     const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
 
@@ -36,6 +39,18 @@ export const NotificationProvider = ({children}) => {
         }
     }, []);
 
+    // 토스트를 누르면 합쳐진 알림을 모두 읽음으로 하고 해당 화면으로 이동
+    const openFromToast = useCallback((items) => {
+        const ids = items.map((i) => i.id).filter((id) => id > 0);
+        if (ids.length > 0) {
+            markNotificationsRead(ids)
+                .then(refreshUnreadCount)
+                .catch((error) => console.error('알림 읽음 처리 실패:', error));
+        }
+        const to = targetOf(items[0]);
+        if (to) void router.navigate(to);
+    }, [refreshUnreadCount]);
+
     const handleMessage = useCallback((event) => {
         try {
             const notification = JSON.parse(event.data);
@@ -44,12 +59,23 @@ export const NotificationProvider = ({children}) => {
             if (notification.message === 'ORDER_EXECUTION') {
                 setUserCash(notification.data.cash);
             }
-            addToast(formatNotification(notification), notification.messageType === 'ERROR' ? 'error' : 'default');
+            const text = formatNotification(notification);
+            if (notification.messageType === 'ERROR') {
+                addToast(text, 'error');
+            } else if (text) {
+                const item = {
+                    id: notification.data?.id, // 저장된 알림 번호 (공지·시즌은 없음)
+                    messageType: notification.message,
+                    message: text.trim(),
+                    postId: notification.data?.postId,
+                };
+                showNotification({key: groupKey(item), item, onOpen: openFromToast});
+            }
             refreshUnreadCount();
         } catch (e) {
             console.error('SSE 메시지 파싱 오류:', e);
         }
-    }, [addToast, refreshUnreadCount]);
+    }, [addToast, showNotification, openFromToast, refreshUnreadCount]);
 
     const connect = useCallback(() => {
         if (eventSourceRef.current) return;

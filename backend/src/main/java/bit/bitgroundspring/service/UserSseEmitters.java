@@ -126,6 +126,7 @@ public class UserSseEmitters {
         Map<String, Object> data = new HashMap<>();
         data.put("text", notification.getMessage());
         data.put("postId", notification.getPostId());
+        data.put("id", notification.getId()); // 토스트를 누르면 이 알림을 읽음으로
         realtimeBus.toUser(notification.getUser().getId(), NotificationResponse.builder()
                 .messageType(MessageType.INFO)
                 .message(notification.getMessageType())

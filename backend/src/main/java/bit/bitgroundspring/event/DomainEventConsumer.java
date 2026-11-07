@@ -130,6 +130,8 @@ public class DomainEventConsumer {
         }
         Long cash = jdbc.query("SELECT cash FROM users WHERE id = ?",
                 rs -> rs.next() ? rs.getLong(1) : 0L, event.userId());
+        Long notificationId = jdbc.query("SELECT id FROM notifications WHERE event_id = ?",
+                rs -> rs.next() ? rs.getLong(1) : 0L, eventId); // 토스트를 누르면 이 알림을 읽음으로
         realtime.toUser(event.userId(), NotificationResponse.builder()
                 .messageType(MessageType.INFO)
                 .message(Message.ORDER_EXECUTION)
@@ -138,7 +140,8 @@ public class DomainEventConsumer {
                         "symbol", event.symbol(),
                         "amount", event.amount(),
                         "tradePrice", event.tradePrice(),
-                        "cash", cash == null ? 0L : cash))
+                        "cash", cash == null ? 0L : cash,
+                        "id", notificationId == null ? 0L : notificationId))
                 .build());
     }
 

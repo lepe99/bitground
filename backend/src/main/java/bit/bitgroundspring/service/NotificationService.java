@@ -1,5 +1,7 @@
 package bit.bitgroundspring.service;
 
+import bit.bitgroundspring.common.error.BusinessException;
+import bit.bitgroundspring.common.error.ErrorCode;
 import bit.bitgroundspring.dto.projection.NotificationProjection;
 import bit.bitgroundspring.entity.Message;
 import bit.bitgroundspring.entity.NotificationGroup;
@@ -10,6 +12,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Collection;
 
 @Service
 @RequiredArgsConstructor
@@ -33,11 +37,19 @@ public class NotificationService {
         return notificationRepository.findNotificationsByUserId(userId, group.types(), pageable);
     }
 
-    // 알림 하나 읽음 (내 알림만, 이미 읽었으면 그대로)
+    // 고른 알림 읽음 (내 알림만, 이미 읽었으면 그대로). 한 번에 최대 100개
     @Transactional
-    public void markAsRead(Integer userId, Integer notificationId) {
-        notificationRepository.markAsRead(notificationId, userId);
+    public void markAsRead(Integer userId, Collection<Integer> notificationIds) {
+        if (notificationIds == null || notificationIds.isEmpty()) {
+            return;
+        }
+        if (notificationIds.size() > MAX_READ_IDS) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT, "한 번에 읽음 처리할 수 있는 알림은 " + MAX_READ_IDS + "개입니다.");
+        }
+        notificationRepository.markAsRead(notificationIds, userId);
     }
+
+    private static final int MAX_READ_IDS = 100;
     
     // userId가 일치하는 isRead 상태 업데이트
     @Transactional

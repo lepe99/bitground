@@ -9,5 +9,5 @@ export const fetchUnreadNotificationCount = async () => (await api.get('/notific
 // 모두 읽음 처리
 export const markAllNotificationsRead = () => api.patch('/notifications');
 
-// 알림 하나 읽음 (누른 알림만)
-export const markNotificationRead = (id) => api.patch(`/notifications/${id}/read`);
+// 고른 알림만 읽음 (누른 알림, 묶여 보이는 알림이면 함께)
+export const markNotificationsRead = (ids) => api.patch('/notifications/read', {ids});

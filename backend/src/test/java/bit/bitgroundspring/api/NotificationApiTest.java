@@ -9,6 +9,7 @@ import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsInAnyOrder;
@@ -70,5 +71,24 @@ class NotificationApiTest extends IntegrationTest {
         assertThat(notificationRepository.findById(mine.getId()).orElseThrow().getIsRead()).isTrue();
         assertThat(notificationRepository.findById(others.getId()).orElseThrow().getIsRead()).isFalse();
         mvc.perform(get("/notifications/count").cookie(cookie)).andExpect(jsonPath("$").value(1));
+    }
+
+    @Test
+    void 묶인_알림은_한_번에_읽음이_되고_남의_알림은_빠진다() throws Exception {
+        Notification a = save(me, Message.COMMENT);
+        Notification b = save(me, Message.COMMENT);
+        save(me, Message.NOTICE);
+        Notification others = save(other, Message.COMMENT);
+
+        mvc.perform(patch("/notifications/read").cookie(cookie).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"ids\":[" + a.getId() + "," + b.getId() + "," + others.getId() + "]}"))
+                .andExpect(status().isNoContent());
+
+        mvc.perform(get("/notifications/count").cookie(cookie)).andExpect(jsonPath("$").value(1));
+        assertThat(notificationRepository.findById(others.getId()).orElseThrow().getIsRead()).isFalse();
+
+        String tooMany = "{\"ids\":[" + "1,".repeat(100) + "1]}";
+        mvc.perform(patch("/notifications/read").cookie(cookie).contentType(MediaType.APPLICATION_JSON).content(tooMany))
+                .andExpect(status().isBadRequest());
     }
 }

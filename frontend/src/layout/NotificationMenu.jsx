@@ -1,7 +1,10 @@
 import {useCallback, useEffect, useRef, useState} from 'react';
 import {useNavigate} from 'react-router-dom';
 import {useNotifications} from '../notifications/useNotifications.js';
-import {fetchNotifications, markAllNotificationsRead, markNotificationRead} from '../api/notificationApi.js';
+import {fetchNotifications, markAllNotificationsRead, markNotificationsRead} from '../api/notificationApi.js';
+import {kindOf, targetOf} from '../notifications/notificationKinds.js';
+import KindIcon from '../notifications/KindIcon.jsx';
+import {groupNotifications, splitMessage, summarize} from '../notifications/groupNotifications.js';
 import {useMediaQuery} from '../hooks/useMediaQuery.js';
 
 const PAGE_SIZE = 15;
@@ -13,39 +16,6 @@ const GROUPS = [
     {value: 'COMMUNITY', label: '커뮤니티'},
     {value: 'SYSTEM', label: '공지·시즌'},
 ];
-
-// 알림 종류별 이동할 화면 (댓글·문의 알림은 그 게시글)
-const TARGETS = {
-    NOTICE: '/notice',
-    ORDER_EXECUTION: '/investments',
-    SEASON_UPDATE: '/rank',
-};
-const targetOf = (item) => ((item.messageType === 'COMMENT' || item.messageType === 'INQUIRY') && item.postId
-    ? `/community/${item.postId}` : TARGETS[item.messageType]);
-
-const ICON_PATHS = {
-    trade: <><path d="M7 17L17 7"/><path d="M9 7h8v8"/></>,
-    comment: <path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/>,
-    inquiry: <><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.5V14"/><path d="M12 17.2v.1"/></>,
-    notice: <><path d="M4 10v4h3l6 4V6L7 10H4z"/><path d="M17 9a4 4 0 0 1 0 6"/></>,
-    season: <><path d="M8 4h8v5a4 4 0 0 1-8 0V4z"/><path d="M8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4"/><path d="M12 13v4M9 20h6"/></>,
-};
-
-/** 알림 종류별 아이콘·색. 체결은 매수(빨강)·매도(파랑) */
-function kindOf(item) {
-    switch (item.messageType) {
-        case 'ORDER_EXECUTION':
-            return item.message?.includes('매도') ? {icon: 'trade', tone: 'bg-down/10 text-down'} : {icon: 'trade', tone: 'bg-up/10 text-up'};
-        case 'COMMENT':
-            return {icon: 'comment', tone: 'bg-brand-soft text-brand-fg'};
-        case 'INQUIRY':
-            return {icon: 'inquiry', tone: 'bg-brand-soft text-brand-fg'};
-        case 'NOTICE':
-            return {icon: 'notice', tone: 'bg-surface-2 text-fg'};
-        default:
-            return {icon: 'season', tone: 'bg-surface-2 text-fg'};
-    }
-}
 
 // 날짜(문자열·밀리초·Date 모두)의 그날 0시
 const startOfDay = (value) => {
@@ -76,37 +46,72 @@ function relativeTime(iso, now) {
     return `${d.getMonth() + 1}월 ${d.getDate()}일`;
 }
 
-/** 저장된 문구의 첫 줄은 제목, 나머지는 본문 */
-function splitMessage(message = '') {
-    const [title, ...rest] = message.split('\n');
-    return {title, body: rest.join('\n').trim()};
-}
-
-function NotificationItem({item, now, onOpen}) {
-    const {icon, tone} = kindOf(item);
-    const {title, body} = splitMessage(item.message);
-    const unread = !item.isRead;
+/** 알림 한 줄. 묶인 알림이면 합친 제목과 개수를 보이고, 펼치면 하나씩 볼 수 있다 */
+function NotificationItem({group, now, onOpen}) {
+    const [expanded, setExpanded] = useState(false);
+    const {items} = group;
+    const latest = items[0];
+    const many = items.length > 1;
+    const kind = kindOf({messageType: latest.messageType, message: items.map((i) => i.message).join(' ')});
+    const {title, body} = summarize(items);
+    const unread = items.some((i) => !i.isRead);
     return (
         <li>
-            <button
-                type="button"
-                onClick={() => onOpen(item)}
-                className={`flex w-full gap-3 px-4 py-3 text-left hover:bg-surface-2 ${unread ? 'bg-brand-soft/40' : ''}`}
-            >
-                <span className={`mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-full ${tone}`}>
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                        {ICON_PATHS[icon]}
-                    </svg>
-                </span>
-                <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                    <span className="flex items-start gap-2">
-                        <span className={`min-w-0 flex-1 text-sm leading-snug ${unread ? 'font-bold' : 'font-semibold text-fg-2'}`}>{title}</span>
-                        <span className="num shrink-0 pt-px text-[11px] text-fg-3">{relativeTime(item.createdAt, now)}</span>
+            <div className={`flex items-stretch ${unread ? 'bg-brand-soft/40' : ''}`}>
+                <button
+                    type="button"
+                    onClick={() => onOpen(items)}
+                    className="flex min-w-0 flex-1 gap-3 py-3 pl-4 text-left hover:bg-surface-2"
+                >
+                    <span className="relative mt-0.5">
+                        <KindIcon kind={kind}/>
+                        {many && (
+                            <span className="num absolute -right-1.5 -bottom-1 rounded-full border-2 border-surface bg-fg px-1 text-[10px] leading-[14px] font-bold text-bg">
+                                {items.length}
+                            </span>
+                        )}
                     </span>
-                    {body && <span className="line-clamp-2 whitespace-pre-line text-[13px] leading-relaxed text-fg-3">{body}</span>}
-                </span>
-                <span className={`mt-2 size-2 shrink-0 rounded-full ${unread ? 'bg-up' : 'bg-transparent'}`} aria-label={unread ? '읽지 않음' : undefined}/>
-            </button>
+                    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                        <span className="flex items-start gap-2">
+                            <span className={`min-w-0 flex-1 text-sm leading-snug ${unread ? 'font-bold' : 'font-semibold text-fg-2'}`}>{title}</span>
+                            <span className="num shrink-0 pt-px text-[11px] text-fg-3">{relativeTime(latest.createdAt, now)}</span>
+                        </span>
+                        {body && <span className="line-clamp-2 whitespace-pre-line text-[13px] leading-relaxed text-fg-3">{body}</span>}
+                    </span>
+                    <span className={`mt-2 size-2 shrink-0 rounded-full ${unread ? 'bg-up' : 'bg-transparent'}`} aria-label={unread ? '읽지 않음' : undefined}/>
+                </button>
+                {many ? (
+                    <button
+                        type="button"
+                        onClick={() => setExpanded((v) => !v)}
+                        aria-expanded={expanded}
+                        aria-label={expanded ? '묶인 알림 접기' : `묶인 알림 ${items.length}개 펼치기`}
+                        className="flex w-9 shrink-0 items-start justify-center pt-3.5 text-fg-3 hover:bg-surface-2 hover:text-fg"
+                    >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className={`transition-transform ${expanded ? 'rotate-180' : ''}`}>
+                            <path d="M6 9l6 6 6-6"/>
+                        </svg>
+                    </button>
+                ) : <span className="w-4 shrink-0"/>}
+            </div>
+            {many && expanded && (
+                <ul className="border-l-2 border-line ml-[34px]">
+                    {items.map((item) => {
+                        const one = splitMessage(item.message);
+                        return (
+                            <li key={item.id}>
+                                <button type="button" onClick={() => onOpen([item])} className="flex w-full items-start gap-2 py-2 pr-4 pl-3 text-left hover:bg-surface-2">
+                                    <span className="min-w-0 flex-1">
+                                        <span className={`block text-[13px] leading-snug ${item.isRead ? 'text-fg-2' : 'font-semibold'}`}>{one.title}</span>
+                                        {one.body && <span className="line-clamp-1 whitespace-pre-line text-xs text-fg-3">{one.body}</span>}
+                                    </span>
+                                    <span className="num shrink-0 text-[11px] text-fg-3">{relativeTime(item.createdAt, now)}</span>
+                                </button>
+                            </li>
+                        );
+                    })}
+                </ul>
+            )}
         </li>
     );
 }
@@ -147,14 +152,16 @@ function NotificationPanel({onNavigate, listClassName}) {
         }
     };
 
-    // 누른 알림만 읽음으로 바꾸고 해당 화면으로 이동
-    const open = (item) => {
-        if (!item.isRead) {
-            setItems((prev) => prev.map((n) => (n.id === item.id ? {...n, isRead: true} : n)));
-            setUnreadNotificationsCount((count) => Math.max(0, count - 1));
-            markNotificationRead(item.id).catch((error) => console.error('알림 읽음 처리 실패:', error));
+    // 누른 알림(묶음이면 묶인 알림 모두)만 읽음으로 바꾸고 해당 화면으로 이동
+    const open = (picked) => {
+        const ids = picked.filter((n) => !n.isRead).map((n) => n.id);
+        if (ids.length > 0) {
+            const unreadIds = new Set(ids);
+            setItems((prev) => prev.map((n) => (unreadIds.has(n.id) ? {...n, isRead: true} : n)));
+            setUnreadNotificationsCount((count) => Math.max(0, count - ids.length));
+            markNotificationsRead(ids).catch((error) => console.error('알림 읽음 처리 실패:', error));
         }
-        onNavigate(targetOf(item));
+        onNavigate(targetOf(picked[0]));
     };
 
     const readAll = () => {
@@ -163,13 +170,14 @@ function NotificationPanel({onNavigate, listClassName}) {
         markAllNotificationsRead().catch((error) => console.error('알림 읽음 처리 실패:', error));
     };
 
-    // 날짜별로 묶기 (목록은 최신순)
+    // 날짜별로 나누고, 같은 날 안에서 비슷한 알림을 묶는다 (목록은 최신순)
     const sections = [];
     for (const item of items) {
         const label = dayGroup(item.createdAt, now);
         if (sections.at(-1)?.label !== label) sections.push({label, items: []});
         sections.at(-1).items.push(item);
     }
+    for (const section of sections) section.groups = groupNotifications(section.items);
 
     return (
         <div className="flex min-h-0 flex-1 flex-col">
@@ -207,7 +215,7 @@ function NotificationPanel({onNavigate, listClassName}) {
                     <section key={section.label} aria-label={section.label}>
                         <h3 className="sticky top-0 z-10 bg-surface px-4 pt-3 pb-1 text-xs font-bold text-fg-3">{section.label}</h3>
                         <ul>
-                            {section.items.map((item) => <NotificationItem key={item.id} item={item} now={now} onOpen={open}/>)}
+                            {section.groups.map((group) => <NotificationItem key={group.key} group={group} now={now} onOpen={open}/>)}
                         </ul>
                     </section>
                 ))}
@@ -280,6 +288,14 @@ export default function NotificationMenu() {
 
     const unread = unreadNotificationsCount > 99 ? '99+' : unreadNotificationsCount;
 
+    // 읽지 않은 개수가 늘면 배지를 한 번 튀게 한다 (key가 바뀌면 애니메이션을 다시 시작)
+    const previousCount = useRef(unreadNotificationsCount);
+    const [bump, setBump] = useState(0);
+    useEffect(() => {
+        if (unreadNotificationsCount > previousCount.current) setBump((b) => b + 1);
+        previousCount.current = unreadNotificationsCount;
+    }, [unreadNotificationsCount]);
+
     return (
         <div ref={rootRef} className="relative">
             <button
@@ -295,7 +311,12 @@ export default function NotificationMenu() {
                     <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>
                 </svg>
                 {unreadNotificationsCount > 0 && (
-                    <span className="num absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-up px-1 text-[10px] font-bold text-white">
+                    <span
+                        key={bump}
+                        className={`num absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-up px-1 text-[10px] font-bold text-white ${
+                            bump > 0 ? 'motion-safe:animate-[badge-bump_450ms_ease-out]' : ''
+                        }`}
+                    >
                         {unread}
                     </span>
                 )}

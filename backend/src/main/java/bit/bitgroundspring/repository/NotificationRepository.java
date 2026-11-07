@@ -23,10 +23,10 @@ public interface NotificationRepository extends JpaRepository<Notification, Inte
     Page<NotificationProjection> findNotificationsByUserId(@Param("userId") Integer userId,
                                                            @Param("types") Collection<Message> types, Pageable pageable);
 
-    // 알림 하나 읽음 (내 알림만). 바뀐 행 수 (이미 읽었거나 남의 알림이면 0)
+    // 고른 알림만 읽음 (내 알림만, 묶인 알림은 여러 개). 바뀐 행 수 (이미 읽었거나 남의 알림이면 세지 않음)
     @Modifying(clearAutomatically = true)
-    @Query("UPDATE Notification n SET n.isRead = true WHERE n.id = :id AND n.user.id = :userId AND n.isRead = false")
-    int markAsRead(@Param("id") Integer id, @Param("userId") Integer userId);
+    @Query("UPDATE Notification n SET n.isRead = true WHERE n.id IN :ids AND n.user.id = :userId AND n.isRead = false")
+    int markAsRead(@Param("ids") Collection<Integer> ids, @Param("userId") Integer userId);
 
     // 공지·시즌 알림을 탈퇴하지 않은 모든 사용자에게 한 행씩 저장 (읽음 여부를 사용자별로 따로 갖도록)
     @Modifying
