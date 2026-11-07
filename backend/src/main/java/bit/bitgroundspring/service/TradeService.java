@@ -1,7 +1,6 @@
 package bit.bitgroundspring.service;
 
 import bit.bitgroundspring.aop.Loggable;
-import bit.bitgroundspring.client.UpbitClient;
 import bit.bitgroundspring.common.error.BusinessException;
 import bit.bitgroundspring.common.error.ErrorCode;
 import bit.bitgroundspring.common.money.Money;
@@ -29,7 +28,7 @@ public class TradeService {
     private final SeasonRepository seasonRepository;
     private final TradingWindow tradingWindow;
     private final OutboxEvents outbox;
-    private final UpbitClient upbitClient;
+    private final MarketPriceService marketPriceService;
 
     /** 슬리피지 허용 범위: 0.5% */
     private static final double SLIPPAGE_TOLERANCE = 0.005;
@@ -50,8 +49,8 @@ public class TradeService {
         Season season = seasonRepository.findByStatus(Status.PENDING)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NO_ACTIVE_SEASON));
         
-        // 2) 현재 시장가 조회
-        BigDecimal marketPrice = upbitClient.currentPrice(req.getSymbol());
+        // 2) 현재 시장가 (실시간 시세로 받아 둔 값, 없으면 업비트 REST)
+        BigDecimal marketPrice = marketPriceService.currentPrice(req.getSymbol());
 
         // 3) 주문 종류 분기
         BigDecimal execPrice = marketPrice;

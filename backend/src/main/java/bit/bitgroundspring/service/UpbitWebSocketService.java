@@ -21,6 +21,7 @@ import org.springframework.web.socket.client.WebSocketConnectionManager;
 import org.springframework.web.socket.client.standard.StandardWebSocketClient;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 
+import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -288,11 +289,12 @@ public class UpbitWebSocketService {
                 }
 
                 String symbol = tickerData.get("cd").asText();
-                double price = tickerData.get("tp").asDouble();
+                BigDecimal price = tickerData.get("tp").decimalValue();
+                // 체결 시각 (늦게 처리된 예전 시세가 새 시세를 덮지 않게). 없으면 받은 시각
+                long tradedAt = tickerData.has("ttms") ? tickerData.get("ttms").asLong() : System.currentTimeMillis();
 
-                if (symbol != null && !symbol.trim().isEmpty() && price > 0) {
-                    // 변경: 개선된 updatePrice 메서드 호출
-                    priceUpdateService.updatePrice(symbol, price);
+                if (symbol != null && !symbol.trim().isEmpty() && price.signum() > 0) {
+                    priceUpdateService.updatePrice(symbol, price, tradedAt);
                 }
             } catch (Exception e) {
                 if (!isShuttingDown.get()) {

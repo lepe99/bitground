@@ -5,9 +5,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
+
 /**
- * Upbit 실시간 시세를 받아 체결 조건을 만족한 예약 주문을 체결 큐로 넘긴다.
- * 시장가 주문은 주문마다 Upbit REST로 현재가를 다시 조회하므로 시세를 따로 저장하지 않는다.
+ * Upbit 실시간 시세를 받아 매매에 쓸 현재가로 남기고, 체결 조건을 만족한 예약 주문을 체결 큐로 넘긴다.
  */
 @Service
 @Slf4j
@@ -15,9 +16,16 @@ import org.springframework.stereotype.Service;
 public class PriceUpdateService {
 
     private final ReservedOrderBook orderBook;
+    private final MarketPriceService marketPriceService;
 
     @Async("priceUpdateTaskExecutor")
-    public void updatePrice(String symbol, double currentPrice) {
+    public void updatePrice(String symbol, BigDecimal price, long tradeTimestampMs) {
+        try {
+            marketPriceService.record(symbol, price, tradeTimestampMs);
+        } catch (RuntimeException e) {
+            log.warn("Failed to record latest price for {}: {}", symbol, e.getMessage());
+        }
+        double currentPrice = price.doubleValue();
         try {
             long claimed = orderBook.claimMatches(symbol, currentPrice);
             if (claimed > 0) {
