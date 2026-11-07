@@ -93,6 +93,19 @@ class OrderValidationTest extends IntegrationTest {
     class MarketOrder {
 
         @Test
+        void 지정가를_붙인_시장가_주문은_거부된다_시세보다_싸게_즉시_체결되지_않게() throws Exception {
+            // 기존: 시세와 0.5% 안쪽 차이면 그 가격으로 즉시 체결돼 싸게 사고 비싸게 팔기를 반복할 수 있었다
+            marketOrder("{\"symbol\":\"KRW-BTC\",\"orderType\":\"BUY\",\"totalPrice\":1000000,\"reservePrice\":%s}".formatted(PRICE * 0.996))
+                    .andExpect(problem(ErrorCode.INVALID_ORDER));
+            marketOrder("{\"symbol\":\"KRW-BTC\",\"orderType\":\"BUY\",\"totalPrice\":1000000}")
+                    .andExpect(status().isCreated());
+            marketOrder("{\"symbol\":\"KRW-BTC\",\"orderType\":\"SELL\",\"amount\":0.001,\"reservePrice\":%s}".formatted(PRICE * 1.004))
+                    .andExpect(problem(ErrorCode.INVALID_ORDER));
+            assertThat(orderRepository.findAll()).hasSize(1)
+                    .allSatisfy(o -> assertThat(o.getTradePrice()).isEqualByComparingTo(String.valueOf(PRICE)));
+        }
+
+        @Test
         void 음수_금액_매수는_거부되고_현금이_늘지_않는다() throws Exception {
             marketOrder("{\"symbol\":\"KRW-BTC\",\"orderType\":\"BUY\",\"totalPrice\":-1000000}")
                     .andExpect(problem(ErrorCode.INVALID_ORDER));

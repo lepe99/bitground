@@ -7,7 +7,7 @@ import lombok.Data;
 public class OrderRequestDto {
     private String symbol;
     private OrderType orderType;
-    private Double amount;        // SELL 또는 reserve 용도
-    private Double reservePrice;  // 예약주문일 경우만 사용
-    private Long totalPrice;    // BUY + market인 경우 사용
+    private Double amount;        // 매도 수량
+    private Double reservePrice;  // 받지 않음: 보내면 거절한다 (지정가는 예약 주문 API)
+    private Long totalPrice;      // 매수 금액(원)
 }

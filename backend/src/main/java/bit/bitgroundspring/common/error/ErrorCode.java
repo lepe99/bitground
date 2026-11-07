@@ -69,7 +69,6 @@ public enum ErrorCode {
     SEASON_SETTLING(HttpStatus.CONFLICT, "시즌 정산 중이에요. 새 시즌이 시작되면 다시 거래할 수 있어요."),
     INSUFFICIENT_CASH(HttpStatus.UNPROCESSABLE_ENTITY, "주문 가능 금액이 부족합니다."),
     INSUFFICIENT_ASSET(HttpStatus.UNPROCESSABLE_ENTITY, "주문 가능 수량이 부족합니다."),
-    PRICE_OUT_OF_RANGE(HttpStatus.UNPROCESSABLE_ENTITY, "지정가가 시장가에서 너무 벗어났습니다."),
 
     // 파일 업로드
     FILE_EMPTY(HttpStatus.BAD_REQUEST, "파일이 비어 있습니다."),

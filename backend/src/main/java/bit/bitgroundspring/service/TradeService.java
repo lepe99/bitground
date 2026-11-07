@@ -30,9 +30,6 @@ public class TradeService {
     private final OutboxEvents outbox;
     private final MarketPriceService marketPriceService;
 
-    /** 슬리피지 허용 범위: 0.5% */
-    private static final double SLIPPAGE_TOLERANCE = 0.005;
-
     @Transactional
     @Loggable("시장가 주문")
     public OrderResponseDto placeOrder(Integer userId, OrderRequestDto req) {
@@ -52,19 +49,9 @@ public class TradeService {
         // 2) 현재 시장가 (실시간 시세로 받아 둔 값, 없으면 업비트 REST)
         BigDecimal marketPrice = marketPriceService.currentPrice(req.getSymbol());
 
-        // 3) 주문 종류 분기
+        // 3) 시장가 주문은 항상 현재가로 체결한다
         BigDecimal execPrice = marketPrice;
         LocalDateTime now = LocalDateTime.now();
-
-        if (req.getReservePrice() != null) {
-            BigDecimal limitPrice = Money.price(Money.of(req.getReservePrice()));
-            BigDecimal diffRatio = limitPrice.subtract(marketPrice).abs()
-                    .divide(marketPrice, Money.PRICE_SCALE, RoundingMode.HALF_UP);
-            if (diffRatio.compareTo(BigDecimal.valueOf(SLIPPAGE_TOLERANCE)) > 0) {
-                throw new BusinessException(ErrorCode.PRICE_OUT_OF_RANGE);
-            }
-            execPrice = limitPrice;
-        }
 
         boolean isBuy = req.getOrderType() == OrderType.BUY;
 
@@ -147,8 +134,10 @@ public class TradeService {
         if (req.getSymbol() == null || req.getOrderType() == null) {
             throw new BusinessException(ErrorCode.INVALID_ORDER, "종목과 주문 종류는 필수입니다.");
         }
-        if (req.getReservePrice() != null && !(req.getReservePrice() > 0)) {
-            throw new BusinessException(ErrorCode.INVALID_ORDER, "지정가는 0보다 커야 합니다.");
+        // 기존: 지정가를 함께 보내면 시세와 0.5% 안쪽 차이인 그 가격으로 즉시 체결돼,
+        // 싸게 사고 비싸게 팔기를 반복해 자산을 늘릴 수 있었다. 지정가 주문은 예약 주문(/orders/reserve)으로만 받는다
+        if (req.getReservePrice() != null) {
+            throw new BusinessException(ErrorCode.INVALID_ORDER, "지정가 주문은 예약 주문으로 넣어 주세요.");
         }
         if (req.getOrderType() == OrderType.BUY) {
             if (req.getTotalPrice() == null || req.getTotalPrice() <= 0) {

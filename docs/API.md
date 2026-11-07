@@ -112,7 +112,6 @@
 | | `ORDER_NOT_PENDING` | 409 | 이미 체결되었거나 취소된 주문입니다. |
 | | `INSUFFICIENT_CASH` | 422 | 주문 가능 금액이 부족합니다. |
 | | `INSUFFICIENT_ASSET` | 422 | 주문 가능 수량이 부족합니다. |
-| | `PRICE_OUT_OF_RANGE` | 422 | 지정가가 시장가에서 너무 벗어났습니다. |
 | 파일 | `FILE_EMPTY` | 400 | 파일이 비어 있습니다. |
 | | `FILE_TOO_LARGE` | 413 | 파일 크기가 너무 큽니다. |
 | | `UNSUPPORTED_FILE_TYPE` | 415 | jpg, png, gif, webp 이미지만 업로드할 수 있습니다. |
@@ -163,7 +162,7 @@
 
 | 엔드포인트 | 설명 | 성공 |
 |---|---|---|
-| `POST /trade` | 시장가·지정가 즉시 주문 | `200` 체결 결과 |
+| `POST /trade` | 시장가 즉시 주문 (현재가 체결. `reservePrice`를 보내면 400, 지정가는 예약 주문으로) | `201` 체결 결과 |
 | `GET /trade/history?symbol=` | 종목 최근 체결 내역 | `200` |
 | `GET /orders?seasonId=` | 시즌별 내 주문 내역 | `200` |
 | `POST /orders/reserve` | 예약 주문 접수 | `201` |
