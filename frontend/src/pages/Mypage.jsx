@@ -5,10 +5,12 @@ import ProfileCard from "../components/mypage/ProfileCard.jsx";
 import SeasonReport from "../components/mypage/SeasonReport.jsx";
 import ProfileEditForm from "../components/mypage/ProfileEditForm.jsx";
 import AdminPanel from "../components/admin/AdminPanel.jsx";
+import NotificationSettings from "../components/mypage/NotificationSettings.jsx";
 
 const MENU = [
     {tab: "report", label: "투자 정보"},
     {tab: "profile", label: "프로필 수정"},
+    {tab: "notifications", label: "알림 설정"},
 ];
 // 관리자 계정에만 보인다 (권한은 서버가 확인)
 const ADMIN_MENU = {tab: "admin", label: "관리자"};
@@ -18,6 +20,7 @@ const MOBILE_LINKS = [
     {to: "/investments", label: "투자내역", desc: "보유 자산 · 거래내역 · 예약 주문"},
     {to: "/trends", label: "최신동향", desc: "코인 뉴스와 AI 시장 분석"},
     {to: "/notice", label: "공지사항", desc: "시즌 일정과 서비스 소식"},
+    {to: "/mypage?tab=notifications", label: "알림 설정", desc: "받을 알림 종류 · 실시간 팝업"},
 ];
 
 const Chevron = () => (
@@ -31,7 +34,7 @@ export default function Mypage() {
     const isAdmin = user?.role === "ROLE_ADMIN";
     const menu = isAdmin ? [...MENU, ADMIN_MENU] : MENU;
     const requested = searchParams.get("tab");
-    const tab = requested === "profile" || (requested === "admin" && isAdmin) ? requested : "report";
+    const tab = menu.some((m) => m.tab === requested) ? requested : "report";
 
     return (
         <div className="mx-auto grid max-w-[1280px] items-start gap-4 px-5 pt-4 pb-10 md:grid-cols-[220px_minmax(0,1fr)] md:gap-6 md:px-8 md:pt-8 md:pb-14">
@@ -58,13 +61,13 @@ export default function Mypage() {
                         </Link>
                         <AdminPanel/>
                     </>
-                ) : tab === "profile" ? (
+                ) : tab === "profile" || tab === "notifications" ? (
                     <>
                         <Link to="/mypage" className="flex items-center gap-1 text-sm font-semibold text-fg-2 md:hidden">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>
                             내 정보로
                         </Link>
-                        <ProfileEditForm/>
+                        {tab === "profile" ? <ProfileEditForm/> : <NotificationSettings/>}
                     </>
                 ) : (
                     <>

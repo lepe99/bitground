@@ -113,6 +113,19 @@ class EventPipelineTest extends IntegrationTest {
     }
 
     @Test
+    @DisplayName("체결 알림을 끈 사용자는 예약 주문이 체결돼도 알림이 저장·전송되지 않는다")
+    void mutedOrderExecutionStoresNothing() {
+        jdbc.update("INSERT INTO notification_settings (user_id, order_execution) VALUES (?, 0)", user.getId());
+
+        reserveAndExecute();
+
+        await(() -> outboxCount("published_at IS NOT NULL") == 1);
+        await(() -> redis.opsForStream().size(domainStream) == 0); // 처리 끝
+        assertThat(notificationRepository.count()).isZero();
+        assertThat(realtime("USER")).isEmpty();
+    }
+
+    @Test
     @DisplayName("시장가 체결도 이벤트로 남아 체결 내역이 방송되고, 알림은 만들지 않는다")
     void marketTradeIsBroadcast() throws Exception {
         doReturn(ResponseEntity.ok(List.of(Map.of("trade_price", 100_000_000))))

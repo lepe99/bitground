@@ -226,6 +226,12 @@ func run(ctx context.Context, db *sql.DB, cfg config.Config, now time.Time, jobs
 			return service.UpdateCoins(ctx, db)
 		}))
 	}
+	if flags.Coin { // 매일 0시
+		errs = append(errs, step("오래된 알림 정리", func(ctx context.Context) error {
+			_, err := service.PurgeOldNotifications(ctx, db, now)
+			return err
+		}))
+	}
 	if flags.Split {
 		errs = append(errs, step("스플릿(현금 지급)", func(ctx context.Context) error {
 			return service.UpdateSplit(ctx, db, cfg, schedule.SplitAt)

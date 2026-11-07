@@ -28,10 +28,24 @@ public interface NotificationRepository extends JpaRepository<Notification, Inte
     @Query("UPDATE Notification n SET n.isRead = true WHERE n.id IN :ids AND n.user.id = :userId AND n.isRead = false")
     int markAsRead(@Param("ids") Collection<Integer> ids, @Param("userId") Integer userId);
 
-    // 공지·시즌 알림을 탈퇴하지 않은 모든 사용자에게 한 행씩 저장 (읽음 여부를 사용자별로 따로 갖도록)
+    // 고른 알림 지우기 (내 알림만). 지운 개수
+    @Modifying(clearAutomatically = true)
+    @Query("DELETE FROM Notification n WHERE n.id IN :ids AND n.user.id = :userId")
+    int deleteByIds(@Param("ids") Collection<Integer> ids, @Param("userId") Integer userId);
+
+    // 읽은 알림 모두 지우기
+    @Modifying(clearAutomatically = true)
+    @Query("DELETE FROM Notification n WHERE n.user.id = :userId AND n.isRead = true")
+    int deleteRead(@Param("userId") Integer userId);
+
+    // 공지·시즌 알림을 탈퇴하지 않은 모든 사용자에게 한 행씩 저장 (읽음 여부를 사용자별로 따로 갖도록).
+    // 그 종류를 끈 사용자는 뺀다 (알림 설정)
     @Modifying
     @Query(value = "INSERT INTO notifications (user_id, message, message_type, is_read) " +
-            "SELECT u.id, :message, :messageType, 0 FROM users u WHERE u.is_deleted = 0", nativeQuery = true)
+            "SELECT u.id, :message, :messageType, 0 FROM users u WHERE u.is_deleted = 0 " +
+            "AND NOT EXISTS (SELECT 1 FROM notification_settings s WHERE s.user_id = u.id AND (" +
+            "(:messageType = 'NOTICE' AND s.notice = 0) OR (:messageType = 'SEASON_UPDATE' AND s.season_update = 0)))",
+            nativeQuery = true)
     int insertForAllUsers(@Param("message") String message, @Param("messageType") String messageType);
     
     Integer countByIsReadFalseAndUser_Id(Integer userId);

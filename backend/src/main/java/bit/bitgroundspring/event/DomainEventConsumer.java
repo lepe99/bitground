@@ -120,11 +120,13 @@ public class DomainEventConsumer {
             return;
         }
 
-        // 접속하지 않은 사이 체결돼도 알림이 남도록 먼저 저장한다. 같은 이벤트가 다시 오면 저장하지 않는다
+        // 접속하지 않은 사이 체결돼도 알림이 남도록 먼저 저장한다. 같은 이벤트가 다시 오면 저장하지 않고,
+        // 체결 알림을 끈 사용자에게는 저장도 실시간 전송도 하지 않는다 (알림 설정)
         int inserted = jdbc.update("""
                 INSERT IGNORE INTO notifications (user_id, message, message_type, event_id, is_read)
-                VALUES (?, ?, ?, ?, 0)
-                """, event.userId(), orderMessage(event), Message.ORDER_EXECUTION.name(), eventId);
+                SELECT ?, ?, ?, ?, 0 FROM DUAL
+                WHERE NOT EXISTS (SELECT 1 FROM notification_settings WHERE user_id = ? AND order_execution = 0)
+                """, event.userId(), orderMessage(event), Message.ORDER_EXECUTION.name(), eventId, event.userId());
         if (inserted == 0 || !fresh) {
             return;
         }

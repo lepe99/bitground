@@ -50,6 +50,24 @@ public class NotificationService {
     }
 
     private static final int MAX_READ_IDS = 100;
+
+    // 고른 알림 지우기 (내 알림만, 묶여 보이는 알림이면 함께). 한 번에 최대 100개
+    @Transactional
+    public void delete(Integer userId, Collection<Integer> notificationIds) {
+        if (notificationIds == null || notificationIds.isEmpty()) {
+            return;
+        }
+        if (notificationIds.size() > MAX_READ_IDS) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT, "한 번에 지울 수 있는 알림은 " + MAX_READ_IDS + "개입니다.");
+        }
+        notificationRepository.deleteByIds(notificationIds, userId);
+    }
+
+    // 읽은 알림 모두 지우기. 지운 개수
+    @Transactional
+    public int deleteRead(Integer userId) {
+        return notificationRepository.deleteRead(userId);
+    }
     
     // userId가 일치하는 isRead 상태 업데이트
     @Transactional

@@ -5,7 +5,9 @@ import bit.bitgroundspring.security.token.AuthUser;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import bit.bitgroundspring.dto.projection.NotificationProjection;
 import bit.bitgroundspring.entity.NotificationGroup;
+import bit.bitgroundspring.dto.NotificationSettingDto;
 import bit.bitgroundspring.service.NotificationService;
+import bit.bitgroundspring.service.NotificationSettingService;
 import bit.bitgroundspring.service.UserSseEmitters;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
@@ -24,6 +26,7 @@ public class NotificationController {
     
     private final UserSseEmitters userSseEmitters;
     private final NotificationService notificationService;
+    private final NotificationSettingService notificationSettingService;
     
     private static final Long SSE_TIMEOUT = 30 * 60 * 1000L; // 30분
     
@@ -73,6 +76,33 @@ public class NotificationController {
         return ResponseEntity.noContent().build();
     }
     
+    // 고른 알림 지우기 (?ids=1,2,3, 내 알림만)
+    @DeleteMapping
+    public ResponseEntity<Void> delete(@AuthenticationPrincipal AuthUser authUser, @RequestParam List<Integer> ids) {
+        notificationService.delete(authUser.id(), ids);
+        return ResponseEntity.noContent().build();
+    }
+
+    // 읽은 알림 모두 지우기
+    @DeleteMapping("/read")
+    public ResponseEntity<Void> deleteRead(@AuthenticationPrincipal AuthUser authUser) {
+        notificationService.deleteRead(authUser.id());
+        return ResponseEntity.noContent().build();
+    }
+
+    // 알림 설정 (종류별 받기, 실시간 토스트)
+    @GetMapping("/settings")
+    public NotificationSettingDto getSettings(@AuthenticationPrincipal AuthUser authUser) {
+        return notificationSettingService.get(authUser.id());
+    }
+
+    // 알림 설정 바꾸기 (보낸 항목만 바뀜)
+    @PutMapping("/settings")
+    public NotificationSettingDto updateSettings(@AuthenticationPrincipal AuthUser authUser,
+                                                 @RequestBody NotificationSettingDto request) {
+        return notificationSettingService.update(authUser.id(), request);
+    }
+
     @GetMapping("/count")
     public ResponseEntity<Integer> countUnreadNotifications(
             @AuthenticationPrincipal AuthUser authUser) {

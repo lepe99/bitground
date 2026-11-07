@@ -32,6 +32,7 @@ public class InquiryNotifier {
     private final NotificationRepository notificationRepository;
     private final UserRepository userRepository;
     private final UserSseEmitters userSseEmitters;
+    private final NotificationSettingService notificationSettingService;
 
     /** 새 문의 → 관리자들 */
     public void newInquiry(Post post, User author) {
@@ -46,7 +47,8 @@ public class InquiryNotifier {
         String title = "[" + shorten(post.getTitle(), TITLE_LENGTH) + "] “" + shorten(content, SNIPPET_LENGTH) + "”";
         User author = post.getUser();
         if (byAdmin) {
-            if (!author.getId().equals(commenter.getId())) {
+            if (!author.getId().equals(commenter.getId())
+                    && !notificationSettingService.receivers(Message.COMMENT, List.of(author.getId())).isEmpty()) {
                 save(List.of(notification(author.getId(), Message.COMMENT, "문의에 답변이 등록됐어요.\n" + title, post)));
             }
         } else if (author.getId().equals(commenter.getId())) {

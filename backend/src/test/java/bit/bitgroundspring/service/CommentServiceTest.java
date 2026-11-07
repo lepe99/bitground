@@ -9,6 +9,7 @@ import bit.bitgroundspring.entity.Post;
 import bit.bitgroundspring.entity.User;
 import bit.bitgroundspring.repository.CommentRepository;
 import bit.bitgroundspring.repository.NotificationRepository;
+import bit.bitgroundspring.repository.NotificationSettingRepository;
 import bit.bitgroundspring.repository.PostRepository;
 import bit.bitgroundspring.repository.UserRepository;
 import org.junit.jupiter.api.AfterEach;
@@ -49,7 +50,7 @@ class CommentServiceTest {
         userSseEmitters = mock(UserSseEmitters.class);
         PostRepository postRepository = mock(PostRepository.class);
         commentService = new CommentService(commentRepository, postRepository, userRepository, notificationRepository, userSseEmitters,
-                mock(InquiryNotifier.class));
+                mock(InquiryNotifier.class), new NotificationSettingService(mock(NotificationSettingRepository.class))); // 설정 없음: 모두 받음
 
         post = Post.builder().id(10).title("비트코인 전망").category(Category.CHAT).user(POST_AUTHOR).build();
         when(postRepository.findById(10)).thenReturn(Optional.of(post));

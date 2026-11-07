@@ -36,6 +36,7 @@ public class CommentService {
     private final NotificationRepository notificationRepository;
     private final UserSseEmitters userSseEmitters;
     private final InquiryNotifier inquiryNotifier;
+    private final NotificationSettingService notificationSettingService;
 
     // 알림 문구에 넣는 댓글·제목 길이 (notifications.message는 255자)
     private static final int SNIPPET_LENGTH = 40;
@@ -93,6 +94,7 @@ public class CommentService {
         messages.putIfAbsent(post.getUser().getId(),
                 writer.getName() + "님이 내 게시글에 댓글을 남겼어요.\n[" + shorten(post.getTitle(), TITLE_LENGTH) + "] " + snippet);
         messages.remove(writer.getId());
+        messages.keySet().retainAll(notificationSettingService.receivers(Message.COMMENT, messages.keySet())); // 댓글 알림을 끈 사람 빼기
         if (messages.isEmpty()) {
             return;
         }
