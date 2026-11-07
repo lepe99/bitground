@@ -53,7 +53,7 @@ public class OrderService {
     }
 
     public List<TradeSummaryDto> getTradeSummary(User user, Season season) {
-        List<Order> orders = orderRepository.findByUserAndSeason(user, season);
+        List<Order> orders = orderRepository.findCompletedByUserAndSeason(user, season);
 
         // 코인 심볼 기준 그룹
         Map<String, List<Order>> grouped = orders.stream()
@@ -110,7 +110,7 @@ public class OrderService {
         return summaries;
     }
     public List<TradeDetailDto> getTradeDetails(User user, Season season) {
-        List<Order> orders = orderRepository.findByUserAndSeason(user, season);
+        List<Order> orders = orderRepository.findCompletedByUserAndSeason(user, season);
 
         return orders.stream().map(order -> {
             String date = String.format("%02d-%02d",

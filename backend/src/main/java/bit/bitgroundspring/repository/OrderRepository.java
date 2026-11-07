@@ -21,9 +21,10 @@ import java.util.Optional;
 
 @Repository
 public interface OrderRepository extends JpaRepository<Order, Integer> {
-    /*마이페이지 사용*/
-    @Query("SELECT o FROM Order o JOIN FETCH o.coin WHERE o.user = :user AND o.season = :season")
-    List<Order> findByUserAndSeason(@Param("user") User user, @Param("season") Season season);
+    // 시즌 리포트(거래 요약·상세): 체결된 주문만, 시간순 (미체결 예약 주문은 체결가가 없어 합계에 넣을 수 없다)
+    @Query("SELECT o FROM Order o JOIN FETCH o.coin WHERE o.user = :user AND o.season = :season " +
+            "AND o.status = bit.bitgroundspring.entity.Status.COMPLETED ORDER BY o.createdAt, o.id")
+    List<Order> findCompletedByUserAndSeason(@Param("user") User user, @Param("season") Season season);
 
     @Query("SELECT o.id AS id, " +  // ✅ 추가
             "c.symbol AS symbol, c.koreanName AS coinName, " +
