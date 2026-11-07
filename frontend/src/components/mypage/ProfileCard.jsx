@@ -36,7 +36,7 @@ export default function ProfileCard() {
                 </span>
                 <span className="num text-sm text-fg-2">
                     {mine
-                        ? <>{mine.seasonName} · <strong className={TIER_TEXT[tier]}>{TIER_NAMES[tier]}</strong> {mine.ranks}위 (상위 {percentile}%)</>
+                        ? <>{mine.seasonName} · <strong className={TIER_TEXT[tier]}>{TIER_NAMES[tier]}</strong> <span className="whitespace-nowrap">{mine.ranks}위 (상위 {percentile}%)</span></>
                         : mine === null ? '이번 시즌 순위 집계 전이에요' : ' '}
                 </span>
             </div>

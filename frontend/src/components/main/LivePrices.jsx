@@ -36,7 +36,7 @@ export default function LivePrices() {
     }, [marketKey]);
 
     return (
-        <Card className="flex flex-col p-5 md:p-6">
+        <Card className="@container flex flex-col p-5 md:p-6">
             <div className="flex items-center justify-between pb-3">
                 <h2 className="text-base font-bold md:text-[17px]">실시간 시세</h2>
                 <span className="flex items-center gap-1.5 text-xs text-fg-3">
@@ -48,19 +48,20 @@ export default function LivePrices() {
                 {coins.map((coin) => {
                     const t = tickers[coin.market];
                     return (
-                        <li key={coin.market} className="border-t border-line first:border-t-0 md:first:border-t">
+                        <li key={coin.market} className="border-t border-line first:border-t-0 @xl:first:border-t">
                             <Link
                                 to={`/trade?market=${coin.market}`}
-                                className="grid grid-cols-[36px_1fr_auto_64px] items-center gap-3 py-3 md:grid-cols-[36px_1fr_120px_130px_76px]"
+                                className="grid grid-cols-[36px_minmax(0,1fr)_auto] items-center gap-x-3 py-3 @xl:grid-cols-[36px_minmax(0,1fr)_120px_130px_76px]"
                             >
-                                <CoinIcon symbol={coin.market}/>
-                                <span className="flex min-w-0 flex-col">
-                                    <span className="text-[15px] font-semibold">{coin.name}</span>
-                                    <span className="text-xs text-fg-3">{coin.market}</span>
+                                {/* 카드가 좁으면 가격 아래에 등락률, 넓으면 그래프·가격·등락률을 한 줄에 */}
+                                <span className="row-span-2 @xl:row-span-1"><CoinIcon symbol={coin.market}/></span>
+                                <span className="row-span-2 flex min-w-0 flex-col @xl:row-span-1">
+                                    <span className="truncate text-[15px] font-semibold">{coin.name}</span>
+                                    <span className="truncate text-xs text-fg-3">{coin.market}</span>
                                 </span>
-                                <Sparkline values={sparks[coin.market]} className={`hidden md:block ${changeColor(t?.changeRate)}`}/>
-                                <span className="num text-right text-[15px] font-semibold">{t ? formatKRW(t.price) : '—'}</span>
-                                <span className={`num text-right text-sm font-semibold ${changeColor(t?.changeRate)}`}>
+                                <Sparkline values={sparks[coin.market]} className={`hidden @xl:block ${changeColor(t?.changeRate)}`}/>
+                                <span className="num text-right text-[15px] font-semibold whitespace-nowrap">{t ? formatKRW(t.price) : '—'}</span>
+                                <span className={`num col-start-3 text-right text-sm font-semibold whitespace-nowrap @xl:col-start-auto ${changeColor(t?.changeRate)}`}>
                                     {t ? formatPercent(t.changeRate) : '—'}
                                 </span>
                             </Link>

@@ -32,7 +32,7 @@ export default function RankPodium({top, myUserId, onSelect, participants}) {
                             {mine && <span className="shrink-0 rounded-md border border-brand-fg px-1 text-[10px] font-bold text-brand-fg md:px-1.5 md:text-[11px]">나</span>}
                         </span>
                         <span className={`text-xs font-semibold max-md:hidden md:text-[13px] ${TIER_TEXT[u.tier] ?? 'text-fg-3'}`}>{TIER_NAMES[u.tier]}</span>
-                        <span className="num text-[13px] font-extrabold md:text-xl">{formatKRW(u.totalValue)}<span className="text-xs font-semibold text-fg-3">원</span></span>
+                        <span className="num text-[clamp(11px,3.5vw,13px)] font-extrabold md:text-xl">{formatKRW(u.totalValue)}<span className="text-xs font-semibold text-fg-3">원</span></span>
                     </Item>
                 );
             })}

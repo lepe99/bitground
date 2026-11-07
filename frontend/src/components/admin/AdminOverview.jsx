@@ -47,9 +47,10 @@ export default function AdminOverview() {
     const {users, trades, season, participants, schedulerRuns, ai, pendingInquiries} = data;
 
     return (
-        <div className="flex flex-col gap-4">
+        // 마이페이지 안(왼쪽 메뉴 옆)이라 화면보다 좁다: 칸 나누기는 이 영역 너비로 정한다
+        <div className="@container flex flex-col gap-4">
             <Section title="사용자">
-                <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+                <div className="grid grid-cols-2 gap-2 @2xl:grid-cols-4">
                     <Stat label="가입자" value={formatNumber(users.total)} sub={`오늘 +${formatNumber(users.joinedToday)}`}/>
                     <Stat label="오늘 거래한 사용자" value={formatNumber(users.activeToday)}/>
                     <Stat label="이용 정지" value={formatNumber(users.suspended)}/>
@@ -64,14 +65,14 @@ export default function AdminOverview() {
             </Section>
 
             <Section title="거래 (오늘)">
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-[repeat(auto-fit,minmax(7rem,1fr))] gap-2">
                     <Stat label="시장가 체결" value={formatNumber(trades.marketToday)}/>
                     <Stat label="예약 체결" value={formatNumber(trades.reservedToday)}/>
                     <Stat label="대기 중인 예약" value={formatNumber(trades.pendingReserved)}/>
                 </div>
             </Section>
 
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-4 @2xl:grid-cols-2">
                 <Section title="시즌">
                     {season ? (
                         <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">
@@ -103,7 +104,7 @@ export default function AdminOverview() {
             </div>
 
             <Section title="AI 운영">
-                <div className="grid gap-3 md:grid-cols-2">
+                <div className="grid gap-3 @2xl:grid-cols-2">
                     <div className="flex flex-col gap-1.5 rounded-xl bg-surface-2 px-4 py-3 text-sm">
                         <span className="text-xs text-fg-3">오늘의 AI 인사이트</span>
                         <span className="num text-xl font-extrabold">{ai.insightsToday}건</span>
@@ -120,7 +121,7 @@ export default function AdminOverview() {
             </Section>
 
             <Section title="모니터링 도구">
-                <div className="grid gap-2 md:grid-cols-2">
+                <div className="grid gap-2 @2xl:grid-cols-2">
                     {TOOLS.map((t) => (
                         <a key={t.label} href={t.href} target="_blank" rel="noopener noreferrer"
                            className="flex items-center justify-between rounded-xl border border-line px-4 py-3 hover:bg-surface-2">

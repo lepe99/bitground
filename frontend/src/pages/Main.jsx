@@ -48,7 +48,7 @@ export default function Main() {
 
             <SeasonSchedule/>
 
-            <section className="grid gap-4 md:grid-cols-[repeat(auto-fit,minmax(300px,1fr))] md:gap-5">
+            <section className="grid grid-cols-[minmax(0,1fr)] gap-4 md:grid-cols-[repeat(auto-fit,minmax(300px,1fr))] md:gap-5">
                 <MarketIndexCard/>
                 <TopCoins/>
                 <SeasonRankingPreview ranking={ranking}/>

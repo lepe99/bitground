@@ -109,8 +109,8 @@ export default function PostDetail() {
                 {/* 글쓴이 티어 기록 (문의는 제외) */}
                 {!inquiry && <div className="flex flex-wrap items-center gap-3 rounded-2xl bg-surface-2 p-4">
                     <Avatar src={post.profileImage} name={post.name} tier={post.tier} size="md" outline="text-surface-2"/>
-                    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                        <span className="text-sm font-semibold">{post.name}</span>
+                    <span className="flex min-w-[8rem] flex-1 flex-col gap-0.5">
+                        <span className="truncate text-sm font-semibold">{post.name}</span>
                         <span className="text-xs text-fg-3">
                             최고 티어{" "}
                             {post.highestTier ? <strong className={TIER_TEXT[post.highestTier]}>{TIER_NAMES[post.highestTier]}</strong> : "기록 없음"}

@@ -89,7 +89,7 @@ export default function AdminSeason() {
     };
 
     return (
-        <Card as="form" onSubmit={submit} className="flex flex-col gap-5 p-5">
+        <Card as="form" onSubmit={submit} className="@container flex flex-col gap-5 p-5">
             <div className="flex flex-col gap-1">
                 <h3 className="text-base font-bold">{season.name} 일정</h3>
                 <p className="text-xs text-fg-3">
@@ -102,7 +102,7 @@ export default function AdminSeason() {
                 <p className="rounded-xl bg-up/10 px-4 py-3 text-sm font-semibold text-up">종료 시각이 지나 정산을 기다리는 중이라 바꿀 수 없어요.</p>
             ) : (
                 <>
-                    <div className="grid gap-4 md:grid-cols-2">
+                    <div className="grid gap-4 @2xl:grid-cols-2">
                         <div className="flex flex-col gap-1.5">
                             <span className="text-sm font-semibold">스플릿 2 시작 <span className="font-normal text-fg-3">(1,000만원 추가 지급)</span></span>
                             <HourInput name="스플릿 2 시작" value={splitAt} onChange={setSplitAt} disabled={splitStarted}/>

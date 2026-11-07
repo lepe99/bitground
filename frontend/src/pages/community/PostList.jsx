@@ -123,14 +123,14 @@ export default function PostList() {
                                         )}
                                     </span>
                                 </span>
-                                <span className="num flex items-center gap-2 text-xs text-fg-3">
+                                <span className="num flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-fg-3">
                                     <Avatar src={post.profileImage} name={post.name} tier={post.tier} size="xs"/>
-                                    <span className="font-semibold text-fg-2">{post.name}</span>
-                                    <span>· {postTime(post.createdAt)}</span>
+                                    <span className="max-w-[10rem] truncate font-semibold text-fg-2">{post.name}</span>
+                                    <span className="whitespace-nowrap">· {postTime(post.createdAt)}</span>
                                     {post.category === INQUIRY ? (
-                                        <span className="ml-auto">{INQUIRY_TYPE_LABEL[post.inquiryType] ?? "기타"}</span>
+                                        <span className="ml-auto whitespace-nowrap">{INQUIRY_TYPE_LABEL[post.inquiryType] ?? "기타"}</span>
                                     ) : (
-                                        <span className="ml-auto flex gap-3">
+                                        <span className="ml-auto flex gap-3 whitespace-nowrap">
                                             <span>조회 {post.views}</span>
                                             <span>좋아요 {post.likes}</span>
                                         </span>

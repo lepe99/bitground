@@ -26,7 +26,7 @@ const rateOf = (text) => parseFloat(String(text ?? '').replace(/[^\d.-]/g, '')) 
 function ScoreRing({score}) {
     const value = Math.max(0, Math.min(100, Number(score) || 0));
     return (
-        <div className="relative size-[132px] shrink-0 md:size-[150px]">
+        <div className="relative size-[132px] shrink-0 @2xl:size-[150px]">
             <svg viewBox="0 0 120 120" className="size-full" role="img" aria-label={`시즌 점수 ${value}점`}>
                 <circle cx="60" cy="60" r="50" fill="none" className="stroke-surface-2" strokeWidth="10"/>
                 <circle cx="60" cy="60" r="50" fill="none" className="stroke-brand" strokeWidth="10" strokeLinecap="round"
@@ -79,7 +79,7 @@ function AdviceView({advice}) {
 
     return (
         <>
-            <div className="flex w-full flex-col items-center gap-3 md:w-[220px] md:shrink-0">
+            <div className="flex w-full flex-col items-center gap-3 @2xl:w-[220px] @2xl:shrink-0">
                 <ScoreRing score={advice.score}/>
                 <span className="text-sm font-bold">시즌 점수</span>
                 {review?.scoreBreakdown?.length > 0 && (
@@ -283,18 +283,22 @@ export default function SeasonReport() {
     ];
 
     return (
-        <div className="flex flex-col gap-3 md:gap-4">
+        // 칸 나누기는 화면이 아니라 리포트가 실제로 차지하는 너비로 정한다 (PC 마이페이지는 왼쪽 메뉴만큼 좁다)
+        <div className="@container flex flex-col gap-3 md:gap-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
                 <h2 className="text-lg font-extrabold md:text-[22px]">시즌 리포트</h2>
                 <SeasonPicker seasons={seasons} value={seasonId} onChange={setSeasonId}/>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 md:grid-cols-4 md:gap-3">
+            {/* 2칸, 충분히 넓을 때만 4칸. 글자 크기는 너비에 맞춰 줄이고, 그래도 길면 칸 안에서 줄바꿈 */}
+            <div className="grid grid-cols-2 gap-2 md:gap-3 @4xl:grid-cols-4">
                 {stats.map((s) => (
-                    <Card key={s.label} className="flex flex-col gap-1 rounded-2xl p-4 md:px-5">
-                        <span className="text-xs text-fg-3 md:text-[13px]">{s.label}</span>
-                        <span className={`num flex items-center gap-1.5 text-lg font-extrabold md:text-[22px] ${s.tone ?? ''}`}>
-                            {s.tier > 0 && <TierBadge tier={s.tier} size={22}/>}
+                    <Card key={s.label} className="flex min-w-0 flex-col gap-1 rounded-2xl p-4 md:px-5">
+                        <span className="flex items-center gap-1.5 text-xs text-fg-3 md:text-[13px]">
+                            {s.label}
+                            {s.tier > 0 && <TierBadge tier={s.tier} size={18}/>}
+                        </span>
+                        <span className={`num min-w-0 text-[clamp(15px,5cqw,22px)] font-extrabold leading-tight [overflow-wrap:anywhere] @4xl:text-[20px] ${s.tone ?? ''}`}>
                             {report ? s.value : '…'}
                         </span>
                         <span className="num text-xs text-fg-3">{report ? s.sub : ''}</span>
@@ -302,7 +306,7 @@ export default function SeasonReport() {
                 ))}
             </div>
 
-            <Card className="flex flex-col items-center gap-5 p-5 md:flex-row md:items-start md:gap-8 md:p-7">
+            <Card className="flex flex-col items-center gap-5 p-5 md:p-7 @2xl:flex-row @2xl:items-start @2xl:gap-8">
                 {advice ? (
                     <AdviceView advice={advice}/>
                 ) : advice === undefined || !report ? (
@@ -325,19 +329,18 @@ export default function SeasonReport() {
             </Card>
 
             {summary.length > 0 && (
-                <div className="grid gap-2 md:grid-cols-3 md:gap-3">
+                // 좁으면 한 줄에 하나(값은 오른쪽), 넓으면 3칸(값은 이름 아래)
+                <div className="grid gap-2 md:gap-3 @3xl:grid-cols-3">
                     {[
                         ['최다 투자 종목', top, `매수 ${formatKRW(top?.buyAmount)}원`, 'text-fg-2'],
                         ['최고 수익 종목', best, best?.returnRate, changeColor(rateOf(best?.returnRate))],
                         ['최저 수익 종목', worst, worst?.returnRate, changeColor(rateOf(worst?.returnRate))],
                     ].map(([label, coin, value, tone]) => (
-                        <Card key={label} className="flex items-center gap-3.5 rounded-2xl p-4 md:px-5">
-                            <CoinIcon symbol={coin?.coin ?? ''} size={40}/>
-                            <span className="flex min-w-0 flex-1 flex-col">
-                                <span className="text-xs text-fg-3">{label}</span>
-                                <span className="truncate text-base font-bold">{coin?.koreanName}</span>
-                            </span>
-                            <span className={`num text-[15px] font-bold ${tone}`}>{value}</span>
+                        <Card key={label} className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3.5 rounded-2xl p-4 md:px-5 @3xl:grid-cols-[auto_minmax(0,1fr)]">
+                            <span className="col-start-1 row-span-2 row-start-1 @3xl:row-span-3"><CoinIcon symbol={coin?.coin ?? ''} size={40}/></span>
+                            <span className="col-start-2 row-start-1 truncate text-xs text-fg-3">{label}</span>
+                            <span className="col-start-2 row-start-2 truncate text-base font-bold">{coin?.koreanName}</span>
+                            <span className={`num col-start-3 row-span-2 row-start-1 text-right text-[15px] font-bold whitespace-nowrap @3xl:col-start-2 @3xl:row-span-1 @3xl:row-start-3 @3xl:text-left ${tone}`}>{value}</span>
                         </Card>
                     ))}
                 </div>
@@ -354,8 +357,8 @@ export default function SeasonReport() {
                         <p className="border-t border-line px-5 py-10 text-center text-sm text-fg-3">이 시즌의 거래가 없어요.</p>
                     ) : (
                         <>
-                        {/* 모바일: 종목마다 카드 (8칸 표를 가로로 밀어 보지 않게) */}
-                        <ul className="md:hidden">
+                        {/* 좁을 때(모바일, 좁은 PC 창): 종목마다 카드 (8칸 표를 가로로 밀어 보지 않게) */}
+                        <ul className="@3xl:hidden">
                             {summary.map((s) => (
                                 <li key={s.coin} className="num flex flex-col gap-2.5 border-t border-line px-4 py-3.5">
                                     <div className="flex items-center gap-3">
@@ -386,8 +389,8 @@ export default function SeasonReport() {
                                 </li>
                             ))}
                         </ul>
-                        <div className="overflow-x-auto max-md:hidden">
-                            <table className="num w-full min-w-[640px] text-sm">
+                        <div className="hidden overflow-x-auto @3xl:block">
+                            <table className="num w-full min-w-[640px] text-sm whitespace-nowrap">
                                 <thead className="text-xs text-fg-3">
                                     <tr className="border-t border-line">
                                         {['종목', '최초 매수', '총 매수', '총 매도', '평균 매수가', '평균 매도가', '수익률', '수익금'].map((h, i) => (
@@ -424,7 +427,7 @@ export default function SeasonReport() {
                                     <span className="w-12 text-xs text-fg-3">{d.date}</span>
                                     <span className={`w-9 font-bold ${d.type === '매수' ? 'text-up' : 'text-down'}`}>{d.type}</span>
                                     <span className="min-w-0 flex-1 truncate font-semibold">{d.koreanName}</span>
-                                    <span className="text-right text-fg-2 max-sm:hidden">{d.qty}</span>
+                                    <span className="hidden text-right text-fg-2 @md:inline">{d.qty}</span>
                                     <span className="w-28 text-right font-semibold">{formatKRW(d.total)}원</span>
                                 </li>
                             ))}

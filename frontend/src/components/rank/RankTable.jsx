@@ -6,34 +6,35 @@ import {TIER_NAMES, TIER_TEXT} from '../../constants/tiers.js';
 import {formatKRW} from '../../utils/format.js';
 
 const PAGE = 20;
-const COLS = 'md:grid-cols-[56px_minmax(0,1fr)_120px_160px]';
+// 표의 칸은 화면이 아니라 표 카드 너비로 정한다 (PC에서는 옆에 티어 안내가 있어 좁다)
+const COLS = '@xl:grid-cols-[56px_minmax(0,1fr)_120px_160px]';
 
 function RankRow({u, mine, onSelect, participants}) {
     const Row = onSelect ? 'button' : 'div';
     return (
-        <li className="border-t border-line first:border-t-0 md:first:border-t">
+        <li className="border-t border-line first:border-t-0 @xl:first:border-t">
             <Row
                 {...(onSelect && {type: 'button', onClick: () => onSelect(u)})}
                 aria-current={mine || undefined}
-                className={`flex w-full items-center gap-3 px-4 py-2.5 text-left md:grid md:px-5 ${COLS} ${
+                className={`flex w-full items-center gap-3 px-4 py-2.5 text-left @xl:grid @xl:px-5 ${COLS} ${
                     mine ? 'bg-brand-soft shadow-[inset_3px_0_0_var(--color-brand)]' : 'hover:bg-surface-2'
                 }`}
             >
-                <span className="num w-6 text-[15px] font-bold text-fg-2 md:w-auto md:text-fg">{u.ranks}</span>
+                <span className="num w-6 shrink-0 text-[15px] font-bold text-fg-2 @xl:w-auto @xl:text-fg">{u.ranks}</span>
                 <span className="flex min-w-0 flex-1 items-center gap-3">
                     <TierHistoryHover user={u} participants={participants}>
                         <Avatar src={u.profileImage} name={u.name} tier={u.tier} size="md" outline={mine ? 'text-brand-soft' : 'text-surface'}/>
                     </TierHistoryHover>
                     <span className="flex min-w-0 flex-col">
                         <span className="flex items-center gap-1.5">
-                            <span className="truncate text-[15px] font-semibold md:text-sm">{u.name}</span>
+                            <span className="truncate text-[15px] font-semibold @xl:text-sm">{u.name}</span>
                             {mine && <span className="shrink-0 rounded-md border border-brand-fg px-1.5 text-[11px] font-bold text-brand-fg">나</span>}
                         </span>
-                        <span className={`text-xs font-semibold md:hidden ${TIER_TEXT[u.tier] ?? 'text-fg-3'}`}>{TIER_NAMES[u.tier]}</span>
+                        <span className={`text-xs font-semibold @xl:hidden ${TIER_TEXT[u.tier] ?? 'text-fg-3'}`}>{TIER_NAMES[u.tier]}</span>
                     </span>
                 </span>
-                <span className={`text-[13px] font-semibold max-md:hidden ${TIER_TEXT[u.tier] ?? 'text-fg-3'}`}>{TIER_NAMES[u.tier]}</span>
-                <span className="num text-right text-sm font-semibold">{formatKRW(u.totalValue)}원</span>
+                <span className={`text-[13px] font-semibold @max-xl:hidden ${TIER_TEXT[u.tier] ?? 'text-fg-3'}`}>{TIER_NAMES[u.tier]}</span>
+                <span className="num shrink-0 text-right text-sm font-semibold whitespace-nowrap">{formatKRW(u.totalValue)}원</span>
             </Row>
         </li>
     );
@@ -52,8 +53,8 @@ export default function RankTable({rows, myUserId, onSelect, participants}) {
     const pinned = myIndex >= shown ? rows[myIndex] : null;
 
     return (
-        <Card className="overflow-hidden">
-            <div className={`hidden gap-3 px-5 py-3 text-xs font-semibold text-fg-3 md:grid ${COLS}`}>
+        <Card className="@container overflow-hidden">
+            <div className={`hidden gap-3 px-5 py-3 text-xs font-semibold text-fg-3 @xl:grid ${COLS}`}>
                 <span>순위</span>
                 <span>참가자</span>
                 <span>티어</span>
