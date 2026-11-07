@@ -48,6 +48,10 @@ public class RateLimitFilter extends OncePerRequestFilter {
             // 업로드: S3 저장 공간·트래픽
             new Rule("upload", "POST", "/uploads/images", 10, 60, false),
             new Rule("upload", "PUT", "/users/me", 10, 60, false),
+            // 커뮤니티 쓰기: 스크립트로 글·댓글을 쏟아내는 것 방지 (댓글마다 알림 행도 생긴다)
+            new Rule("post", "POST", "/posts/form", 5, 60, false),
+            new Rule("comment", "POST", "/comments", 20, 60, false),
+            new Rule("reaction", "POST", "/reactions", 60, 60, false),
             // AI 조언 생성(버튼 요청): Gemini 호출 비용. 조회(GET)는 제한하지 않음
             new Rule("ai", "POST", "/mypage/ai-advice", 5, 60, false),
             // 로그인 시도·토큰 재발급: 비로그인 상태에서도 호출되므로 IP 기준

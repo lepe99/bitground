@@ -152,7 +152,10 @@
 |---|---|---|
 | `POST /trade`, `POST /orders/reserve` (주문) | 사용자 | 30 |
 | `POST /uploads/images`, `PUT /users/me` (이미지 업로드) | 사용자 | 10 |
-| `GET /mypage/ai-advice` (Gemini 호출) | 사용자 | 5 |
+| `POST /posts/form` (글쓰기) | 사용자 | 5 |
+| `POST /comments` (댓글) | 사용자 | 20 |
+| `POST /reactions` (좋아요·싫어요) | 사용자 | 60 |
+| `POST /mypage/ai-advice` (AI 리뷰 생성, Gemini 호출) | 사용자 | 5 |
 | `GET /oauth2/authorization/**` (로그인 시도) | IP | 20 |
 | `POST /auth/refresh` | IP | 30 |
 
