@@ -41,6 +41,9 @@ class AdminSeasonScheduleTest extends IntegrationTest {
         adminCookie = fixtures.login(fixtures.admin());
         season = fixtures.activeSeason();
         hour = LocalDateTime.now().truncatedTo(ChronoUnit.HOURS);
+        // 시즌 시작을 일주일 전으로: "2시간 전 스플릿" 같은 과거 시각이 0~2시에도 시즌 시작보다 앞서지 않게
+        // (기존: 시작일이 오늘이라 0~2시에 실행하면 실패)
+        season.setStartAt(hour.toLocalDate().minusDays(7));
         schedule(hour.plusDays(3), hour.plusDays(10));
     }
 
