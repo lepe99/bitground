@@ -14,6 +14,7 @@ export const targetOf = ({messageType, postId}) => ((messageType === 'COMMENT' |
 export function kindOf({messageType, message = ''}) {
     switch (messageType) {
         case 'ORDER_EXECUTION': {
+            if (message.startsWith('상장 폐지')) return {icon: 'trade', tone: 'bg-surface-2 text-fg'};
             const sell = message.includes('매도');
             const buy = message.includes('매수');
             if (sell && buy) return {icon: 'trade', tone: 'bg-surface-2 text-fg'};

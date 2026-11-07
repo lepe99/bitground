@@ -7,10 +7,13 @@ export function splitMessage(message = '') {
     return {title, body: rest.join('\n').trim()};
 }
 
-/** 같은 묶음이 되는 기준: 같은 글의 댓글·문의 알림, 예약 주문 체결. 공지·시즌은 묶지 않는다 */
-export function groupKey({messageType, postId}) {
+/**
+ * 같은 묶음이 되는 기준: 같은 글의 댓글·문의 알림, 예약 주문 체결. 공지·시즌은 묶지 않는다.
+ * 거래 알림 중 상장 폐지 정리·취소 안내는 체결과 문구가 달라 묶지 않는다
+ */
+export function groupKey({messageType, postId, message = ''}) {
     if ((messageType === 'COMMENT' || messageType === 'INQUIRY') && postId) return `post:${postId}`;
-    if (messageType === 'ORDER_EXECUTION') return 'order';
+    if (messageType === 'ORDER_EXECUTION' && message.startsWith('예약')) return 'order';
     return null;
 }
 

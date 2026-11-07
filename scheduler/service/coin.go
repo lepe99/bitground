@@ -2,7 +2,6 @@ package service
 
 import (
 	"Bitground-go/model"
-	"Bitground-go/util"
 	"context"
 	"database/sql"
 	"fmt"
@@ -27,16 +26,11 @@ func UpdateCoins(ctx context.Context, db *sql.DB) error {
 		return nil
 	})
 
-	// 2. 심볼에 해당하는 코인 정보들 가져오기
-	// 3. DB에서 코인 심볼 목록을 조회하여 is_deleted 업데이트
+	// 2. 심볼에 해당하는 코인 정보들 가져오기 (상장 폐지 표시는 매시간 SyncDelistings가 맡는다)
 	g.Go(func() error {
 		details, err := getCoinDetails(gCtx) // gCtx를 사용
 		if err != nil {
 			return fmt.Errorf("getCoinDetails 에러: %w", err)
-		}
-		// getCoinDetails가 성공적으로 완료된 후에 updateDeletedVal을 호출합니다.
-		if err := updateDeletedVal(gCtx, db, details); err != nil { // gCtx를 사용
-			return fmt.Errorf("updateDeletedVal 에러: %w", err)
 		}
 		coinDetailList = details // 결과 저장
 		return nil
@@ -124,104 +118,6 @@ func prepareCoinSymbols(coinList []model.UpbitCoinList, coinDetailList map[strin
 	}
 
 	return coinSymbols
-}
-
-// db에서 코인 심볼 목록을 조회합니다.
-// coinDetailList에 있는데 is_deleted가 true라면 false로 업데이트
-// coinDetailList에 없는데 is_deleted가 false라면 true로 업데이트
-func updateDeletedVal(ctx context.Context, db *sql.DB, coinDetailList map[string]model.UpbitCoinPrice) error {
-	// 쿼리 타임아웃 설정 (20초)
-	queryCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
-	defer cancel()
-
-	// 트랜잭션 시작
-	tx, err := db.BeginTx(queryCtx, nil)
-	if err != nil {
-		return fmt.Errorf("트랜잭션 시작 에러: %w", err)
-	}
-	defer func() {
-		if p := recover(); p != nil {
-			_ = tx.Rollback()
-			panic(p)
-		} else if err != nil {
-			_ = tx.Rollback()
-		}
-	}()
-
-	query := `
-		SELECT symbol, is_deleted
-		FROM coins
-    `
-
-	// 쿼리 실행
-	rows, err := tx.QueryContext(queryCtx, query)
-	if err != nil {
-		return fmt.Errorf("쿼리 실행 에러: %w", err)
-	}
-	defer func(rows *sql.Rows) {
-		if err := rows.Close(); err != nil {
-			slog.WarnContext(ctx, "행 닫기 실패", "error", err)
-		}
-	}(rows)
-
-	var symbolsToSetTrue []string
-	var symbolsToSetFalse []string
-
-	for rows.Next() {
-		var testSymbol model.CoinSymbol
-		if err := rows.Scan(&testSymbol.Symbol, &testSymbol.IsDeleted); err != nil {
-			return fmt.Errorf("rows.Scan 에러: %w", err)
-		}
-
-		// coinDetailList에 있는지 확인
-		if _, exists := coinDetailList[testSymbol.Symbol]; exists {
-			// coinDetailList에 있는데 is_deleted가 true라면 false로 업데이트
-			if testSymbol.IsDeleted {
-				symbolsToSetFalse = append(symbolsToSetFalse, testSymbol.Symbol)
-			}
-		} else {
-			// coinDetailList에 없는데 is_deleted가 false라면 true로 업데이트
-			if !testSymbol.IsDeleted {
-				symbolsToSetTrue = append(symbolsToSetTrue, testSymbol.Symbol)
-			}
-		}
-	}
-
-	if err := rows.Err(); err != nil { // rows.Err()로 반복 중 발생한 에러 확인
-		return fmt.Errorf("rows 반복 중 에러: %w", err)
-	}
-
-	// is_deleted를 true로 업데이트할 심볼들이 있다면 배치 업데이트
-	if len(symbolsToSetTrue) > 0 {
-		args := make([]interface{}, len(symbolsToSetTrue))
-		for i, symbol := range symbolsToSetTrue {
-			args[i] = symbol
-		}
-
-		updateQuery := fmt.Sprintf(`UPDATE coins SET is_deleted = true WHERE symbol IN (%s)`,
-			util.GeneratePlaceholders(len(symbolsToSetTrue)))
-
-		if _, err := tx.ExecContext(queryCtx, updateQuery, args...); err != nil {
-			return fmt.Errorf("is_deleted = true 업데이트 에러: %w", err)
-		}
-	}
-
-	// is_deleted를 false로 업데이트할 심볼들이 있다면 배치 업데이트
-	if len(symbolsToSetFalse) > 0 {
-		args := make([]interface{}, len(symbolsToSetFalse))
-		for i, symbol := range symbolsToSetFalse {
-			args[i] = symbol
-		}
-
-		updateQuery := fmt.Sprintf(`UPDATE coins SET is_deleted = false WHERE symbol IN (%s)`,
-			util.GeneratePlaceholders(len(symbolsToSetFalse)))
-
-		if _, err := tx.ExecContext(queryCtx, updateQuery, args...); err != nil {
-			return fmt.Errorf("is_deleted = false 업데이트 에러: %w", err)
-		}
-	}
-
-	return tx.Commit() // 트랜잭션 커밋
 }
 
 // db에 코인 심볼 목록을 저장합니다.

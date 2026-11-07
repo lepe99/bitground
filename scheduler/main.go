@@ -232,6 +232,10 @@ func run(ctx context.Context, db *sql.DB, cfg config.Config, now time.Time, jobs
 			return err
 		}))
 	}
+	// 업비트 목록에서 사라진 코인(거래지원 종료)은 매시간 상장 폐지로 표시하고 보유분을 정리한다 (랭킹보다 먼저)
+	errs = append(errs, step("상장 폐지 확인", func(ctx context.Context) error {
+		return service.SyncDelistings(ctx, db)
+	}))
 	if flags.Split {
 		errs = append(errs, step("스플릿(현금 지급)", func(ctx context.Context) error {
 			return service.UpdateSplit(ctx, db, cfg, schedule.SplitAt)
