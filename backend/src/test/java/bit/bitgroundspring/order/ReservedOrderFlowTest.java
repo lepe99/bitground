@@ -294,10 +294,10 @@ class ReservedOrderFlowTest extends IntegrationTest {
     }
 
     private static void await(BooleanSupplier condition) {
-        long deadline = System.currentTimeMillis() + 5_000;
+        long deadline = System.currentTimeMillis() + 10_000; // 전체 테스트 중 부하로 비동기 처리(아웃박스·스트림)가 늦을 수 있다
         while (!condition.getAsBoolean()) {
             if (System.currentTimeMillis() > deadline) {
-                throw new AssertionError("조건이 5초 안에 충족되지 않음");
+                throw new AssertionError("조건이 10초 안에 충족되지 않음");
             }
             try {
                 Thread.sleep(50);

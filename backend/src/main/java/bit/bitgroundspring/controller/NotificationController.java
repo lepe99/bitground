@@ -4,6 +4,7 @@ import bit.bitgroundspring.common.response.PageResponse;
 import bit.bitgroundspring.security.token.AuthUser;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import bit.bitgroundspring.dto.projection.NotificationProjection;
+import bit.bitgroundspring.entity.NotificationGroup;
 import bit.bitgroundspring.service.NotificationService;
 import bit.bitgroundspring.service.UserSseEmitters;
 import lombok.RequiredArgsConstructor;
@@ -36,14 +37,22 @@ public class NotificationController {
         return emitter;
     }
     
-    // 나한테 온 알림, 전체 알림, 안읽은 알림 개수 조회
+    // 내 알림 목록 (group: ALL·TRADE·COMMUNITY·SYSTEM 탭, 잘못된 값이면 400)
     @GetMapping
     public PageResponse<NotificationProjection> getNotifications(
-            @AuthenticationPrincipal AuthUser authUser, Pageable pageable) {
-        Integer userId = authUser.id();
-        return PageResponse.of(notificationService.findNotifications(userId, pageable));
+            @AuthenticationPrincipal AuthUser authUser,
+            @RequestParam(defaultValue = "ALL") NotificationGroup group, Pageable pageable) {
+        return PageResponse.of(notificationService.findNotifications(authUser.id(), group, pageable));
     }
-    
+
+    // 알림 하나 읽음 (누른 알림만)
+    @PatchMapping("/{id}/read")
+    public ResponseEntity<Void> markOneAsRead(@AuthenticationPrincipal AuthUser authUser, @PathVariable Integer id) {
+        notificationService.markAsRead(authUser.id(), id);
+        return ResponseEntity.noContent().build();
+    }
+
+    // 모두 읽음
     @PatchMapping
     public ResponseEntity<Void> markAsRead(
             @AuthenticationPrincipal AuthUser authUser) {

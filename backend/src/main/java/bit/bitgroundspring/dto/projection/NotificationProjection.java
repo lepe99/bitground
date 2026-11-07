@@ -10,4 +10,5 @@ public interface NotificationProjection {
     Message getMessageType();
     Integer getPostId();
     LocalDateTime getCreatedAt();
+    Boolean getIsRead();
 }

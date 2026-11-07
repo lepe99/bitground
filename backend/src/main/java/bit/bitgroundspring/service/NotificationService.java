@@ -2,6 +2,7 @@ package bit.bitgroundspring.service;
 
 import bit.bitgroundspring.dto.projection.NotificationProjection;
 import bit.bitgroundspring.entity.Message;
+import bit.bitgroundspring.entity.NotificationGroup;
 import bit.bitgroundspring.entity.Notification;
 import bit.bitgroundspring.repository.NotificationRepository;
 import lombok.RequiredArgsConstructor;
@@ -27,9 +28,15 @@ public class NotificationService {
         return notificationRepository.insertForAllUsers(message, messageType.name());
     }
 
-    // 사용자별 알림 조회
-    public Page<NotificationProjection> findNotifications(Integer userId, Pageable pageable) {
-        return notificationRepository.findNotificationsByUserId(userId, pageable);
+    // 사용자별 알림 조회 (탭: 전체·거래·커뮤니티·공지·시즌)
+    public Page<NotificationProjection> findNotifications(Integer userId, NotificationGroup group, Pageable pageable) {
+        return notificationRepository.findNotificationsByUserId(userId, group.types(), pageable);
+    }
+
+    // 알림 하나 읽음 (내 알림만, 이미 읽었으면 그대로)
+    @Transactional
+    public void markAsRead(Integer userId, Integer notificationId) {
+        notificationRepository.markAsRead(notificationId, userId);
     }
     
     // userId가 일치하는 isRead 상태 업데이트
