@@ -7,6 +7,7 @@ import bit.bitgroundspring.dto.response.ReserveOrderResponse;
 import bit.bitgroundspring.entity.Order;
 import bit.bitgroundspring.security.token.AuthUser;
 import bit.bitgroundspring.service.OrderService;
+import bit.bitgroundspring.service.SeasonService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -26,6 +27,7 @@ import java.util.List;
 public class OrderController {
 
     private final OrderService orderService;
+    private final SeasonService seasonService;
 
     // 시즌별 내 주문 내역 (체결·미체결 전체)
     @GetMapping
@@ -45,7 +47,7 @@ public class OrderController {
     // 현재 시즌의 미체결 예약 주문
     @GetMapping("/reserve")
     public List<OrderDto> getReserveOrders(@AuthenticationPrincipal AuthUser authUser) {
-        return orderService.getPendingOrders(authUser.id(), orderService.getCurrentSeasonId());
+        return orderService.getPendingOrders(authUser.id(), seasonService.getCurrentSeasonId());
     }
 
     // 예약 주문 취소 (본인 주문, 미체결일 때만)

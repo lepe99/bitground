@@ -5,7 +5,6 @@ import bit.bitgroundspring.common.error.ErrorCode;
 import bit.bitgroundspring.dto.projection.NotificationProjection;
 import bit.bitgroundspring.entity.Message;
 import bit.bitgroundspring.entity.NotificationGroup;
-import bit.bitgroundspring.entity.Notification;
 import bit.bitgroundspring.repository.NotificationRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -21,10 +20,6 @@ public class NotificationService {
     
     private final NotificationRepository notificationRepository;
     
-    // 알림 저장
-    public void saveNotification(Notification notification) {
-        notificationRepository.save(notification);
-    }
     
     // 모든 사용자에게 같은 알림 저장 (공지·시즌 알림). 저장한 행 수 반환
     @Transactional

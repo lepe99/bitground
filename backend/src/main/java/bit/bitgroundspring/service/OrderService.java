@@ -27,7 +27,6 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -287,13 +286,5 @@ public class OrderService {
                 )
         ).toList();
     }
-
-    // 현재 시즌 ID 반환
-    public Integer getCurrentSeasonId() {
-        return seasonRepository.findByStatus(Status.PENDING)
-                .orElseThrow(() -> new BusinessException(ErrorCode.NO_ACTIVE_SEASON))
-                .getId();
-    }
-
 
 }

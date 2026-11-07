@@ -4,7 +4,6 @@ import bit.bitgroundspring.entity.Message;
 import bit.bitgroundspring.entity.MessageType;
 import bit.bitgroundspring.dto.response.NotificationResponse;
 import bit.bitgroundspring.entity.Notification;
-import bit.bitgroundspring.entity.User;
 import bit.bitgroundspring.service.NotificationService;
 import bit.bitgroundspring.event.RealtimeBus;
 import bit.bitgroundspring.event.RealtimeListener;
@@ -73,10 +72,6 @@ public class UserSseEmitters {
         log.debug("사용자 {} 연결됨. 총 연결: {}", userId, getUserConnectionCount(userId));
     }
     
-    /** 이 서버에 연결된 사용자에게 보낸다 (다른 서버 연결은 {@link RealtimeBus}를 거쳐 그 서버가 보냄) */
-    public boolean sendToUser(Integer userId, NotificationResponse data) {
-        return send(userId, data, null);
-    }
 
     /** 이미 JSON으로 만든 알림을 이 서버에 연결된 사용자에게 보낸다 ({@link RealtimeListener}) */
     public boolean sendJsonToUser(Integer userId, String json) {

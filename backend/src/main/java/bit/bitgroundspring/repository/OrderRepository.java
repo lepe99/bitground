@@ -15,7 +15,6 @@ import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -35,8 +34,6 @@ public interface OrderRepository extends JpaRepository<Order, Integer> {
             "FROM Order o JOIN o.coin c WHERE o.user.id = :userId AND o.season.id = :seasonId")
     List<OrderProjection> findBySeasonIdAndUserId(@Param("seasonId") Integer seasonId, @Param("userId") Integer userId);
 
-
-
     @Query(
             "SELECT new bit.bitgroundspring.dto.response.TradeDto( " +
                     "    o.coin.symbol,        " + // String
@@ -55,28 +52,6 @@ public interface OrderRepository extends JpaRepository<Order, Integer> {
     List<TradeDto> findTop30ByCoinSymbolAndStatus(
             @Param("symbol") String symbol,
             @Param("status") Status status
-    );
-
-    @Query("""
-        SELECT new bit.bitgroundspring.dto.response.TradeDto(
-            o.coin.symbol,
-            o.coin.koreanName,
-            o.orderType,
-            o.amount,
-            o.tradePrice,
-            o.createdAt,
-            o.updatedAt
-        )
-        FROM Order o
-        WHERE o.coin.symbol = :symbol
-          AND o.status       = :status
-          AND o.createdAt > :since
-        ORDER BY o.createdAt ASC
-    """)
-    List<TradeDto> findNewTradesByCoinSymbolAndStatusSince(
-            @Param("symbol") String symbol,
-            @Param("status") Status status,
-            @Param("since") LocalDateTime since
     );
 
     List<Order> findByUserAndSeasonAndStatus(User user, Season season, Status status);
@@ -130,7 +105,6 @@ public interface OrderRepository extends JpaRepository<Order, Integer> {
             "WHERE o.user.id = :userId AND o.season.id = :seasonId AND o.status = bit.bitgroundspring.entity.Status.PENDING")
     List<Order> findPendingOrdersByUserAndSeason(@Param("userId") Integer userId,
                                                  @Param("seasonId") Integer seasonId);
-
 
     // 체결 대기 주문 전체 (Redis 예약 주문 대기열 재적재용)
     @Query("SELECT o FROM Order o JOIN FETCH o.coin WHERE o.status = bit.bitgroundspring.entity.Status.PENDING")

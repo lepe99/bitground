@@ -5,7 +5,7 @@ const TICK_MS = 30_000;
 // 정산이 오래 걸릴 때 새 시즌이 열렸는지 다시 확인하는 간격
 const SETTLING_POLL_MS = 30_000;
 // 이 시간 안에 끝나면 '곧 거래 마감'을 알린다
-export const CLOSING_SOON_MS = 10 * 60_000;
+const CLOSING_SOON_MS = 10 * 60_000;
 
 // 서버가 주는 시각은 한국 시각(시간대 없음). 화면과 서버 시각을 같은 방식으로 읽어 차이만 쓰므로 PC 시간대와 상관없다
 export const parseServerTime = (s) => (s ? new Date(s) : null);

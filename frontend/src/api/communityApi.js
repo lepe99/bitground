@@ -16,7 +16,6 @@ export const deletePost = (postId) => api.delete(`/posts/${postId}`);
 // 댓글
 export const fetchComments = async (postId) => (await api.get(`/comments/post/${postId}`)).data;
 
-export const fetchCommentCount = async (postId) => (await api.get(`/comments/post/${postId}/count`)).data;
 
 export const createComment = ({postId, content, parentId = null}) =>
     api.post('/comments', {postId, content, parentId});

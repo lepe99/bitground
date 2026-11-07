@@ -32,12 +32,6 @@ public class AiInsightService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.AI_INSIGHT_NOT_FOUND));
     }
 
-    public AiInsightResponse getTodayMarketOverall() {
-        return aiInsightRepository.findByAiInsightSymbolAndDate(MARKET_OVERALL, LocalDate.now())
-                .map(AiInsightResponse::from)
-                .orElseThrow(() -> new BusinessException(ErrorCode.AI_INSIGHT_NOT_FOUND));
-    }
-
     /**
      * 오늘 인사이트가 있는 심볼 목록 (분석 종목 버튼용). 없으면 빈 배열.
      * 전체 시장과 비트코인을 앞에 두고, 나머지는 스케줄러가 고른 순서(거래대금 상위 2, 상승률 1위, 하락률 1위) 그대로.

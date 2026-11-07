@@ -166,10 +166,9 @@
 | 엔드포인트 | 설명 | 성공 |
 |---|---|---|
 | `POST /trade` | 시장가 즉시 주문 (현재가 체결. `reservePrice`를 보내면 400, 지정가는 예약 주문으로) | `201` 체결 결과 |
-| `GET /trade/history?symbol=` | 종목 최근 체결 내역 | `200` |
 | `GET /orders?seasonId=` | 시즌별 내 주문 내역 | `200` |
 | `POST /orders/reserve` | 예약 주문 접수 | `201` |
 | `GET /orders/reserve` | 현재 시즌 미체결 예약 주문 | `200` |
 | `DELETE /orders/reserve/{orderId}` | 예약 주문 취소 (본인·미체결만) | `204` |
 
-예약 주문은 접수·조회·취소를 모두 `/orders/reserve` 아래에 둡니다. 실시간 체결 내역은 WebSocket `/ws/trade/history`로 받습니다.
+예약 주문은 접수·조회·취소를 모두 `/orders/reserve` 아래에 둡니다. 체결 내역은 WebSocket `/ws/trade/history`로 받습니다 (연결하면 최근 30건을 먼저 보내고, 이후 새 체결을 실시간으로).

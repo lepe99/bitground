@@ -64,7 +64,7 @@ class ApiResponseContractTest extends IntegrationTest {
 
         @Test
         void 지원하지_않는_메서드는_405_METHOD_NOT_ALLOWED() throws Exception {
-            mvc.perform(put("/coins").cookie(userCookie)).andExpect(problem(ErrorCode.METHOD_NOT_ALLOWED));
+            mvc.perform(put("/coins/symbols").cookie(userCookie)).andExpect(problem(ErrorCode.METHOD_NOT_ALLOWED));
         }
 
         @Test
@@ -192,7 +192,7 @@ class ApiResponseContractTest extends IntegrationTest {
                     .andExpect(header().string("X-Trace-Id", "client-trace-12345"))
                     .andExpect(jsonPath("$.traceId").value("client-trace-12345"));
             // 안전하지 않은 값(로그 인젝션)은 이어받지 않고 새로 만든다
-            mvc.perform(get("/coins").header("X-Trace-Id", "bad value <script>"))
+            mvc.perform(get("/coins/symbols").header("X-Trace-Id", "bad value <script>"))
                     .andExpect(header().string("X-Trace-Id", org.hamcrest.Matchers.matchesPattern("[0-9a-f]{16}")));
             org.assertj.core.api.Assertions.assertThat(header).matches("[0-9a-f]{16}");
         }

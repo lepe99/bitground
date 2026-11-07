@@ -20,11 +20,6 @@ public class CoinController {
     private final CoinService coinService;
     private final AiInsightService aiInsightService;
 
-    @GetMapping("/coins")
-    public List<CoinResponse> getAllCoins() {
-        return coinService.getAllCoins();
-    }
-
     @GetMapping("/coins/high-trade-price")
     public List<CoinResponse> getTop5HighTradePriceCoins() {
         return coinService.getTop5ByTradePrice();
@@ -58,11 +53,6 @@ public class CoinController {
     @GetMapping("/coins/{symbol}/insight")
     public AiInsightResponse getCoinInsight(@PathVariable String symbol) {
         return aiInsightService.getTodayInsight(symbol);
-    }
-
-    @GetMapping("/ai-insights/overall-market")
-    public AiInsightResponse getOverallMarketInsight() {
-        return aiInsightService.getTodayMarketOverall();
     }
 
     @GetMapping("/ai-insights/today-symbols")

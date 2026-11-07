@@ -1,6 +1,6 @@
 import {RouterProvider} from "react-router-dom";
 import {AuthProvider} from "./auth/AuthProvider.jsx";
-import router from "./routes/router.jsx";
+import {router} from "./routes/router.jsx";
 import {ToastProvider} from "./components/Toast.jsx";
 import {NotificationProvider} from "./notifications/NotificationProvider.jsx";
 import {ThemeProvider} from "./theme/ThemeProvider.jsx";

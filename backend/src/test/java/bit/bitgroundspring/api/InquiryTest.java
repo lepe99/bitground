@@ -96,7 +96,6 @@ class InquiryTest extends IntegrationTest {
 
         mvc.perform(get("/posts/" + id).cookie(otherCookie)).andExpect(problem(ErrorCode.POST_NOT_FOUND));
         mvc.perform(get("/comments/post/" + id).cookie(otherCookie)).andExpect(problem(ErrorCode.POST_NOT_FOUND));
-        mvc.perform(get("/comments/post/" + id + "/count").cookie(otherCookie)).andExpect(problem(ErrorCode.POST_NOT_FOUND));
         comment(otherCookie, id, "끼어들기").andExpect(problem(ErrorCode.POST_NOT_FOUND));
         mvc.perform(post("/reactions").cookie(otherCookie).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"targetType\":\"POST\",\"targetId\":%d,\"liked\":true}".formatted(id)))

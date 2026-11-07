@@ -18,9 +18,6 @@ public interface AiInsightRepository extends JpaRepository<AiInsight, Integer> {
     // 특정 코인 심볼과 특정 날짜에 해당하는 AI 분석 결과가 이미 있는지 확인하는 메서드
     Optional<AiInsight> findBySymbolAndDate(String symbol, LocalDate date);
 
-    // 특정 코인 심볼에 대한 모든 AI 분석 결과를 최신순으로 가져오는 메서드
-    List<AiInsight> findBySymbolOrderByCreatedAtDesc(String symbol);
-
     /**
      * 오늘 코인 인사이트의 심볼·한글 이름·선정 이유. 스케줄러가 선정 순서대로 넣으므로 id 순서가 곧 화면 순서다.
      * MARKET_OVERALL은 coins 테이블에 없어 조인에서 빠진다.

@@ -5,17 +5,6 @@ import api from "./axiosConfig.js"; // axiosConfig.js에서 설정된 'api' 인�
 // 이제 모든 요청은 axiosConfig.js에 정의된 'api' 인스턴스를 직접 사용합니다.
 // axiosConfig.js의 baseURL이 최종 엔드포인트를 결정합니다.
 
-// 1. 모든 코인 정보 조회 (GET /coins)
-export const fetchAllCoins = async () => {
-    try {
-        const response = await api.get('/coins'); // api 인스턴스 직접 사용
-        return response.data;
-    } catch (error) {
-        console.error('Error fetching all coins:', error);
-        return [];
-    }
-};
-
 // 2. 거래대금 상위 5개 코인 조회 (GET /coins/high-trade-price)
 export const fetchTop5HighTradePriceCoins = async () => {
     try {
@@ -89,17 +78,6 @@ export const fetchCoinInsight = async (symbol) => {
         return response.data;
     } catch (error) {
         console.error(`Error fetching AI insight for ${symbol}:`, error);
-        return null;
-    }
-};
-
-// 9. 전체 시장에 대한 AI 분석 결과 조회 (GET /ai-insights/overall-market)
-export const fetchOverallMarketInsight = async () => {
-    try {
-        const response = await api.get('/ai-insights/overall-market'); // api 인스턴스 직접 사용
-        return response.data;
-    } catch (error) {
-        console.error('Error fetching overall market AI insight:', error);
         return null;
     }
 };

@@ -166,12 +166,6 @@ public class CommentService {
         commentRepository.delete(comment); // 부모 댓글 삭제
     }
 
-    @Transactional(readOnly = true)
-    public long countByPostId(Integer postId, AuthUser viewer) {
-        requireReadable(postId, viewer);
-        return commentRepository.countByPostId(postId);
-    }
-
     private void requireReadable(Integer postId, AuthUser viewer) {
         PostAccess.requireReadable(postRepository.findById(postId).orElse(null), viewer.id(), viewer.admin());
     }

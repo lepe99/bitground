@@ -14,8 +14,6 @@ import java.util.List;
 import java.util.Optional;
 
 public interface UserAssetRepository extends JpaRepository<UserAsset, Integer> {
-    //유저가 가지고있는 보유자산 목록
-    List<UserAsset> findByUser(User user);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT a FROM UserAsset a WHERE a.user = :user AND a.coin = :coin")

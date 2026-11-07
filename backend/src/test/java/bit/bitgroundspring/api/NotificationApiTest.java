@@ -65,8 +65,10 @@ class NotificationApiTest extends IntegrationTest {
         save(me, Message.NOTICE);
         Notification others = save(other, Message.COMMENT);
 
-        mvc.perform(patch("/notifications/" + mine.getId() + "/read").cookie(cookie)).andExpect(status().isNoContent());
-        mvc.perform(patch("/notifications/" + others.getId() + "/read").cookie(cookie)).andExpect(status().isNoContent());
+        mvc.perform(patch("/notifications/read").cookie(cookie).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"ids\":[" + mine.getId() + "]}")).andExpect(status().isNoContent());
+        mvc.perform(patch("/notifications/read").cookie(cookie).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"ids\":[" + others.getId() + "]}")).andExpect(status().isNoContent());
 
         assertThat(notificationRepository.findById(mine.getId()).orElseThrow().getIsRead()).isTrue();
         assertThat(notificationRepository.findById(others.getId()).orElseThrow().getIsRead()).isFalse();

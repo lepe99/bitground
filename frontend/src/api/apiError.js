@@ -12,5 +12,3 @@ export const getErrorMessage = (error, fallback = DEFAULT_MESSAGE) => {
     return problem?.detail ?? fallback;
 };
 
-// 분기용 에러 코드 (예: INSUFFICIENT_CASH, AI_INSIGHT_NOT_FOUND)
-export const getErrorCode = (error) => error?.response?.data?.code;

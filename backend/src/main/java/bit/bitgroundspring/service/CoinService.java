@@ -24,10 +24,6 @@ public class CoinService {
         return coinRepository.findByIsDeletedFalse().stream().map(Coin::getSymbol).toList();
     }
 
-    public List<CoinResponse> getAllCoins() {
-        return toResponses(coinRepository.findByIsDeletedFalse());
-    }
-
     public List<CoinResponse> getTop5ByTradePrice() {
         return toResponses(coinRepository.findTop5ByIsDeletedFalseOrderByTradePrice24hDesc());
     }

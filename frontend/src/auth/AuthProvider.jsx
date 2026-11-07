@@ -64,7 +64,6 @@ export const AuthProvider = ({children}) => {
         // Axios 인터셉터에서 발생하는 강제 로그아웃 이벤트 리스너 (선택적 고급 처리)
         const handleForceLogout = () => {
             if (!isLoggedIn) return;
-            console.log("Force logout event received");
             void logout();
         };
         window.addEventListener('forceLogout', handleForceLogout);

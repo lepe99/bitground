@@ -50,14 +50,7 @@ public class NotificationController {
         return PageResponse.of(notificationService.findNotifications(authUser.id(), group, pageable));
     }
 
-    // 알림 하나 읽음 (누른 알림만)
-    @PatchMapping("/{id}/read")
-    public ResponseEntity<Void> markOneAsRead(@AuthenticationPrincipal AuthUser authUser, @PathVariable Integer id) {
-        notificationService.markAsRead(authUser.id(), List.of(id));
-        return ResponseEntity.noContent().build();
-    }
-
-    // 고른 알림들 읽음 (목록에서 묶여 보이는 알림을 누르면 함께)
+    // 고른 알림 읽음 (누른 알림, 묶여 보이는 알림이면 함께)
     @PatchMapping("/read")
     public ResponseEntity<Void> markSomeAsRead(@AuthenticationPrincipal AuthUser authUser, @RequestBody ReadRequest request) {
         notificationService.markAsRead(authUser.id(), request.ids());
