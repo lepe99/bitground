@@ -17,7 +17,6 @@ import org.springframework.web.socket.BinaryMessage;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
-import org.springframework.web.socket.client.WebSocketConnectionManager;
 import org.springframework.web.socket.client.standard.StandardWebSocketClient;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 
@@ -63,7 +62,6 @@ public class UpbitWebSocketService {
 
     private volatile WebSocketSession session;
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private WebSocketConnectionManager connectionManager;
 
     // 재연결 관련 설정
     private final AtomicInteger reconnectAttempts = new AtomicInteger(0);
@@ -105,10 +103,8 @@ public class UpbitWebSocketService {
         log.info("Shutting down UpbitWebSocketService...");
         isShuttingDown.set(true); // 종료 플래그 설정
 
-        // 1. ConnectionManager를 먼저 중지시켜 재연결 로직을 차단합니다.
-        if (connectionManager != null) {
-            connectionManager.stop();
-        }
+        // 1. 지금 연결을 닫는다 (플래그를 먼저 세워 닫힘 이벤트가 재연결하지 않는다)
+        closeQuietly(session);
 
         // 2. 주입받은 Executor를 명시적으로 종료시킵니다.
         // TaskExecutor가 ThreadPoolTaskExecutor의 인스턴스일 경우에만 종료 가능
@@ -161,14 +157,9 @@ public class UpbitWebSocketService {
         }
 
         try {
-            // 기존 연결 정리
-            if (connectionManager != null) {
-                try {
-                    connectionManager.stop();
-                } catch (Exception e) {
-                    log.warn("Error stopping previous connection manager", e);
-                }
-            }
+            // 기존 연결 정리 (새 핸들러로 바꾼 뒤라 닫힘 이벤트는 무시된다)
+            WebSocketSession previous = session;
+            session = null;
 
             StandardWebSocketClient client = new StandardWebSocketClient();
             client.setTaskExecutor((AsyncTaskExecutor) webSocketTaskExecutor);
@@ -177,14 +168,17 @@ public class UpbitWebSocketService {
             UpbitWebSocketHandler handler = new UpbitWebSocketHandler();
             currentHandler = handler;
             connecting = true;
-            connectionManager = new WebSocketConnectionManager(client, handler, websocketUrl);
-            connectionManager.setAutoStartup(false);
-            connectionManager.start();
-
-            // 시도 횟수는 실제로 연결된 뒤에 초기화한다 (start는 비동기라 여기서 초기화하면 재시도 간격이 늘지 않음)
+            closeQuietly(previous);
+            // 시도 횟수는 실제로 연결된 뒤에 초기화한다 (연결은 비동기라 여기서 초기화하면 재시도 간격이 늘지 않음)
             isReconnecting = false;
 
-            log.debug("WebSocketConnectionManager started for Upbit WebSocket");
+            // 연결 실패도 비동기로 온다. 예전에는 WebSocketConnectionManager가 실패를 로그로만 남겨
+            // 재연결 시도가 한 번 실패하면(업비트 점검 중 등) 다시 시도하지 않고 시세가 끊긴 채로 남았다
+            client.execute(handler, websocketUrl).whenComplete((connected, error) -> {
+                if (error != null) {
+                    handler.connectFailed(error);
+                }
+            });
 
         } catch (Exception e) {
             connecting = false;
@@ -192,6 +186,16 @@ public class UpbitWebSocketService {
                     reconnectAttempts.get(), e.toString());
             if (!isShuttingDown.get()) {
                 scheduleReconnect();
+            }
+        }
+    }
+
+    private static void closeQuietly(WebSocketSession s) {
+        if (s != null && s.isOpen()) {
+            try {
+                s.close();
+            } catch (Exception e) {
+                log.debug("Error closing Upbit WebSocket session", e);
             }
         }
     }
@@ -303,6 +307,19 @@ public class UpbitWebSocketService {
             }
         }
 
+        /** 연결 자체가 실패함 (서버 응답 없음·업그레이드 거절·타임아웃) */
+        void connectFailed(Throwable error) {
+            if (this != currentHandler || isShuttingDown.get()) {
+                return;
+            }
+            connecting = false;
+            markDisconnected();
+            Throwable cause = error.getCause() != null ? error.getCause() : error;
+            log.atLevel(disconnectLevel()).log("Failed to connect to Upbit WebSocket (attempt {}): {}",
+                    reconnectAttempts.get(), cause.toString());
+            scheduleReconnect();
+        }
+
         @Override
         public void handleTransportError(WebSocketSession session, Throwable exception) {
             if (this != currentHandler) {
@@ -367,7 +384,7 @@ public class UpbitWebSocketService {
     }
 
     public boolean isConnected() {
-        return !isShuttingDown.get() && session != null && session.isOpen() &&
-                connectionManager != null && connectionManager.isRunning();
+        WebSocketSession current = session;
+        return !isShuttingDown.get() && current != null && current.isOpen();
     }
 }
