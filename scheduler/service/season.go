@@ -15,9 +15,6 @@ import (
 	"time"
 )
 
-// 시즌 시작·스플릿 때 지급하는 현금
-const seasonStartCash = 10000000
-
 // UpdateSeason 시즌 정산: 이전 시즌을 닫고 새 시즌을 연 뒤, 티어 반영·보유 코인 청산·현금 초기화를 합니다.
 //
 // 각 단계가 앞 단계 결과에 의존하고 같은 테이블(users, orders, user_assets)을 고치므로

@@ -9,13 +9,17 @@ export const TIER_NAMES = {
     7: 'Grandmaster',
 };
 
+// 4위 이하 참가자 중 상위 % 로 정하는 티어. 실제 계산은 스케줄러(scheduler/service/rules.go tierCutoffs)가 하고,
+// 값이 같은지는 scheduler/service/rules_test.go가 확인한다
+const TIER_CUTOFFS = {5: 10, 4: 25, 3: 45, 2: 70};
+
 // 티어 기준 (랭킹 페이지 안내)
 export const TIER_RULES = {
-    1: '하위 30%',
-    2: '상위 70%',
-    3: '상위 45%',
-    4: '상위 25%',
-    5: '상위 10%',
+    1: `하위 ${100 - TIER_CUTOFFS[2]}%`,
+    2: `상위 ${TIER_CUTOFFS[2]}%`,
+    3: `상위 ${TIER_CUTOFFS[3]}%`,
+    4: `상위 ${TIER_CUTOFFS[4]}%`,
+    5: `상위 ${TIER_CUTOFFS[5]}%`,
     6: '2~3위',
     7: '1위',
 };

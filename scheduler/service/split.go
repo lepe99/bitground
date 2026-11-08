@@ -29,7 +29,7 @@ func UpdateSplit(ctx context.Context, db *sql.DB, cfg config.Config, splitAt tim
 			return nil
 		}
 
-		res, err := tx.ExecContext(txCtx, `UPDATE users SET cash = cash + ? WHERE is_deleted = 0`, seasonStartCash)
+		res, err := tx.ExecContext(txCtx, `UPDATE users SET cash = cash + ? WHERE is_deleted = 0`, splitCash)
 		if err != nil {
 			return fmt.Errorf("현금 지급 실패: %w", err)
 		}

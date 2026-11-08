@@ -17,6 +17,8 @@ import java.time.LocalDateTime;
 @RequiredArgsConstructor
 public class InitialCashPolicy {
 
+    // 같은 값이 스케줄러(scheduler/service/rules.go)와 프론트(constants/season.js)에도 있다.
+    // 세 곳이 같은지는 scheduler/service/rules_test.go가 확인한다
     static final int SEASON_START_CASH = 10_000_000;
     static final int SPLIT_CASH = 10_000_000;
 

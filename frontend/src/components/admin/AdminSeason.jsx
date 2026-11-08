@@ -1,5 +1,6 @@
 import {useEffect, useState} from 'react';
 import Card from '../ui/Card.jsx';
+import {SPLIT_CASH_LABEL} from '../../constants/season.js';
 import Button from '../ui/Button.jsx';
 import {useToast} from '../toastContext.js';
 import {fetchCurrentSeason} from '../../api/seasonApi.js';
@@ -104,7 +105,7 @@ export default function AdminSeason() {
                 <>
                     <div className="grid gap-4 @2xl:grid-cols-2">
                         <div className="flex flex-col gap-1.5">
-                            <span className="text-sm font-semibold">스플릿 2 시작 <span className="font-normal text-fg-3">(1,000만원 추가 지급)</span></span>
+                            <span className="text-sm font-semibold">스플릿 2 시작 <span className="font-normal text-fg-3">({SPLIT_CASH_LABEL} 추가 지급)</span></span>
                             <HourInput name="스플릿 2 시작" value={splitAt} onChange={setSplitAt} disabled={splitStarted}/>
                             <span className="text-xs text-fg-3">
                                 {splitStarted ? '이미 시작돼서 바꿀 수 없어요.' : `지금: ${label(season.splitStartsAt)}`}

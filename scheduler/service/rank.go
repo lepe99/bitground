@@ -78,7 +78,7 @@ func UpdateRank(ctx context.Context, db *sql.DB, symbolMap map[string]int, seaso
 
 // upsertRankings 총자산 내림차순으로 순위를 매기고 순위 구간에 따라 티어를 정합니다.
 //   - 1위: 7, 2~3위: 6
-//   - 나머지는 4위 이하 인원 중 상위 비율로 10%: 5, 25%: 4, 45%: 3, 70%: 2, 그 외: 1
+//   - 나머지는 4위 이하 인원 중 상위 비율로 정한다 (tierCutoffs, rules.go)
 func upsertRankings(ctx context.Context, tx *sql.Tx, seasonID int, prices string) (int64, error) {
 	// 시즌 중 탈퇴한 사용자는 랭킹에서 지운다
 	_, err := tx.ExecContext(ctx, `
@@ -92,15 +92,7 @@ func upsertRankings(ctx context.Context, tx *sql.Tx, seasonID int, prices string
 	query := `
 		INSERT INTO user_rankings (season_id, user_id, total_value, ranks, tier)` + userTotalsCTE + `
 		SELECT ?, user_id, total_value, ranks,
-		       CASE
-		           WHEN ranks = 1 THEN 7
-		           WHEN ranks <= 3 THEN 6
-		           WHEN (ranks - 3) / GREATEST(participants - 3, 1.0) <= 0.10 THEN 5
-		           WHEN (ranks - 3) / GREATEST(participants - 3, 1.0) <= 0.25 THEN 4
-		           WHEN (ranks - 3) / GREATEST(participants - 3, 1.0) <= 0.45 THEN 3
-		           WHEN (ranks - 3) / GREATEST(participants - 3, 1.0) <= 0.70 THEN 2
-		           ELSE 1
-		       END
+		       ` + tierCaseSQL() + `
 		FROM (
 		    SELECT user_id,
 		           total_value,

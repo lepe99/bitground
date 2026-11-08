@@ -1,4 +1,5 @@
 import Card from '../ui/Card.jsx';
+import {SPLIT_CASH_LABEL} from '../../constants/season.js';
 import {parseServerTime as parse, useCurrentSeason} from '../../hooks/useCurrentSeason.js';
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
@@ -97,7 +98,7 @@ export default function SeasonSchedule({className = ''}) {
                 </ol>
             </div>
             <div className="flex gap-4 border-t border-line pt-4 md:flex-1 md:border-t-0 md:border-l md:pt-0 md:pl-8">
-                <Milestone label="스플릿 2 시작" at={split} note="1,000만원 추가 지급" now={now} done={inSplit2}/>
+                <Milestone label="스플릿 2 시작" at={split} note={`${SPLIT_CASH_LABEL} 추가 지급`} now={now} done={inSplit2}/>
                 <Milestone label="시즌 종료" at={end} note="자산 초기화 · 티어 확정" now={now}/>
             </div>
         </Card>
