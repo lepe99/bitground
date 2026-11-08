@@ -23,7 +23,11 @@ function TierName({tier, className = ''}) {
 
 function HistoryCard({user, participants, x, y}) {
     const detail = useRankDetail(user.userId);
-    const left = x + GAP + CARD_W > window.innerWidth ? x - GAP - CARD_W : x + GAP;
+    // 세로 스크롤바를 뺀 폭 (innerWidth는 스크롤바를 포함해 카드가 스크롤바 밑으로 들어갔다)
+    const viewW = document.documentElement.clientWidth;
+    const width = Math.min(CARD_W, viewW - 16);
+    const preferred = x + GAP + width > viewW ? x - GAP - width : x + GAP;
+    const left = Math.max(8, Math.min(preferred, viewW - width - 8)); // 좁은 창에서는 커서 양쪽 어디에도 다 들어가지 않는다
     const vertical = window.innerHeight - y < FLIP_BELOW ? {bottom: window.innerHeight - y + GAP} : {top: y + GAP};
     const seasons = detail?.pastSeasonTiers ?? [];
     const top = topPercent(user.ranks, participants);
@@ -31,7 +35,7 @@ function HistoryCard({user, participants, x, y}) {
     return (
         <div
             role="tooltip"
-            style={{left: Math.max(8, left), width: CARD_W, ...vertical}}
+            style={{left, width, ...vertical}}
             className="pointer-events-none fixed z-50 flex flex-col gap-3 rounded-2xl border border-line bg-surface p-4 shadow-xl"
         >
             <div className="flex items-baseline justify-between gap-2">
@@ -41,10 +45,10 @@ function HistoryCard({user, participants, x, y}) {
 
             {/* 지금 보고 있는 시즌의 기록 (순위표 데이터) */}
             <div className="flex items-center gap-3 rounded-xl bg-surface-2 p-3">
-                <TierBadge tier={user.tier} size={36}/>
+                <TierBadge tier={user.tier} size={32}/>
                 <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                     <span className="truncate text-[11px] text-fg-3">{user.seasonName ?? '이번 시즌'}</span>
-                    <TierName tier={user.tier} className="text-sm"/>
+                    <TierName tier={user.tier} className="truncate text-sm"/>
                 </div>
                 <div className="num flex flex-col items-end gap-0.5 text-right">
                     <span className="text-sm font-bold">{user.ranks}위{top && <span className="ml-1 text-xs font-medium text-fg-3">{top}</span>}</span>

@@ -16,12 +16,12 @@ function RankRow({u, mine, onSelect, participants}) {
             <Row
                 {...(onSelect && {type: 'button', onClick: () => onSelect(u)})}
                 aria-current={mine || undefined}
-                className={`flex w-full items-center gap-3 px-4 py-2.5 text-left @xl:grid @xl:px-5 ${COLS} ${
+                className={`flex w-full items-center gap-2 px-4 py-2.5 text-left @xs:gap-3 @xl:grid @xl:px-5 ${COLS} ${
                     mine ? 'bg-brand-soft shadow-[inset_3px_0_0_var(--color-brand)]' : 'hover:bg-surface-2'
                 }`}
             >
                 <span className="num w-6 shrink-0 text-[15px] font-bold text-fg-2 @xl:w-auto @xl:text-fg">{u.ranks}</span>
-                <span className="flex min-w-0 flex-1 items-center gap-3">
+                <span className="flex min-w-0 flex-1 items-center gap-2 @xs:gap-3">
                     <TierHistoryHover user={u} participants={participants}>
                         <Avatar src={u.profileImage} name={u.name} tier={u.tier} size="md" outline={mine ? 'text-brand-soft' : 'text-surface'}/>
                     </TierHistoryHover>
