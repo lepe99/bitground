@@ -16,9 +16,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.redis.connection.stream.*;
 import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Duration;
@@ -222,19 +222,19 @@ class ReservedOrderFlowTest extends IntegrationTest {
     @DisplayName("체결 요청을 가져간 서버가 확인 전에 죽으면, 잠시 뒤 다른 서버가 넘겨받아 체결한다")
     void reclaimsUnacknowledgedRequest() {
         Order order = reserveBuy(0.01, 50_000_000f);
+        redis.opsForZSet().remove(BUY_KEY, String.valueOf(order.getId()));
         orderExecutionService.ensureGroup();
-        orderBook.claimMatches("KRW-BTC", 49_000_000);
-        // 다른 서버가 읽기만 하고 죽음 (확인 없음)
-        List<MapRecord<String, Object, Object>> taken = redis.opsForStream().read(Consumer.from(group, "dead-server"),
-                StreamReadOptions.empty().count(10), StreamOffset.create(stream, ReadOffset.lastConsumed()));
-        assertThat(taken).hasSize(1);
+        // 다른 서버가 읽기만 하고 죽음 (확인 없음).
+        // 넣기와 읽기를 한 번에 해야 이 서버의 주기 소비자(100ms)가 먼저 가져가지 않는다
+        assertThat(enqueueTakenBy("dead-server", order, 49_000_000)).isEqualTo(1);
         assertThat(orderStatus(order)).isEqualTo(Status.PENDING);
 
-        sleep(1_200); // 넘겨받기 대기 시간(테스트 1초)이 지남
-        orderExecutionService.reclaimStale();
-
-        await(() -> orderStatus(order) == Status.COMPLETED);
-        assertThat(redis.opsForStream().pending(stream, group).getTotalPendingMessages()).isZero();
+        // 넘겨받기 대기 시간(테스트 1초)이 지나면 넘겨받아 체결한다. 고정 대기 대신 될 때까지 다시 시도
+        await(() -> {
+            orderExecutionService.reclaimStale();
+            return orderStatus(order) == Status.COMPLETED;
+        });
+        await(() -> redis.opsForStream().pending(stream, group).getTotalPendingMessages() == 0);
     }
 
     @Test
@@ -277,20 +277,22 @@ class ReservedOrderFlowTest extends IntegrationTest {
                 "price", String.valueOf(price), "requestedAt", String.valueOf(requestedAt)));
     }
 
+    /** 체결 요청을 넣고 곧바로 consumer가 가져간 상태로 만든다 (원자적). 가져간 개수를 돌려준다 */
+    private long enqueueTakenBy(String consumer, Order order, double price) {
+        String script = """
+                redis.call('XADD', KEYS[1], '*', 'orderId', ARGV[1], 'price', ARGV[2], 'requestedAt', ARGV[3])
+                local read = redis.call('XREADGROUP', 'GROUP', ARGV[4], ARGV[5], 'COUNT', 10, 'STREAMS', KEYS[1], '>')
+                return #read[1][2]
+                """;
+        return redis.execute(new DefaultRedisScript<>(script, Long.class), List.of(stream),
+                String.valueOf(order.getId()), String.valueOf(price), String.valueOf(System.currentTimeMillis()), group, consumer);
+    }
+
     private void flushRedis() {
         redis.execute((RedisCallback<Object>) c -> {
             c.serverCommands().flushAll();
             return null;
         });
-    }
-
-    private static void sleep(long millis) {
-        try {
-            Thread.sleep(millis);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new AssertionError(e);
-        }
     }
 
     private static void await(BooleanSupplier condition) {
