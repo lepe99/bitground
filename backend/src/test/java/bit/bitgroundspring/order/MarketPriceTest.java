@@ -2,7 +2,7 @@ package bit.bitgroundspring.order;
 
 import bit.bitgroundspring.common.error.BusinessException;
 import bit.bitgroundspring.common.error.ErrorCode;
-import bit.bitgroundspring.service.MarketPriceService;
+import bit.bitgroundspring.market.MarketPriceService;
 import bit.bitgroundspring.support.IntegrationTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

@@ -1,12 +1,13 @@
 package bit.bitgroundspring.api;
 
 import bit.bitgroundspring.common.error.ErrorCode;
-import bit.bitgroundspring.entity.Post;
-import bit.bitgroundspring.entity.User;
-import bit.bitgroundspring.repository.NotificationRepository;
-import bit.bitgroundspring.repository.PostRepository;
-import bit.bitgroundspring.repository.UserRepository;
+import bit.bitgroundspring.community.Post;
+import bit.bitgroundspring.community.PostRepository;
+import bit.bitgroundspring.notification.NotificationRepository;
 import bit.bitgroundspring.support.IntegrationTest;
+import bit.bitgroundspring.user.User;
+import bit.bitgroundspring.user.UserRepository;
+import static bit.bitgroundspring.support.ProblemMatchers.problem;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -14,7 +15,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-import static bit.bitgroundspring.support.ProblemMatchers.problem;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -126,7 +126,7 @@ class AdminApiTest extends IntegrationTest {
     @Test
     void 게시글을_지우면_작업_기록이_남는다() throws Exception {
         Post post = postRepository.save(Post.builder().user(member).tier(0).title("광고글")
-                .content("c").category(bit.bitgroundspring.entity.Category.CHAT).build());
+                .content("c").category(bit.bitgroundspring.community.Category.CHAT).build());
 
         mvc.perform(get("/admin/posts").cookie(adminCookie))
                 .andExpect(jsonPath("$.content[0].title").value("광고글"));

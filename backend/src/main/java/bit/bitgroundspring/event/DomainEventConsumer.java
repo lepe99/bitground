@@ -1,9 +1,9 @@
 package bit.bitgroundspring.event;
 
-import bit.bitgroundspring.dto.response.NotificationResponse;
-import bit.bitgroundspring.entity.Message;
-import bit.bitgroundspring.entity.MessageType;
-import bit.bitgroundspring.service.NotificationMessages;
+import bit.bitgroundspring.notification.Message;
+import bit.bitgroundspring.notification.MessageType;
+import bit.bitgroundspring.notification.NotificationMessages;
+import bit.bitgroundspring.notification.dto.NotificationResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;

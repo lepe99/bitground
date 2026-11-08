@@ -1,7 +1,7 @@
 package bit.bitgroundspring.event;
 
-import bit.bitgroundspring.dto.response.NotificationResponse;
-import bit.bitgroundspring.dto.response.TradeDto;
+import bit.bitgroundspring.notification.dto.NotificationResponse;
+import bit.bitgroundspring.order.dto.TradeDto;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;

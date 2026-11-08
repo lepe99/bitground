@@ -1,10 +1,10 @@
 package bit.bitgroundspring.api;
 
-import bit.bitgroundspring.entity.Message;
-import bit.bitgroundspring.entity.Notification;
-import bit.bitgroundspring.entity.User;
-import bit.bitgroundspring.repository.NotificationRepository;
+import bit.bitgroundspring.notification.Message;
+import bit.bitgroundspring.notification.Notification;
+import bit.bitgroundspring.notification.NotificationRepository;
 import bit.bitgroundspring.support.IntegrationTest;
+import bit.bitgroundspring.user.User;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

@@ -1,13 +1,17 @@
 package bit.bitgroundspring.order;
 
-import bit.bitgroundspring.dto.InvestmentSummaryDto;
-import bit.bitgroundspring.entity.*;
-import bit.bitgroundspring.repository.CoinPriceHistoryRepository;
-import bit.bitgroundspring.repository.OrderRepository;
-import bit.bitgroundspring.repository.SeasonRepository;
-import bit.bitgroundspring.repository.UserRankingRepository;
-import bit.bitgroundspring.service.InvestmentAnalysisService;
+import bit.bitgroundspring.ai.InvestmentAnalysisService;
+import bit.bitgroundspring.ai.dto.InvestmentSummaryDto;
+import bit.bitgroundspring.common.Status;
+import bit.bitgroundspring.market.Coin;
+import bit.bitgroundspring.market.CoinPriceHistory;
+import bit.bitgroundspring.market.CoinPriceHistoryRepository;
+import bit.bitgroundspring.season.Season;
+import bit.bitgroundspring.season.SeasonRepository;
+import bit.bitgroundspring.season.UserRanking;
+import bit.bitgroundspring.season.UserRankingRepository;
 import bit.bitgroundspring.support.IntegrationTest;
+import bit.bitgroundspring.user.User;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

@@ -1,7 +1,7 @@
 package bit.bitgroundspring.api;
 
-import bit.bitgroundspring.entity.Coin;
-import bit.bitgroundspring.repository.CoinRepository;
+import bit.bitgroundspring.market.Coin;
+import bit.bitgroundspring.market.CoinRepository;
 import bit.bitgroundspring.support.IntegrationTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

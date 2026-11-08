@@ -1,10 +1,11 @@
 package bit.bitgroundspring.api;
 
 import bit.bitgroundspring.common.error.ErrorCode;
-import bit.bitgroundspring.entity.User;
-import bit.bitgroundspring.repository.UserRepository;
-import bit.bitgroundspring.service.UserService;
 import bit.bitgroundspring.support.IntegrationTest;
+import bit.bitgroundspring.user.User;
+import bit.bitgroundspring.user.UserRepository;
+import bit.bitgroundspring.user.UserService;
+import static bit.bitgroundspring.support.ProblemMatchers.problem;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -12,7 +13,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.servlet.MvcResult;
 
-import static bit.bitgroundspring.support.ProblemMatchers.problem;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;

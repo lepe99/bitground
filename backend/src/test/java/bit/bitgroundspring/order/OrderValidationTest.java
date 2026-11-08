@@ -1,14 +1,15 @@
 package bit.bitgroundspring.order;
 
+import bit.bitgroundspring.common.Status;
 import bit.bitgroundspring.common.error.ErrorCode;
-import bit.bitgroundspring.entity.*;
-import bit.bitgroundspring.repository.CoinRepository;
-import bit.bitgroundspring.repository.NotificationRepository;
-import bit.bitgroundspring.repository.OrderRepository;
-import bit.bitgroundspring.repository.UserAssetRepository;
-import bit.bitgroundspring.repository.UserRepository;
-import bit.bitgroundspring.service.OrderExecutionService;
+import bit.bitgroundspring.market.Coin;
+import bit.bitgroundspring.market.CoinRepository;
+import bit.bitgroundspring.notification.NotificationRepository;
+import bit.bitgroundspring.season.Season;
 import bit.bitgroundspring.support.IntegrationTest;
+import bit.bitgroundspring.user.User;
+import bit.bitgroundspring.user.UserRepository;
+import static bit.bitgroundspring.support.ProblemMatchers.problem;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -27,7 +28,6 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 
-import static bit.bitgroundspring.support.ProblemMatchers.problem;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
 import static org.mockito.ArgumentMatchers.*;

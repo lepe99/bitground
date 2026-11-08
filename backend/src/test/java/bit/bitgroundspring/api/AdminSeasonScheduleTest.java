@@ -1,9 +1,10 @@
 package bit.bitgroundspring.api;
 
 import bit.bitgroundspring.common.error.ErrorCode;
-import bit.bitgroundspring.entity.Season;
-import bit.bitgroundspring.repository.SeasonRepository;
+import bit.bitgroundspring.season.Season;
+import bit.bitgroundspring.season.SeasonRepository;
 import bit.bitgroundspring.support.IntegrationTest;
+import static bit.bitgroundspring.support.ProblemMatchers.problem;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -15,7 +16,6 @@ import org.springframework.test.web.servlet.ResultActions;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 
-import static bit.bitgroundspring.support.ProblemMatchers.problem;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;

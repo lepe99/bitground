@@ -1,11 +1,16 @@
 package bit.bitgroundspring.support;
 
-import bit.bitgroundspring.entity.*;
-import bit.bitgroundspring.repository.CoinRepository;
-import bit.bitgroundspring.repository.SeasonRepository;
-import bit.bitgroundspring.repository.UserAssetRepository;
-import bit.bitgroundspring.repository.UserRepository;
+import bit.bitgroundspring.common.Status;
+import bit.bitgroundspring.market.Coin;
+import bit.bitgroundspring.market.CoinRepository;
+import bit.bitgroundspring.order.UserAsset;
+import bit.bitgroundspring.order.UserAssetRepository;
+import bit.bitgroundspring.season.Season;
+import bit.bitgroundspring.season.SeasonRepository;
 import bit.bitgroundspring.security.token.JwtTokenProvider;
+import bit.bitgroundspring.user.Role;
+import bit.bitgroundspring.user.User;
+import bit.bitgroundspring.user.UserRepository;
 import jakarta.servlet.http.Cookie;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.test.context.TestComponent;

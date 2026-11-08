@@ -1,9 +1,9 @@
 package bit.bitgroundspring.security.oauth2;
 
-import bit.bitgroundspring.util.CookieUtil;
-import bit.bitgroundspring.entity.User;
-import bit.bitgroundspring.repository.UserRepository;
 import bit.bitgroundspring.security.token.AuthTokenService;
+import bit.bitgroundspring.security.token.CookieUtil;
+import bit.bitgroundspring.user.User;
+import bit.bitgroundspring.user.UserRepository;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;

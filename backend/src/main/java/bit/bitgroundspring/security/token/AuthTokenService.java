@@ -2,8 +2,8 @@ package bit.bitgroundspring.security.token;
 
 import bit.bitgroundspring.common.error.BusinessException;
 import bit.bitgroundspring.common.error.ErrorCode;
-import bit.bitgroundspring.entity.User;
-import bit.bitgroundspring.repository.UserRepository;
+import bit.bitgroundspring.user.User;
+import bit.bitgroundspring.user.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

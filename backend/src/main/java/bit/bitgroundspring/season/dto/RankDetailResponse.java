@@ -1,0 +1,18 @@
+package bit.bitgroundspring.season.dto;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.util.List;
+
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class RankDetailResponse {
+    private Integer highestTier; // 최고 티어
+    private List<PastSeasonTierProjection> pastSeasonTiers; // 참여한 최근 5시즌 기록 (쉰 시즌은 건너뜀)
+    private Long seasonCount; // 참여한 완료 시즌 수
+}

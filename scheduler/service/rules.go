@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-// 게임 규칙. 같은 값이 백엔드(service/InitialCashPolicy.java)와
+// 게임 규칙. 같은 값이 백엔드(season/InitialCashPolicy.java)와
 // 프론트(constants/season.js, constants/tiers.js)에도 있다. 세 곳이 같은지는 rules_test.go가 확인한다.
 const (
 	// 시즌 시작 때 모든 사용자의 현금을 이 금액으로 맞춘다

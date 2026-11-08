@@ -29,7 +29,7 @@ func TestRulesMatchBackendAndFrontend(t *testing.T) {
 		return n
 	}
 
-	java := read("backend/src/main/java/bit/bitgroundspring/service/InitialCashPolicy.java")
+	java := read("backend/src/main/java/bit/bitgroundspring/season/InitialCashPolicy.java")
 	js := read("frontend/src/constants/season.js")
 	if got := number(java, "SEASON_START_CASH"); got != seasonStartCash {
 		t.Errorf("백엔드 SEASON_START_CASH = %d, Go = %d", got, seasonStartCash)

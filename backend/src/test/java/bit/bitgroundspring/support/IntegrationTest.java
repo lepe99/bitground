@@ -1,6 +1,6 @@
 package bit.bitgroundspring.support;
 
-import bit.bitgroundspring.service.UpbitWebSocketService;
+import bit.bitgroundspring.market.UpbitWebSocketService;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;

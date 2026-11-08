@@ -1,9 +1,9 @@
 package bit.bitgroundspring.event;
 
-import bit.bitgroundspring.dto.response.TradeDto;
-import bit.bitgroundspring.entity.Coin;
-import bit.bitgroundspring.entity.Order;
-import bit.bitgroundspring.entity.OrderType;
+import bit.bitgroundspring.market.Coin;
+import bit.bitgroundspring.order.Order;
+import bit.bitgroundspring.order.OrderType;
+import bit.bitgroundspring.order.dto.TradeDto;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;

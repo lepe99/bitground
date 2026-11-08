@@ -1,14 +1,11 @@
 package bit.bitgroundspring.order;
 
-import bit.bitgroundspring.dto.request.CreateOrderRequest;
-import bit.bitgroundspring.entity.*;
+import bit.bitgroundspring.common.Status;
 import bit.bitgroundspring.event.OutboxRelay;
-import bit.bitgroundspring.repository.NotificationRepository;
-import bit.bitgroundspring.repository.OrderRepository;
-import bit.bitgroundspring.service.OrderExecutionService;
-import bit.bitgroundspring.service.OrderService;
-import bit.bitgroundspring.service.ReservedOrderBook;
+import bit.bitgroundspring.notification.NotificationRepository;
+import bit.bitgroundspring.order.dto.CreateOrderRequest;
 import bit.bitgroundspring.support.IntegrationTest;
+import bit.bitgroundspring.user.User;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

@@ -2,13 +2,13 @@ package bit.bitgroundspring.api;
 
 import bit.bitgroundspring.common.error.ErrorCode;
 import bit.bitgroundspring.support.IntegrationTest;
+import static bit.bitgroundspring.support.ProblemMatchers.problem;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 
-import static bit.bitgroundspring.support.ProblemMatchers.problem;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;

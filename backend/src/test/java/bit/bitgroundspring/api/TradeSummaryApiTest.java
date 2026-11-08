@@ -1,8 +1,13 @@
 package bit.bitgroundspring.api;
 
-import bit.bitgroundspring.entity.*;
-import bit.bitgroundspring.repository.OrderRepository;
+import bit.bitgroundspring.common.Status;
+import bit.bitgroundspring.market.Coin;
+import bit.bitgroundspring.order.Order;
+import bit.bitgroundspring.order.OrderRepository;
+import bit.bitgroundspring.order.OrderType;
+import bit.bitgroundspring.season.Season;
 import bit.bitgroundspring.support.IntegrationTest;
+import bit.bitgroundspring.user.User;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

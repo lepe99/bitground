@@ -1,8 +1,8 @@
 package bit.bitgroundspring.security.oauth2;
 
-import bit.bitgroundspring.entity.User;
-import bit.bitgroundspring.repository.UserRepository;
-import bit.bitgroundspring.service.InitialCashPolicy;
+import bit.bitgroundspring.season.InitialCashPolicy;
+import bit.bitgroundspring.user.User;
+import bit.bitgroundspring.user.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;

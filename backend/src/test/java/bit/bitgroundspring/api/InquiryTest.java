@@ -1,11 +1,12 @@
 package bit.bitgroundspring.api;
 
 import bit.bitgroundspring.common.error.ErrorCode;
-import bit.bitgroundspring.entity.Message;
-import bit.bitgroundspring.entity.User;
-import bit.bitgroundspring.repository.NotificationRepository;
-import bit.bitgroundspring.repository.PostRepository;
+import bit.bitgroundspring.community.PostRepository;
+import bit.bitgroundspring.notification.Message;
+import bit.bitgroundspring.notification.NotificationRepository;
 import bit.bitgroundspring.support.IntegrationTest;
+import bit.bitgroundspring.user.User;
+import static bit.bitgroundspring.support.ProblemMatchers.problem;
 import com.jayway.jsonpath.JsonPath;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.BeforeEach;
@@ -14,7 +15,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.ResultActions;
 
-import static bit.bitgroundspring.support.ProblemMatchers.problem;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.hasSize;

@@ -1,12 +1,12 @@
 package bit.bitgroundspring.auth;
 
-import bit.bitgroundspring.entity.User;
-import bit.bitgroundspring.repository.UserRepository;
+import bit.bitgroundspring.season.InitialCashPolicy;
 import bit.bitgroundspring.security.oauth2.CustomOidcUserService;
 import bit.bitgroundspring.security.oauth2.OidcAuthenticationSuccessHandler;
-import bit.bitgroundspring.service.InitialCashPolicy;
-import bit.bitgroundspring.service.UserService;
 import bit.bitgroundspring.support.IntegrationTest;
+import bit.bitgroundspring.user.User;
+import bit.bitgroundspring.user.UserRepository;
+import bit.bitgroundspring.user.UserService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

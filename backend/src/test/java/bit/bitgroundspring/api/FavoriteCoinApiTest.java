@@ -1,14 +1,14 @@
 package bit.bitgroundspring.api;
 
 import bit.bitgroundspring.common.error.ErrorCode;
-import bit.bitgroundspring.entity.User;
 import bit.bitgroundspring.support.IntegrationTest;
+import bit.bitgroundspring.user.User;
+import static bit.bitgroundspring.support.ProblemMatchers.problem;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import static bit.bitgroundspring.support.ProblemMatchers.problem;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.empty;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
