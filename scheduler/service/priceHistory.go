@@ -5,7 +5,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log/slog"
 	"time"
 )
 
@@ -16,57 +15,37 @@ func UpdateCoinPriceHistory(ctx context.Context, db *sql.DB, coinPriceHistory ma
 	currentDate := now.Format("2006-01-02")
 	currentHour := now.Hour()
 
-	// 쿼리 타임아웃 설정 (10초)
+	// 쿼리 타임아웃 설정 (20초)
 	queryCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
 
-	// 트랜잭션 시작
-	tx, err := db.BeginTx(queryCtx, nil)
-	if err != nil {
-		return fmt.Errorf("트랜잭션 시작 에러: %w", err)
-	}
-	defer func() {
-		if p := recover(); p != nil {
-			_ = tx.Rollback()
-			panic(p)
-		} else if err != nil {
-			_ = tx.Rollback()
-		}
-	}()
-
-	// 쿼리 준비
-	query := `
+	return withTx(queryCtx, db, func(tx *sql.Tx) error {
+		query := `
 		INSERT INTO coin_price_history (coin_id, date, hour, open_price, close_price, high_price, low_price, volume)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 		ON DUPLICATE KEY UPDATE
-		                     			open_price = VALUES(open_price),
-		                     			close_price = VALUES(close_price),
-		                     			high_price = VALUES(high_price),
-		                     			low_price = VALUES(low_price),
-		                     			volume = VALUES(volume);
+			open_price = VALUES(open_price),
+			close_price = VALUES(close_price),
+			high_price = VALUES(high_price),
+			low_price = VALUES(low_price),
+			volume = VALUES(volume);
 	`
-	stmt, err := tx.PrepareContext(queryCtx, query)
-	if err != nil {
-		return fmt.Errorf("쿼리 준비 에러: %w", err)
-	}
-	defer func(stmt *sql.Stmt) {
-		if err := stmt.Close(); err != nil {
-			slog.WarnContext(ctx, "쿼리 닫기 실패", "error", err)
-		}
-	}(stmt)
-
-	// 각 코인 가격 히스토리를 데이터베이스에 삽입
-	for coinID, coinPrice := range coinPriceHistory {
-		// 쿼리 실행
-		_, err := stmt.ExecContext(queryCtx,
-			coinID, currentDate, currentHour,
-			coinPrice.OpenPrice, coinPrice.TradePrice,
-			coinPrice.HighPrice, coinPrice.LowPrice,
-			coinPrice.TradeVolume)
+		stmt, err := tx.PrepareContext(queryCtx, query)
 		if err != nil {
-			return fmt.Errorf("코인 가격 히스토리 삽입 에러: %w", err)
+			return fmt.Errorf("쿼리 준비 에러: %w", err)
 		}
-	}
+		defer closeStmt(ctx, stmt)
 
-	return tx.Commit() // 트랜잭션 커밋
+		// 각 코인 가격 히스토리를 데이터베이스에 삽입
+		for coinID, coinPrice := range coinPriceHistory {
+			if _, err := stmt.ExecContext(queryCtx,
+				coinID, currentDate, currentHour,
+				coinPrice.OpenPrice, coinPrice.TradePrice,
+				coinPrice.HighPrice, coinPrice.LowPrice,
+				coinPrice.TradeVolume); err != nil {
+				return fmt.Errorf("코인 가격 히스토리 삽입 에러: %w", err)
+			}
+		}
+		return nil
+	})
 }

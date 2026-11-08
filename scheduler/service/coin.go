@@ -6,7 +6,6 @@ import (
 	"database/sql"
 	"fmt"
 	"golang.org/x/sync/errgroup"
-	"log/slog"
 	"time"
 )
 
@@ -127,21 +126,10 @@ func insertCoinSymbols(ctx context.Context, db *sql.DB, coinSymbols []model.Coin
 	queryCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	// 트랜잭션 시작
-	tx, err := db.BeginTx(queryCtx, nil)
-	if err != nil {
-		return fmt.Errorf("트랜잭션 시작 에러: %w", err)
-	}
-	defer func() {
-		if p := recover(); p != nil {
-			_ = tx.Rollback()
-			panic(p)
-		} else if err != nil {
-			_ = tx.Rollback()
-		}
-	}()
-
-	query := `
+	// 실패하면 withTx가 롤백한다 (예전: err가 이름 있는 반환값이 아니어서 삽입 실패 시 지연 롤백이 돌지 않고
+	// 컨텍스트 취소에 기대고 있었다)
+	return withTx(queryCtx, db, func(tx *sql.Tx) error {
+		query := `
 		INSERT INTO coins (symbol, korean_name, trade_price_24h, change_rate, is_caution, is_warning)
 		VALUES (?, ?, ?, ?, ?, ?)
 		ON DUPLICATE KEY UPDATE
@@ -151,23 +139,19 @@ func insertCoinSymbols(ctx context.Context, db *sql.DB, coinSymbols []model.Coin
 			is_caution = VALUES(is_caution),
 			is_warning = VALUES(is_warning)
 	`
-	stmt, err := tx.PrepareContext(queryCtx, query)
-	if err != nil {
-		return fmt.Errorf("쿼리 준비 에러: %w", err)
-	}
-	defer func() {
-		if err := stmt.Close(); err != nil {
-			slog.WarnContext(ctx, "쿼리 닫기 실패", "error", err)
+		stmt, err := tx.PrepareContext(queryCtx, query)
+		if err != nil {
+			return fmt.Errorf("쿼리 준비 에러: %w", err)
 		}
-	}()
+		defer closeStmt(ctx, stmt)
 
-	for _, symbol := range coinSymbols {
-		if _, err := stmt.ExecContext(queryCtx,
-			symbol.Symbol, symbol.KoreanName, symbol.TradePrice,
-			symbol.ChangeRate, symbol.IsCaution, symbol.IsWarning); err != nil {
-			return fmt.Errorf("코인 심볼 삽입/업데이트 에러: %w", err)
+		for _, symbol := range coinSymbols {
+			if _, err := stmt.ExecContext(queryCtx,
+				symbol.Symbol, symbol.KoreanName, symbol.TradePrice,
+				symbol.ChangeRate, symbol.IsCaution, symbol.IsWarning); err != nil {
+				return fmt.Errorf("코인 심볼 삽입/업데이트 에러: %w", err)
+			}
 		}
-	}
-
-	return tx.Commit() // 트랜잭션 커밋
+		return nil
+	})
 }

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"sort"
 )
 
@@ -28,6 +29,13 @@ func withTx(ctx context.Context, db *sql.DB, fn func(tx *sql.Tx) error) (err err
 		return err
 	}
 	return tx.Commit()
+}
+
+// closeStmt 는 준비한 쿼리를 닫습니다. 닫기 실패는 결과에 영향이 없어 경고만 남깁니다.
+func closeStmt(ctx context.Context, stmt *sql.Stmt) {
+	if err := stmt.Close(); err != nil {
+		slog.WarnContext(ctx, "쿼리 닫기 실패", "error", err)
+	}
 }
 
 // claimRun 같은 (kind, period) 작업을 한 번만 실행하도록 실행 기록을 남깁니다.
