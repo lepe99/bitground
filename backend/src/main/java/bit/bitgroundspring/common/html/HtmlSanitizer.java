@@ -11,7 +11,7 @@ import java.util.regex.Pattern;
 /**
  * 게시글·공지 본문 HTML 정제 (저장 시점)
  *
- * 프론트도 렌더링할 때 sanitize-html로 정제하지만, DB에 원본이 남으면 다른 클라이언트나
+ * 프론트도 렌더링할 때 DOMPurify로 정제하지만, DB에 원본이 남으면 다른 클라이언트나
  * 관리 도구에서 그대로 노출될 수 있으므로 서버에서도 허용 목록으로 걸러 저장한다.
  * 허용 목록은 Quill 에디터가 만드는 서식과 같다 (frontend/src/utils/sanitize.js).
  */
