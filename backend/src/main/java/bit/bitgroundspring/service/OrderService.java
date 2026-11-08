@@ -79,21 +79,19 @@ public class OrderService {
             double avgBuy = buyQty == 0 ? 0 : buyTotal / buyQty;
             double avgSell = sellQty == 0 ? 0 : sellTotal / sellQty;
             double profit = sellTotal - buyTotal;
-            String returnRate = buyTotal == 0 ? "0%" :
-                    String.format("%+.2f%%", (profit / buyTotal) * 100);
+            double returnRate = buyTotal == 0 ? 0 : profit / buyTotal * 100;
 
-            String buyDate = buys.stream()
+            LocalDateTime firstBuyAt = buys.stream()
                     .map(Order::getCreatedAt)
                     .min(LocalDateTime::compareTo)
-                    .map(dt -> String.format("%02d-%02d", dt.getMonthValue(), dt.getDayOfMonth()))
-                    .orElse("N/A");
+                    .orElse(null);
 
             String koreanName = coinOrders.get(0).getCoin().getKoreanName();
 
             summaries.add(TradeSummaryDto.builder()
                     .coin(coin)
                     .koreanName(koreanName)
-                    .buyDate(buyDate)
+                    .firstBuyAt(firstBuyAt)
                     .buyAmount(buyTotal)
                     .sellAmount(sellTotal)
                     .avgBuy(avgBuy)
@@ -108,15 +106,8 @@ public class OrderService {
     public List<TradeDetailDto> getTradeDetails(User user, Season season) {
         List<Order> orders = orderRepository.findCompletedByUserAndSeason(user, season);
 
+        // 날짜·매수/매도·수량은 값 그대로 내려주고 표시 형식은 화면이 정한다
         return orders.stream().map(order -> {
-            String date = String.format("%02d-%02d",
-                    order.getCreatedAt().getMonthValue(),
-                    order.getCreatedAt().getDayOfMonth());
-
-            String type = order.getOrderType().name().equals("BUY") ? "매수" : "매도";
-
-            String coin = order.getCoin().getSymbol().replace("KRW-", "");
-            String qty = order.getAmount().stripTrailingZeros().toPlainString() + " " + coin;
             String koreanName = order.getCoin().getKoreanName();
 
             BigDecimal price = order.getTradePrice();
@@ -125,9 +116,10 @@ public class OrderService {
                     : Money.krwFloor(price, order.getAmount());
 
             return TradeDetailDto.builder()
-                    .date(date)
-                    .type(type)
-                    .qty(qty)
+                    .createdAt(order.getCreatedAt())
+                    .orderType(order.getOrderType())
+                    .symbol(order.getCoin().getSymbol())
+                    .amount(order.getAmount().stripTrailingZeros())
                     .price(price)
                     .total(total)
                     .koreanName(koreanName)

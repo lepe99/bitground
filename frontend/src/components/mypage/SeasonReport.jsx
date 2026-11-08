@@ -11,7 +11,7 @@ import {getErrorMessage} from '../../api/apiError.js';
 import {useToast} from '../toastContext.js';
 import Button from '../ui/Button.jsx';
 import {TIER_NAMES, TIER_TEXT} from '../../constants/tiers.js';
-import {changeColor, formatKRW, formatNumber, formatPrice, formatSignedKRW} from '../../utils/format.js';
+import {changeColor, formatAmount, formatKRW, formatMonthDay, formatNumber, formatPercent, formatPrice, formatSignedKRW} from '../../utils/format.js';
 
 const DETAIL_TABS = [
     {value: 'coins', label: '종목별 성과'},
@@ -19,9 +19,6 @@ const DETAIL_TABS = [
 ];
 
 const RING = 2 * Math.PI * 50;
-
-// '+15.2%' → 15.2
-const rateOf = (text) => parseFloat(String(text ?? '').replace(/[^\d.-]/g, '')) || 0;
 
 function ScoreRing({score}) {
     const value = Math.max(0, Math.min(100, Number(score) || 0));
@@ -273,7 +270,7 @@ export default function SeasonReport() {
     const worst = pick((a, b) => a.profit < b.profit);
     const percentile = report?.rank && report.total ? Math.max(1, Math.round((report.rank / report.total) * 100)) : null;
     const trades = report?.details ?? [];
-    const buys = trades.filter((d) => d.type === '매수').length;
+    const buys = trades.filter((d) => d.orderType === 'BUY').length;
 
     const stats = [
         {label: '최종 순위', value: report?.rank ? `${report.rank}위` : '—', sub: report?.rank ? `${report.total}명 중 · 상위 ${percentile}%` : '순위 기록 없음'},
@@ -333,8 +330,8 @@ export default function SeasonReport() {
                 <div className="grid gap-2 md:gap-3 @3xl:grid-cols-3">
                     {[
                         ['최다 투자 종목', top, `매수 ${formatKRW(top?.buyAmount)}원`, 'text-fg-2'],
-                        ['최고 수익 종목', best, best?.returnRate, changeColor(rateOf(best?.returnRate))],
-                        ['최저 수익 종목', worst, worst?.returnRate, changeColor(rateOf(worst?.returnRate))],
+                        ['최고 수익 종목', best, formatPercent(best?.returnRate), changeColor(best?.returnRate)],
+                        ['최저 수익 종목', worst, formatPercent(worst?.returnRate), changeColor(worst?.returnRate)],
                     ].map(([label, coin, value, tone]) => (
                         <Card key={label} className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3.5 rounded-2xl p-4 md:px-5 @3xl:grid-cols-[auto_minmax(0,1fr)]">
                             <span className="col-start-1 row-span-2 row-start-1 @3xl:row-span-3"><CoinIcon symbol={coin?.coin ?? ''} size={40}/></span>
@@ -365,10 +362,10 @@ export default function SeasonReport() {
                                         <CoinIcon symbol={s.coin} size={32}/>
                                         <div className="flex min-w-0 flex-1 flex-col">
                                             <span className="truncate text-[15px] font-semibold">{s.koreanName}</span>
-                                            <span className="text-xs text-fg-3">최초 매수 {s.buyDate}</span>
+                                            <span className="text-xs text-fg-3">최초 매수 {formatMonthDay(s.firstBuyAt)}</span>
                                         </div>
                                         <div className="flex flex-col items-end">
-                                            <span className={`text-[15px] font-bold ${changeColor(rateOf(s.returnRate))}`}>{s.returnRate}</span>
+                                            <span className={`text-[15px] font-bold ${changeColor(s.returnRate)}`}>{formatPercent(s.returnRate)}</span>
                                             <span className={`text-xs ${changeColor(Math.round(s.profit))}`}>{formatSignedKRW(s.profit)}</span>
                                         </div>
                                     </div>
@@ -402,12 +399,12 @@ export default function SeasonReport() {
                                     {summary.map((s) => (
                                         <tr key={s.coin} className="border-t border-line">
                                             <th scope="row" className="px-5 py-3 text-left font-semibold">{s.koreanName}</th>
-                                            <td className="px-5 py-3 text-right text-fg-3">{s.buyDate}</td>
+                                            <td className="px-5 py-3 text-right text-fg-3">{formatMonthDay(s.firstBuyAt)}</td>
                                             <td className="px-5 py-3 text-right">{formatKRW(s.buyAmount)}</td>
                                             <td className="px-5 py-3 text-right">{formatKRW(s.sellAmount)}</td>
                                             <td className="px-5 py-3 text-right text-fg-2">{formatPrice(s.avgBuy)}</td>
                                             <td className="px-5 py-3 text-right text-fg-2">{s.avgSell ? formatPrice(s.avgSell) : '—'}</td>
-                                            <td className={`px-5 py-3 text-right font-bold ${changeColor(rateOf(s.returnRate))}`}>{s.returnRate}</td>
+                                            <td className={`px-5 py-3 text-right font-bold ${changeColor(s.returnRate)}`}>{formatPercent(s.returnRate)}</td>
                                             <td className={`px-5 py-3 text-right ${changeColor(Math.round(s.profit))}`}>{formatSignedKRW(s.profit)}</td>
                                         </tr>
                                     ))}
@@ -424,10 +421,10 @@ export default function SeasonReport() {
                         <ul className="max-h-[480px] overflow-y-auto">
                             {trades.map((d, i) => (
                                 <li key={i} className="num flex items-center gap-3 border-t border-line px-5 py-3 text-sm">
-                                    <span className="w-12 text-xs text-fg-3">{d.date}</span>
-                                    <span className={`w-9 font-bold ${d.type === '매수' ? 'text-up' : 'text-down'}`}>{d.type}</span>
+                                    <span className="w-12 text-xs text-fg-3">{formatMonthDay(d.createdAt)}</span>
+                                    <span className={`w-9 font-bold ${d.orderType === 'BUY' ? 'text-up' : 'text-down'}`}>{d.orderType === 'BUY' ? '매수' : '매도'}</span>
                                     <span className="min-w-0 flex-1 truncate font-semibold">{d.koreanName}</span>
-                                    <span className="hidden text-right text-fg-2 @md:inline">{d.qty}</span>
+                                    <span className="hidden text-right text-fg-2 @md:inline">{formatAmount(d.amount)} {d.symbol?.replace('KRW-', '')}</span>
                                     <span className="w-28 text-right font-semibold">{formatKRW(d.total)}원</span>
                                 </li>
                             ))}

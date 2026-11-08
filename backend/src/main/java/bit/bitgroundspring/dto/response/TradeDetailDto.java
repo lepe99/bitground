@@ -1,5 +1,8 @@
 package bit.bitgroundspring.dto.response;
 
+import bit.bitgroundspring.entity.OrderType;
+import java.time.LocalDateTime;
+
 import lombok.Builder;
 import lombok.Data;
 
@@ -8,9 +11,10 @@ import java.math.BigDecimal;
 @Data
 @Builder
 public class TradeDetailDto {
-    private String date;     // ex. 06-10
-    private String type;     // 매수 / 매도
-    private String qty;      // 0.08 BTC
+    private LocalDateTime createdAt; // 주문 시각
+    private OrderType orderType;     // BUY / SELL
+    private String symbol;           // KRW-BTC
+    private BigDecimal amount;       // 수량
     private BigDecimal price; // 단가
     private long total;       // 금액 (원)
     private String koreanName;

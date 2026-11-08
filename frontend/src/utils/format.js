@@ -45,6 +45,9 @@ export const formatPrice = (value) => {
 export const formatAmount = (value) =>
     Number(value ?? 0).toLocaleString('ko-KR', {maximumFractionDigits: 8});
 
+/** 서버의 ISO 날짜(2026-11-06T10:00:00) → '11-06'. 서버 시각(한국)을 그대로 쓴다 (시간대 변환 없음) */
+export const formatMonthDay = (iso) => (iso ? `${iso.slice(5, 7)}-${iso.slice(8, 10)}` : '—');
+
 /** 큰 원화 금액을 짧게: 4812억, 35백만 */
 export const formatCompactKRW = (won) => {
     const n = Number(won ?? 0);

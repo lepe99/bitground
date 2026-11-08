@@ -11,7 +11,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+import static org.hamcrest.Matchers.closeTo;
+import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.matchesPattern;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -56,5 +59,21 @@ class TradeSummaryApiTest extends IntegrationTest {
         mvc.perform(get("/users/trade-details").cookie(cookie).param("seasonId", season.getId().toString()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(1)));
+    }
+
+    @Test
+    void 수익률은_숫자_날짜는_ISO로_내려주고_표시_형식은_화면이_정한다() throws Exception {
+        order(OrderType.BUY, Status.COMPLETED, "0.01", "100000000", null);  // 100만 원 매수
+        order(OrderType.SELL, Status.COMPLETED, "0.01", "115200000", null); // 115.2만 원 매도
+
+        mvc.perform(get("/users/trade-summary").cookie(cookie).param("seasonId", season.getId().toString()))
+                .andExpect(jsonPath("$[0].returnRate").value(closeTo(15.2, 1e-9)))
+                .andExpect(jsonPath("$[0].profit").value(152_000.0))
+                .andExpect(jsonPath("$[0].firstBuyAt", matchesPattern("\\d{4}-\\d{2}-\\d{2}T.*")));
+        mvc.perform(get("/users/trade-details").cookie(cookie).param("seasonId", season.getId().toString()))
+                .andExpect(jsonPath("$[*].orderType", containsInAnyOrder("BUY", "SELL")))
+                .andExpect(jsonPath("$[0].symbol").value("KRW-BTC"))
+                .andExpect(jsonPath("$[0].amount").value(0.01))
+                .andExpect(jsonPath("$[0].createdAt", matchesPattern("\\d{4}-\\d{2}-\\d{2}T.*")));
     }
 }
