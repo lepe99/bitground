@@ -34,7 +34,7 @@ public class CommentService {
     private final PostRepository postRepository;
     private final UserRepository userRepository;
     private final NotificationRepository notificationRepository;
-    private final UserSseEmitters userSseEmitters;
+    private final NotificationService notificationService;
     private final InquiryNotifier inquiryNotifier;
     private final NotificationSettingService notificationSettingService;
 
@@ -110,7 +110,7 @@ public class CommentService {
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
-                saved.forEach(userSseEmitters::sendSaved);
+                saved.forEach(notificationService::push);
             }
         });
     }

@@ -3,7 +3,7 @@ package bit.bitgroundspring.event;
 import bit.bitgroundspring.dto.response.NotificationResponse;
 import bit.bitgroundspring.entity.Message;
 import bit.bitgroundspring.entity.MessageType;
-import bit.bitgroundspring.entity.OrderType;
+import bit.bitgroundspring.service.NotificationMessages;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
@@ -16,7 +16,6 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -122,11 +121,12 @@ public class DomainEventConsumer {
 
         // 접속하지 않은 사이 체결돼도 알림이 남도록 먼저 저장한다. 같은 이벤트가 다시 오면 저장하지 않고,
         // 체결 알림을 끈 사용자에게는 저장도 실시간 전송도 하지 않는다 (알림 설정)
+        String text = NotificationMessages.orderExecuted(event.orderType(), event.symbol(), event.amount(), event.tradePrice());
         int inserted = jdbc.update("""
                 INSERT IGNORE INTO notifications (user_id, message, message_type, event_id, is_read)
                 SELECT ?, ?, ?, ?, 0 FROM DUAL
                 WHERE NOT EXISTS (SELECT 1 FROM notification_settings WHERE user_id = ? AND order_execution = 0)
-                """, event.userId(), orderMessage(event), Message.ORDER_EXECUTION.name(), eventId, event.userId());
+                """, event.userId(), text, Message.ORDER_EXECUTION.name(), eventId, event.userId());
         if (inserted == 0 || !fresh) {
             return;
         }
@@ -138,31 +138,9 @@ public class DomainEventConsumer {
                 .messageType(MessageType.INFO)
                 .message(Message.ORDER_EXECUTION)
                 .data(Map.of(
-                        "orderType", event.orderType().name(),
-                        "symbol", event.symbol(),
-                        "amount", event.amount(),
-                        "tradePrice", event.tradePrice(),
-                        "cash", cash == null ? 0L : cash,
+                        "text", text, // 저장한 문구 그대로 (토스트와 알림 목록이 같은 문장)
+                        "cash", cash == null ? 0L : cash, // 화면의 보유 현금 갱신
                         "id", notificationId == null ? 0L : notificationId))
                 .build());
-    }
-
-    static String orderMessage(OrderExecutedEvent event) {
-        String side = event.orderType() == OrderType.BUY ? "매수" : "매도";
-        String coin = event.symbol().contains("-") ? event.symbol().split("-")[1] : event.symbol();
-        return String.format("예약 %s 주문이 체결되었습니다.\n수량 : %.7f %s\n체결 : 개당 %s원",
-                side, event.amount(), coin, formatPrice(event.tradePrice()));
-    }
-
-    /** 정수면 소수점 없이, 소수면 불필요한 0을 빼고 천 단위 구분 */
-    private static String formatPrice(BigDecimal price) {
-        if (price == null) {
-            return "0";
-        }
-        BigDecimal stripped = price.stripTrailingZeros();
-        if (stripped.scale() <= 0) {
-            return String.format("%,d", stripped.longValueExact());
-        }
-        return String.format("%,." + stripped.scale() + "f", stripped);
     }
 }

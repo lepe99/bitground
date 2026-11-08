@@ -1,14 +1,7 @@
 package bit.bitgroundspring.service;
 
-import bit.bitgroundspring.entity.Message;
-import bit.bitgroundspring.entity.MessageType;
-import bit.bitgroundspring.dto.response.NotificationResponse;
-import bit.bitgroundspring.entity.Notification;
-import bit.bitgroundspring.service.NotificationService;
-import bit.bitgroundspring.event.RealtimeBus;
 import bit.bitgroundspring.event.RealtimeListener;
 import lombok.Getter;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -23,14 +16,14 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
 
+/**
+ * 이 서버에 붙은 사용자별 SSE 연결 관리 (연결·하트비트·정리·전송).
+ * 알림 저장과 여러 서버로의 전달은 NotificationService·RealtimeBus가, 받은 알림을 여기로 넘기는 것은 RealtimeListener가 맡는다
+ */
 @Component
 @Slf4j
-@RequiredArgsConstructor
 public class UserSseEmitters {
-    private final NotificationService notificationService;
-    // 실시간 전송은 모든 서버를 거쳐 사용자가 붙어 있는 서버가 보낸다 (서버가 여러 대일 때)
-    private final RealtimeBus realtimeBus;
-    
+
     // 사용자별 SSE 연결 관리
     private final Map<Integer, List<EmitterWrapper>> userEmitters = new ConcurrentHashMap<>();
     
@@ -116,19 +109,6 @@ public class UserSseEmitters {
         return hasSuccessfulSend;
     }
     
-    /** 저장해 둔 알림을 접속 중이면 실시간으로 보낸다 (댓글 알림: 문구는 저장한 것을 그대로 쓴다). 어느 서버에 접속했든 전달된다 */
-    public void sendSaved(Notification notification) {
-        Map<String, Object> data = new HashMap<>();
-        data.put("text", notification.getMessage());
-        data.put("postId", notification.getPostId());
-        data.put("id", notification.getId()); // 토스트를 누르면 이 알림을 읽음으로
-        realtimeBus.toUser(notification.getUser().getId(), NotificationResponse.builder()
-                .messageType(MessageType.INFO)
-                .message(notification.getMessageType())
-                .data(data)
-                .build());
-    }
-
     /** 클라이언트가 이미 연결을 끊어 생긴 오류인지 (서버 문제가 아님) */
     static boolean isClientGone(Throwable e) {
         for (Throwable t = e; t != null; t = t.getCause()) {
@@ -228,40 +208,6 @@ public class UserSseEmitters {
         }
     }
     
-    /** 모든 사용자 알림 (공지·시즌): 저장한 뒤 접속 중인 사용자에게 보낸다 (모든 서버) */
-    public void sendToAll(NotificationResponse request) {
-        // 시스템 알림 저장 (접속 여부와 무관). 받은 화면이 곧바로 읽지 않은 개수를 다시 읽으므로 보내기 전에 저장한다
-        if (request.getMessage() == Message.SEASON_UPDATE || request.getMessage() == Message.NOTICE) {
-            saveSystemNotification(request);
-        }
-        realtimeBus.toAll(request);
-    }
-
-    // 시스템 알림 저장
-    private void saveSystemNotification(NotificationResponse request) {
-        try {
-            Map<String, Object> dataMap = request.getData();
-            String message = "";
-            
-            if (request.getMessage() == Message.SEASON_UPDATE) {
-                String seasonName = (String) dataMap.get("seasonName");
-                String seasonFlag = (String) dataMap.get("seasonFlag");
-                message = getMessage(seasonFlag, seasonName);
-            } else if (request.getMessage() == Message.NOTICE) {
-                String title = (String) dataMap.get("title");
-                message = String.format("🔔 새로운 공지사항이 등록되었습니다.\n공지사항 탭에서 확인해보세요.\n[%s]", title);
-            }
-            
-            // 예전에는 1번 사용자 행 하나에 저장해 모두가 같이 읽었는데, 1번은 실제 사용자라
-            // 그 사람의 주문 알림까지 모두에게 보이고 읽지 않은 개수도 셀 수 없었다
-            int saved = notificationService.saveForAllUsers(request.getMessage(), message);
-            log.info("시스템 알림 {}건 저장 ({})", saved, request.getMessage());
-            
-        } catch (Exception e) {
-            log.error("시스템 알림 저장 실패: {}", e.getMessage());
-        }
-    }
-    
     public void removeUser(Integer userId, SseEmitter emitter) {
         List<EmitterWrapper> wrappers = userEmitters.get(userId);
         if (wrappers != null) {
@@ -287,15 +233,6 @@ public class UserSseEmitters {
         return wrappers != null ? wrappers.size() : 0;
     }
     
-    
-    private String getMessage(String seasonFlag, String seasonName) {
-        if (seasonFlag.equals("season")) {
-            return String.format("🎉 %s 스플릿 1 🎉\n새로운 시즌이 시작되었습니다!\n이전 랭킹과 수익률을 확인해보세요.", seasonName);
-        } else if (seasonFlag.equals("split")) {
-            return String.format("🚀 %s 스플릿 2 🚀\n새로운 스플릿이 시작되었습니다!\n10,000,000원의 추가 자금이 지급됩니다.", seasonName);
-        }
-        return "";
-    }
     
     // 🔄 애플리케이션 종료 시 모든 연결 정리
     @PreDestroy

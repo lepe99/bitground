@@ -12,11 +12,8 @@ import bit.bitgroundspring.common.error.ErrorCode;
 import bit.bitgroundspring.common.tx.AfterCommit;
 import bit.bitgroundspring.dto.projection.OrderProjection;
 import bit.bitgroundspring.entity.Message;
-import bit.bitgroundspring.entity.MessageType;
-import bit.bitgroundspring.dto.response.NotificationResponse;
 import bit.bitgroundspring.entity.*;
 import bit.bitgroundspring.repository.*;
-import bit.bitgroundspring.service.UserSseEmitters;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -39,7 +36,7 @@ public class OrderService {
     private final TradingWindow tradingWindow;
     private final ReservedOrderBook orderBook;
     private final CoinRepository coinRepository;
-    private final UserSseEmitters userSseEmitters;
+    private final NotificationService notificationService;
     private final UserRepository userRepository;
     private final UserAssetRepository userAssetRepository;
 
@@ -247,18 +244,10 @@ public class OrderService {
         // 사용자에게 시즌 종료 / 스플릿 업데이트 알림 전송
         Season currentSeason = seasonRepository.findByStatus(Status.PENDING)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NO_ACTIVE_SEASON));
-        String seasonName = currentSeason.getName();
-
-        Map<String, Object> data = Map.of(
-                "seasonName", seasonName,
-                "seasonFlag", seasonFlag
-        );
-        NotificationResponse notificationResponse = NotificationResponse.builder()
-                .messageType(MessageType.INFO)
-                .message(Message.SEASON_UPDATE)
-                .data(data)
-                .build();
-        userSseEmitters.sendToAll(notificationResponse);
+        String text = NotificationMessages.seasonUpdate(seasonFlag, currentSeason.getName());
+        if (text != null) {
+            notificationService.broadcast(Message.SEASON_UPDATE, text);
+        }
     }
 
     private static BigDecimal sumValue(List<Order> orders) {

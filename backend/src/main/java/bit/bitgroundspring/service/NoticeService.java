@@ -7,26 +7,22 @@ import bit.bitgroundspring.common.html.HtmlSanitizer;
 import bit.bitgroundspring.dto.request.NoticeRequestDto;
 import bit.bitgroundspring.dto.response.NoticeResponseDto;
 import bit.bitgroundspring.entity.Message;
-import bit.bitgroundspring.entity.MessageType;
-import bit.bitgroundspring.dto.response.NotificationResponse;
 import bit.bitgroundspring.entity.Notice;
 import bit.bitgroundspring.entity.User;
 import bit.bitgroundspring.repository.NoticeRepository;
 import bit.bitgroundspring.repository.UserRepository;
-import bit.bitgroundspring.service.UserSseEmitters;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
 public class NoticeService {
     private final NoticeRepository noticeRepository;
     private final UserRepository userRepository;
-    private final UserSseEmitters userSseEmitters;
+    private final NotificationService notificationService;
     private final HtmlSanitizer htmlSanitizer;
     private final AdminAuditService audit;
 
@@ -49,15 +45,7 @@ public class NoticeService {
         }
 
         // 저장이 끝난 뒤 사용자들에게 공지 등록 알림 전송 (기존: 저장 전에 알림부터 보냄)
-        Map<String, Object> data = Map.of(
-                "title", dto.getTitle()
-        );
-        NotificationResponse notificationResponse = NotificationResponse.builder()
-                .messageType(MessageType.INFO)
-                .message(Message.NOTICE)
-                .data(data)
-                .build();
-        userSseEmitters.sendToAll(notificationResponse);
+        notificationService.broadcast(Message.NOTICE, NotificationMessages.notice(dto.getTitle()));
 
         return saved;
     }

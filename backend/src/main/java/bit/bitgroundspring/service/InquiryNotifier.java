@@ -31,7 +31,7 @@ public class InquiryNotifier {
 
     private final NotificationRepository notificationRepository;
     private final UserRepository userRepository;
-    private final UserSseEmitters userSseEmitters;
+    private final NotificationService notificationService;
     private final NotificationSettingService notificationSettingService;
 
     /** 새 문의 → 관리자들 */
@@ -82,11 +82,11 @@ public class InquiryNotifier {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
                 public void afterCommit() {
-                    saved.forEach(userSseEmitters::sendSaved);
+                    saved.forEach(notificationService::push);
                 }
             });
         } else {
-            saved.forEach(userSseEmitters::sendSaved);
+            saved.forEach(notificationService::push);
         }
     }
 

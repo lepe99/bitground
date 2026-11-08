@@ -109,6 +109,11 @@ class EventPipelineTest extends IntegrationTest {
         assertThat(jdbc.queryForObject("SELECT event_id FROM notifications", Long.class)).isNotNull();
         await(() -> realtime("USER").size() == 1 && realtime("TRADE").size() == 1);
         assertThat(realtime("USER").get(0).getValue().get("userId")).isEqualTo(String.valueOf(user.getId()));
+        // 토스트 문구는 저장한 알림 문구와 같다 (프론트가 따로 조립하지 않는다)
+        String saved = jdbc.queryForObject("SELECT message FROM notifications", String.class);
+        assertThat(saved).startsWith("예약 매수 주문이 체결되었습니다.");
+        String payload = String.valueOf(realtime("USER").get(0).getValue().get("payload"));
+        assertThat(payload).contains(saved.replace("\n", "\\n")).contains("\"cash\"").contains("\"id\"");
         await(() -> redis.opsForStream().size(domainStream) == 0); // 처리 후 확인·삭제
     }
 

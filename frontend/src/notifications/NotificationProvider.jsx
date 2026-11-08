@@ -1,6 +1,5 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {NotificationContext} from './NotificationContext.js';
-import {formatNotification} from './formatNotification.js';
 import {useAuth} from '../auth/useAuth.js';
 import {useToast} from '../components/toastContext.js';
 import {
@@ -72,7 +71,7 @@ export const NotificationProvider = ({children}) => {
             if (notification.message === 'ORDER_EXECUTION' && notification.data?.cash != null) {
                 setUserCash(notification.data.cash);
             }
-            const text = formatNotification(notification);
+            const text = notification.data?.text ?? ''; // 서버가 저장한 문구 그대로 (알림 목록과 같은 문장)
             // 공지·시즌은 모든 접속자에게 오므로 끈 종류는 여기서 거른다. 토스트를 끄면 배지만 바뀐다
             const muted = settingsRef.current[SETTING_OF[notification.message]] === false;
             if (muted) return;

@@ -38,7 +38,7 @@ class CommentServiceTest {
     private CommentRepository commentRepository;
     private NotificationRepository notificationRepository;
     private UserRepository userRepository;
-    private UserSseEmitters userSseEmitters;
+    private NotificationService notificationService;
     private CommentService commentService;
     private Post post;
 
@@ -47,9 +47,9 @@ class CommentServiceTest {
         commentRepository = mock(CommentRepository.class);
         notificationRepository = mock(NotificationRepository.class);
         userRepository = mock(UserRepository.class);
-        userSseEmitters = mock(UserSseEmitters.class);
+        notificationService = mock(NotificationService.class);
         PostRepository postRepository = mock(PostRepository.class);
-        commentService = new CommentService(commentRepository, postRepository, userRepository, notificationRepository, userSseEmitters,
+        commentService = new CommentService(commentRepository, postRepository, userRepository, notificationRepository, notificationService,
                 mock(InquiryNotifier.class), new NotificationSettingService(mock(NotificationSettingRepository.class))); // 설정 없음: 모두 받음
 
         post = Post.builder().id(10).title("비트코인 전망").category(Category.CHAT).user(POST_AUTHOR).build();
@@ -131,8 +131,8 @@ class CommentServiceTest {
         Map<Integer, String> sent = notifiedOn(COMMENTER.getId(), null, "가".repeat(60) + "\n\n끝");
 
         assertThat(sent.get(POST_AUTHOR.getId())).endsWith("가".repeat(40) + "…”");
-        verify(userSseEmitters, never()).sendSaved(any());
+        verify(notificationService, never()).push(any());
         TransactionSynchronizationManager.getSynchronizations().forEach(TransactionSynchronization::afterCommit);
-        verify(userSseEmitters).sendSaved(any());
+        verify(notificationService).push(any());
     }
 }
