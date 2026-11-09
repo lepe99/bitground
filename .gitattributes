@@ -7,3 +7,5 @@ gradlew text eol=lf
 # AI 프롬프트 파일은 줄바꿈까지 모델에 그대로 보내므로 OS와 관계없이 LF로 고정
 backend/src/main/resources/prompts/** text eol=lf
 scheduler/service/prompts/** text eol=lf
+# 운영 서버 설정은 Windows에서 로컬 검증할 때도 LF로 (tinyproxy·Caddy 설정이 CRLF를 그대로 읽지 않게)
+deploy/** text eol=lf

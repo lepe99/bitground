@@ -1,0 +1,144 @@
+# 운영 앱 서버 (EC2 t4g.small: 2 vCPU, 2GiB + 스왑 2GiB, 퍼블릭 서브넷, 공인 IPv4 1개)
+#   cd /opt/bitground/deploy/app && docker compose up -d
+#
+# 메모리 상한 (부하 테스트로 정한 값, 합계 약 1.7GiB):
+#   backend 1000M · mysql 400M · redis 64M · alloy 160M · caddy 64M · tinyproxy 32M
+#
+# 외부에 여는 포트 (보안 그룹으로 출발지를 제한):
+#   80, 443  caddy      인터넷 전체 (HTTPS, Let's Encrypt 인증서 발급)
+#   3306     mysql      쓰기 Lambda(B) 보안 그룹만
+#   8090     backend    쓰기 Lambda(B) 보안 그룹만 (시즌·스플릿 완료 알림)
+#   8888     tinyproxy  모니터링 서버 보안 그룹만 (모니터링 서버의 외부 통신 출구)
+# 관리 포트 8091(actuator)은 열지 않는다. 같은 네트워크의 alloy·caddy만 접근한다.
+#
+# 비밀값은 배포할 때 SSM Parameter Store에서 읽어 .env / backend.env 로 만든다 (커밋 금지, .env.example 참고)
+
+name: bitground
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "20m"
+    max-file: "5"
+
+services:
+  caddy:
+    logging: *default-logging
+    image: caddy:2.10.2-alpine
+    restart: unless-stopped
+    mem_limit: 64m
+    environment:
+      API_DOMAIN: ${API_DOMAIN:?API_DOMAIN 필요}
+      ACME_EMAIL: ${ACME_EMAIL:?ACME_EMAIL 필요}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp" # HTTP/3
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data # 발급받은 인증서 (지우면 재발급되며, Let's Encrypt 발급 횟수 제한에 걸릴 수 있다)
+      - caddy-config:/config
+    depends_on:
+      - backend
+
+  backend:
+    logging: *default-logging
+    image: ${BACKEND_IMAGE:-ghcr.io/lepe99/bitground-backend}:${BACKEND_TAG:-latest}
+    restart: unless-stopped
+    mem_limit: 1000m # 힙은 이미지의 MaxRAMPercentage=60 → 약 600MB
+    env_file: ./backend.env
+    environment:
+      DB_URL: jdbc:mysql://mysql:3306/bitground?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+      DB_USERNAME: bitground
+      DB_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD 필요}
+      REDIS_HOST: redis
+      SERVER_TOMCAT_THREADS_MAX: "80" # 2 vCPU에서 200보다 지연이 짧았다 (부하 테스트 500명 p95 402ms vs 650ms)
+      LOGGING_STRUCTURED_FORMAT_CONSOLE: logstash # JSON 로그 → Alloy → Loki
+    ports:
+      - "8090:8090" # 쓰기 Lambda(B)의 완료 알림용. 인터넷에는 보안 그룹으로 막는다 (사용자 요청은 caddy 443)
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  mysql:
+    logging: *default-logging
+    image: mysql:8.0
+    restart: unless-stopped
+    mem_limit: 400m
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD 필요}
+      MYSQL_DATABASE: bitground
+      MYSQL_USER: bitground
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD 필요}
+      TZ: Asia/Seoul
+    # 400MB 상한 안에 두는 설정 (부하 테스트 최대 사용량 약 210MB).
+    # 설정 파일 대신 실행 옵션으로 둔다: 마운트한 .cnf가 쓰기 가능 권한이면 MySQL이 경고만 남기고 통째로 무시한다
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-time-zone=+09:00
+      - --innodb-buffer-pool-size=128M
+      - --performance-schema=OFF # 켜 두면 그것만으로 약 200MB
+      - --max-connections=30 # 백엔드 Hikari 10 + 쓰기 Lambda + 백업·관리 여유
+      - --temptable-max-ram=64M
+      - --tmp-table-size=32M
+      - --max-heap-table-size=32M
+    ports:
+      - "3306:3306" # 쓰기 Lambda(B) 전용. 보안 그룹으로 Lambda만 허용
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      retries: 20
+
+  redis:
+    logging: *default-logging
+    image: redis:7-alpine
+    restart: unless-stopped
+    mem_limit: 64m
+    # AOF 1초 기록 (로컬과 같음). maxmemory를 컨테이너 상한보다 낮게 둬 OOM으로 죽기 전에 쓰기만 거절되게 한다
+    command: ["redis-server", "--appendonly", "yes", "--appendfsync", "everysec", "--maxmemory", "48mb"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 10
+
+  # 로그·지표 수집기. 컨테이너 로그는 모니터링 서버 Loki로, 백엔드·호스트 지표는 Prometheus로 보낸다
+  alloy:
+    logging: *default-logging
+    image: grafana/alloy:v1.21.3
+    restart: unless-stopped
+    mem_limit: 160m
+    command: run --storage.path=/var/lib/alloy/data /etc/alloy/config.alloy
+    environment:
+      MONITORING_HOST: ${MONITORING_HOST:?MONITORING_HOST 필요 (모니터링 서버 프라이빗 IP)}
+    volumes:
+      - ./alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - alloy-data:/var/lib/alloy/data # 모니터링 서버가 잠시 내려가도 보내지 못한 지표를 디스크에 잠시 보관 (WAL)
+      - /var/run/docker.sock:/var/run/docker.sock:ro # 컨테이너 로그
+      - /proc:/host/proc:ro # 호스트 메모리·스왑·CPU·디스크 지표
+      - /sys:/host/sys:ro
+      - /:/host/root:ro
+
+  # 모니터링 서버(공인 IP 없음)의 외부 통신 출구: 이미지 받기, Grafana 알림(디스코드), SSM 에이전트.
+  # NAT 게이트웨이(월 $30 이상)나 공인 IPv4 추가 대신 쓴다. 들어오는 연결은 보안 그룹이 모니터링 서버만 허용한다
+  tinyproxy:
+    logging: *default-logging
+    build:
+      context: ./tinyproxy
+    restart: unless-stopped
+    mem_limit: 32m
+    ports:
+      - "8888:8888"
+
+volumes:
+  caddy-data:
+  caddy-config:
+  mysql-data:
+  redis-data:
+  alloy-data:

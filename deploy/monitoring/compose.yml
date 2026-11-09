@@ -1,0 +1,98 @@
+# 운영 모니터링 서버 (EC2 t4g.micro: 2 vCPU, 1GiB + 스왑, 프라이빗 서브넷, 공인 IP 없음)
+#   cd /opt/bitground/deploy/monitoring && docker compose up -d
+#
+# 메모리 상한 (합계 약 800M, 나머지는 OS·Docker·SSM 에이전트):
+#   loki 320M · prometheus 224M · grafana 160M · alloy 96M
+#
+# 받는 포트 (보안 그룹으로 출발지 제한):
+#   3100  loki        앱 서버 Alloy (컨테이너 로그)
+#   9090  prometheus  앱 서버 Alloy (지표 remote write)
+#   3500  alloy       lambda-promtail (스케줄러 Lambda 로그)
+#   3000  grafana     앱 서버를 거친 SSM 포트 포워딩으로만 접속
+# 외부로 나가는 통신(이미지 받기, 디스코드 알림)은 앱 서버 tinyproxy(8888)를 거친다.
+#
+# 설정 파일은 로컬 개발 환경(monitoring/)과 같은 것을 쓴다. 서버에는 deploy/와 monitoring/을 함께 올린다
+
+name: bitground-monitoring
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "20m"
+    max-file: "5"
+
+services:
+  loki:
+    logging: *default-logging
+    image: grafana/loki:3.7.1
+    restart: unless-stopped
+    mem_limit: 320m
+    command: -config.file=/etc/loki/config.yaml
+    ports:
+      - "3100:3100"
+    volumes:
+      - ../../monitoring/loki/config.yaml:/etc/loki/config.yaml:ro # 90일 보관
+      - loki-data:/loki
+
+  prometheus:
+    logging: *default-logging
+    image: prom/prometheus:v3.5.0
+    restart: unless-stopped
+    mem_limit: 224m
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=15d
+      - --storage.tsdb.retention.size=4GB # 디스크가 작아 크기로도 한 번 더 제한
+      - --web.enable-remote-write-receiver
+    ports:
+      - "9090:9090"
+    volumes:
+      - ../../monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+
+  # Lambda 로그 수신기: lambda-promtail이 보낸 로그를 받아 스케줄러 JSON 필드를 정리한 뒤 Loki에 넣는다
+  alloy:
+    logging: *default-logging
+    image: grafana/alloy:v1.21.3
+    restart: unless-stopped
+    mem_limit: 96m
+    command: run --storage.path=/var/lib/alloy/data /etc/alloy/config.alloy
+    ports:
+      - "3500:3500"
+    volumes:
+      - ./alloy/config.alloy:/etc/alloy/config.alloy:ro
+    depends_on:
+      - loki
+
+  grafana:
+    logging: *default-logging
+    image: grafana/grafana:13.3.0
+    restart: unless-stopped
+    mem_limit: 160m
+    environment:
+      # 로컬과 달리 로그인 필요. 관리자 비밀번호는 .env (SSM Parameter Store에서 생성)
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?GRAFANA_ADMIN_PASSWORD 필요}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES: "false"
+      GF_PLUGINS_PREINSTALL_DISABLED: "true"
+      # 알림(디스코드 웹훅)은 앱 서버 tinyproxy를 거쳐 나간다. 같은 서버 안의 데이터 소스는 프록시를 쓰지 않는다
+      HTTPS_PROXY: http://${PROXY_HOST:?PROXY_HOST 필요 (앱 서버 프라이빗 IP)}:8888
+      NO_PROXY: loki,prometheus,localhost,127.0.0.1
+    ports:
+      - "3000:3000"
+    volumes:
+      - ../../monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ../../monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - loki
+      - prometheus
+
+volumes:
+  loki-data:
+  prometheus-data:
+  grafana-data:
