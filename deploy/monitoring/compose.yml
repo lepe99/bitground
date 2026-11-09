@@ -1,8 +1,10 @@
 # 운영 모니터링 서버 (EC2 t4g.micro: 2 vCPU, 1GiB + 스왑, 프라이빗 서브넷, 공인 IP 없음)
 #   cd /opt/bitground/deploy/monitoring && docker compose up -d
 #
-# 메모리 상한 (합계 약 800M, 나머지는 OS·Docker·SSM 에이전트):
-#   loki 320M · prometheus 224M · grafana 160M · alloy 96M
+# 메모리 상한 (합계 800M, 나머지는 OS·Docker·SSM 에이전트):
+#   loki 224M · prometheus 160M · grafana 320M · alloy 96M
+#   로컬 검증 때 요청이 없을 때의 실사용(anon): grafana 191M, alloy 39M, prometheus 30M, loki 약 40M.
+#   Grafana 13은 160M 상한에서 메모리 회수에 CPU를 다 쓰며 응답하지 못해 가장 많이 준다
 #
 # 받는 포트 (보안 그룹으로 출발지 제한):
 #   3100  loki        앱 서버 Alloy (컨테이너 로그)
@@ -26,7 +28,7 @@ services:
     logging: *default-logging
     image: grafana/loki:3.7.1
     restart: unless-stopped
-    mem_limit: 320m
+    mem_limit: 224m
     command: -config.file=/etc/loki/config.yaml
     ports:
       - "3100:3100"
@@ -38,7 +40,7 @@ services:
     logging: *default-logging
     image: prom/prometheus:v3.5.0
     restart: unless-stopped
-    mem_limit: 224m
+    mem_limit: 160m
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.path=/prometheus
@@ -69,9 +71,10 @@ services:
     logging: *default-logging
     image: grafana/grafana:13.3.0
     restart: unless-stopped
-    mem_limit: 160m
+    mem_limit: 320m
     environment:
       # 로컬과 달리 로그인 필요. 관리자 비밀번호는 .env (SSM Parameter Store에서 생성)
+      GOMEMLIMIT: 280MiB # 상한에 닿기 전에 GC가 메모리를 돌려주게 (Grafana는 컨테이너 상한을 스스로 읽지 않음)
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?GRAFANA_ADMIN_PASSWORD 필요}
       GF_USERS_ALLOW_SIGN_UP: "false"

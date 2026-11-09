@@ -117,6 +117,7 @@ services:
     command: run --storage.path=/var/lib/alloy/data /etc/alloy/config.alloy
     environment:
       MONITORING_HOST: ${MONITORING_HOST:?MONITORING_HOST 필요 (모니터링 서버 프라이빗 IP)}
+      COMPOSE_PROJECT: ${COMPOSE_PROJECT_NAME:-bitground} # 로그를 모을 compose 프로젝트 (로컬 검증 때 다른 이름으로 띄움)
     volumes:
       - ./alloy/config.alloy:/etc/alloy/config.alloy:ro
       - alloy-data:/var/lib/alloy/data # 모니터링 서버가 잠시 내려가도 보내지 못한 지표를 디스크에 잠시 보관 (WAL)

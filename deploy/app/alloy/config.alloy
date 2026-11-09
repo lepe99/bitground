@@ -6,10 +6,10 @@
 discovery.docker "app" {
   host = "unix:///var/run/docker.sock"
 
-  // compose 프로젝트 bitground의 backend·caddy 컨테이너만
+  // 같은 compose 프로젝트(기본 bitground)의 컨테이너만. backend·caddy만 남기는 것은 아래 relabel
   filter {
     name   = "label"
-    values = ["com.docker.compose.project=bitground"]
+    values = [string.format("com.docker.compose.project=%s", coalesce(sys.env("COMPOSE_PROJECT"), "bitground"))]
   }
 }
 
