@@ -182,7 +182,7 @@ func run(ctx context.Context, db *sql.DB, cfg config.Config, now time.Time, jobs
 	var wg sync.WaitGroup
 	wg.Go(func() {
 		marketErr = step("마켓 인덱스 업데이트", func(ctx context.Context) error {
-			return service.UpdateMarketIndex(ctx, db, cfg.CoinGeckoAPIKey)
+			return service.UpdateMarketIndex(ctx, db, cfg.CoinGeckoAPIKey, now)
 		})
 	})
 	newsCfg := newsArchiveConfig(cfg)
@@ -253,7 +253,7 @@ func run(ctx context.Context, db *sql.DB, cfg config.Config, now time.Time, jobs
 	errs = append(errs, rankErr)
 	if rankErr == nil {
 		errs = append(errs, step("코인 가격 히스토리 업데이트", func(ctx context.Context) error {
-			return service.UpdateCoinPriceHistory(ctx, db, coinPriceHistory)
+			return service.UpdateCoinPriceHistory(ctx, db, coinPriceHistory, now)
 		}))
 	}
 

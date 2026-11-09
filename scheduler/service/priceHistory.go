@@ -9,10 +9,9 @@ import (
 )
 
 // UpdateCoinPriceHistory 는 코인 가격 히스토리를 업데이트하는 함수입니다.
-func UpdateCoinPriceHistory(ctx context.Context, db *sql.DB, coinPriceHistory map[int]model.UpbitCoinPrice) error {
-	// 현재 날짜 및 시간
-	now := time.Now()
-	currentDate := now.Format("2006-01-02")
+// now 실행 기준 정시: 이 시각의 행으로 남긴다 (기존: 실제 현재 시각을 써서, 늦게 돈 재시도·TEST_TIME 실행이 다른 시각 행에 들어갔다)
+func UpdateCoinPriceHistory(ctx context.Context, db *sql.DB, coinPriceHistory map[int]model.UpbitCoinPrice, now time.Time) error {
+	currentDate := now.Format(time.DateOnly)
 	currentHour := now.Hour()
 
 	// 쿼리 타임아웃 설정 (20초)

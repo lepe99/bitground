@@ -15,7 +15,8 @@ type GeckoCoin struct {
 
 // UpdateMarketIndex 함수는 상위 10개 코인의 마켓 캡 정보를 가져와서 마켓 인덱스와 알트 인덱스를 계산하고, 이를 데이터베이스에 삽입합니다.
 // coingeckoKey 무료 Demo 키(비우면 키 없이 호출). 키 없는 호출은 IP 기준 제한이라 Lambda처럼 IP를 나눠 쓰면 막힐 수 있다
-func UpdateMarketIndex(ctx context.Context, db *sql.DB, coingeckoKey string) error {
+// now 실행 기준 정시 (이 시각의 행으로 남긴다)
+func UpdateMarketIndex(ctx context.Context, db *sql.DB, coingeckoKey string, now time.Time) error {
 	// 1. CoinGecko API를 사용하여 상위 10개 코인의 마켓 캡 정보를 가져옵니다.
 	coinCaps, err := getMarketCap(ctx, coingeckoKey)
 	if err != nil {
@@ -26,7 +27,7 @@ func UpdateMarketIndex(ctx context.Context, db *sql.DB, coingeckoKey string) err
 	marketIndex, altIndex := calcMarketIndex(coinCaps)
 
 	// 3. 데이터베이스에 마켓 인덱스와 알트 인덱스를 삽입합니다.
-	if err := insertMarketIndex(ctx, db, marketIndex, altIndex); err != nil {
+	if err := insertMarketIndex(ctx, db, marketIndex, altIndex, now); err != nil {
 		return fmt.Errorf("insertMarketIndex 에러: %w", err)
 	}
 
@@ -116,10 +117,9 @@ func calcMarketIndex(coinCaps []GeckoCoin) (int, int) {
 }
 
 // insertMarketIndex 함수는 계산된 마켓 인덱스와 알트 인덱스를 데이터베이스에 삽입합니다.
-func insertMarketIndex(ctx context.Context, db *sql.DB, marketIndex, altIndex int) error {
-	// 현재 날짜와 시간을 가져옵니다.
-	now := time.Now().Round(time.Hour)
-	date := now.Format("2006-01-02")
+// (기존: 실제 현재 시각을 반올림해, 14시 실행이 30분 넘게 늦거나 재시도되면 15시 행에 들어갔다)
+func insertMarketIndex(ctx context.Context, db *sql.DB, marketIndex, altIndex int, now time.Time) error {
+	date := now.Format(time.DateOnly)
 	hour := now.Hour()
 
 	// 데이터베이스에 마켓 인덱스와 알트 인덱스를 업데이트하는 쿼리
