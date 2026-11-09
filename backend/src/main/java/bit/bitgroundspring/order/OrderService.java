@@ -24,6 +24,7 @@ import bit.bitgroundspring.user.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -136,7 +137,8 @@ public class OrderService {
     
     
     // 예약 주문 생성 메서드
-    @Transactional
+    // 매도 예약은 보유 자산 행을 잠가 확인한다. 행이 없을 때 빈 구간까지 잠그지 않도록 READ COMMITTED (OrderTransactions 참고)
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     @Loggable("예약 주문 접수")
     public Order createReserveOrder(Integer userId, CreateOrderRequest request) {
         validateOrderRequest(request);

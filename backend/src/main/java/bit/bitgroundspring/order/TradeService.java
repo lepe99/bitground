@@ -16,7 +16,6 @@ import bit.bitgroundspring.season.Season;
 import bit.bitgroundspring.season.SeasonRepository;
 import bit.bitgroundspring.user.User;
 import bit.bitgroundspring.user.UserRepository;
-import org.springframework.transaction.support.TransactionTemplate;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -35,7 +34,7 @@ public class TradeService {
     private final TradingWindow tradingWindow;
     private final OutboxEvents outbox;
     private final MarketPriceService marketPriceService;
-    private final TransactionTemplate transactionTemplate;
+    private final OrderTransactions orderTransactions;
 
     /**
      * 시장가 주문. 현재가는 트랜잭션·잠금 밖에서 먼저 구한다
@@ -47,7 +46,7 @@ public class TradeService {
         tradingWindow.ensureOpen(); // 시즌 종료 시각부터 정산이 끝날 때까지 거래 마감
         ensureTradable(req.getSymbol());
         BigDecimal marketPrice = marketPriceService.currentPrice(req.getSymbol());
-        return transactionTemplate.execute(status -> execute(userId, req, marketPrice));
+        return orderTransactions.execute(() -> execute(userId, req, marketPrice));
     }
 
     /** 없는 종목이나 상장 폐지된 종목은 사고팔 수 없다 (실제 거래소도 거래지원이 끝나면 매수·매도 모두 막힌다) */

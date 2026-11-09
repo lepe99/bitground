@@ -27,7 +27,6 @@ import org.springframework.data.redis.connection.stream.MapRecord;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
 import java.time.Duration;
@@ -68,7 +67,7 @@ public class OrderExecutionService {
     private final UserRepository userRepository;
     private final UserAssetRepository userAssetRepository;
     private final ReservedOrderBook orderBook;
-    private final TransactionTemplate transactionTemplate;
+    private final OrderTransactions orderTransactions;
     private final OutboxEvents outbox;
     private final RedisStreamGroup requests;
 
@@ -80,7 +79,7 @@ public class OrderExecutionService {
 
     public OrderExecutionService(OrderRepository orderRepository, UserRepository userRepository,
                                  UserAssetRepository userAssetRepository, ReservedOrderBook orderBook,
-                                 StringRedisTemplate redis, TransactionTemplate transactionTemplate,
+                                 StringRedisTemplate redis, OrderTransactions orderTransactions,
                                  OutboxEvents outbox, TradingWindow tradingWindow,
                                  NotificationRepository notificationRepository,
                                  NotificationSettingService notificationSettingService,
@@ -96,7 +95,7 @@ public class OrderExecutionService {
         this.userRepository = userRepository;
         this.userAssetRepository = userAssetRepository;
         this.orderBook = orderBook;
-        this.transactionTemplate = transactionTemplate;
+        this.orderTransactions = orderTransactions;
         this.outbox = outbox;
         // 넘겨받고도 계속 처리하지 못하는 요청은 버린다. 주문은 DB에 PENDING으로 남아 대조 작업이 대기열에 되돌린다
         this.requests = new RedisStreamGroup(redis, executionStream, group, reclaimIdle, MAX_DELIVERIES);
@@ -166,7 +165,7 @@ public class OrderExecutionService {
             if (lag > LAG_WARN_MILLIS) {
                 log.warn("Order {} execution delayed {} ms in queue", request.orderId(), lag);
             }
-            transactionTemplate.executeWithoutResult(status -> executeOrder(request.orderId(), request.price()));
+            orderTransactions.run(() -> executeOrder(request.orderId(), request.price()));
             return true;
         } catch (RuntimeException e) {
             // 롤백된 주문은 PENDING 그대로이므로 대기열에 되돌려 다음 시세에서 다시 체결

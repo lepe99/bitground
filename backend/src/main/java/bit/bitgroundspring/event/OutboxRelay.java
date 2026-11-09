@@ -8,6 +8,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Duration;
@@ -38,7 +39,10 @@ public class OutboxRelay {
                        @Value("${events.domain.stream}") String stream) {
         this.jdbc = jdbc;
         this.redis = redis;
-        this.tx = tx;
+        // READ COMMITTED: 기본(REPEATABLE READ)에서는 미발행 이벤트를 잠그는 조회가 인덱스 끝의 빈 구간까지 잠가,
+        // 같은 순간 이벤트를 쓰는 주문·체결 트랜잭션과 서로 기다리다 데드락이 났다 (TradeConcurrencyTest에서 확인)
+        this.tx = new TransactionTemplate(tx.getTransactionManager());
+        this.tx.setIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);
         this.stream = stream;
     }
 
