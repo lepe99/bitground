@@ -43,7 +43,7 @@ services:
 
   backend:
     logging: *default-logging
-    image: ${BACKEND_IMAGE:-ghcr.io/lepe99/bitground-backend}:${BACKEND_TAG:-latest}
+    image: ${BACKEND_IMAGE:-ghcr.io/lepe99/bitground-backend}:${BACKEND_TAG:-main}
     restart: unless-stopped
     mem_limit: 1000m # 힙은 이미지의 MaxRAMPercentage=60 → 약 600MB
     env_file: ./backend.env
