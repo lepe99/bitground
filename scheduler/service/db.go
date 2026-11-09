@@ -10,8 +10,19 @@ import (
 )
 
 // withTx fn을 한 트랜잭션에서 실행합니다. fn이 에러를 반환하거나 panic이 나면 롤백합니다.
-func withTx(ctx context.Context, db *sql.DB, fn func(tx *sql.Tx) error) (err error) {
-	tx, err := db.BeginTx(ctx, nil)
+func withTx(ctx context.Context, db *sql.DB, fn func(tx *sql.Tx) error) error {
+	return withTxOptions(ctx, db, nil, fn)
+}
+
+// readCommitted 다른 트랜잭션(백엔드의 주문)과 같은 행을 읽기만 하는 집계에 쓴다.
+// 기본 격리 수준(REPEATABLE READ)에서 INSERT … SELECT는 읽는 원본 행에도 공유 잠금을 걸어,
+// 사용자 행을 잠근 채 주문을 넣는 백엔드 트랜잭션과 데드락이 났다 (부하 테스트에서 랭킹 계산 중 주문 실패).
+// READ COMMITTED에서는 원본을 잠그지 않고 커밋된 값을 읽는다 (MySQL 8 기본 binlog_format=ROW 필요)
+var readCommitted = &sql.TxOptions{Isolation: sql.LevelReadCommitted}
+
+// withTxOptions 격리 수준 등을 지정해 트랜잭션을 실행한다 (opts가 nil이면 DB 기본값)
+func withTxOptions(ctx context.Context, db *sql.DB, opts *sql.TxOptions, fn func(tx *sql.Tx) error) (err error) {
+	tx, err := db.BeginTx(ctx, opts)
 	if err != nil {
 		return fmt.Errorf("트랜잭션 시작 에러: %w", err)
 	}

@@ -38,8 +38,8 @@ const userTotalsCTE = `
 // 코인 현재가(시즌 정산의 청산 가격)와 시세(가격 이력 저장용)를 함께 반환합니다.
 //
 // 총자산 계산과 순위·티어 산정을 SQL 집합 연산 한 번(윈도 함수)으로 처리한다.
-// 실행 간 공유하는 임시 테이블·전역 상태가 없어 두 실행이 겹쳐도 서로의 결과를 지우지 않고,
-// 랭킹과 스냅샷이 한 트랜잭션에서 같은 시점의 자산으로 계산된다.
+// 실행 간 공유하는 임시 테이블·전역 상태가 없어 두 실행이 겹쳐도 서로의 결과를 지우지 않는다.
+// 거래 중에도 매시 돌므로 원본(주문·자산·사용자)을 잠그지 않도록 READ COMMITTED로 실행한다 (readCommitted, db.go).
 func UpdateRank(ctx context.Context, db *sql.DB, symbolMap map[string]int, seasonID int, dailySnapshot bool, now time.Time) (map[int]float64, map[int]model.UpbitCoinPrice, error) {
 	coinPrices, coinPriceHistory, err := getAllCoinsCurrentPrice(ctx, symbolMap)
 	if err != nil {
@@ -53,7 +53,7 @@ func UpdateRank(ctx context.Context, db *sql.DB, symbolMap map[string]int, seaso
 	txCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 
-	err = withTx(txCtx, db, func(tx *sql.Tx) error {
+	err = withTxOptions(txCtx, db, readCommitted, func(tx *sql.Tx) error {
 		n, err := upsertRankings(txCtx, tx, seasonID, prices)
 		if err != nil {
 			return err
@@ -160,7 +160,6 @@ func getAllCoinsCurrentPrice(ctx context.Context, symbolMap map[string]int) (map
 
 	return coinPrices, coinPriceHistory, nil
 }
-
 
 // GetActiveCoinsSymbols 데이터베이스에서 활성화된 코인 심볼들을 가져오는 함수
 func GetActiveCoinsSymbols(ctx context.Context, db *sql.DB) (map[string]int, error) {
