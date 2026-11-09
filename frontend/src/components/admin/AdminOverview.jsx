@@ -7,8 +7,7 @@ import {shortTime} from './adminFormat.js';
 
 // 모니터링 도구 주소 (운영에서는 내부망 주소로 바꾼다)
 const TOOLS = [
-    {label: 'Grafana', desc: '백엔드·스케줄러 로그', href: import.meta.env.VITE_GRAFANA_URL ?? 'http://localhost:3000'},
-    {label: 'Pinpoint', desc: '요청 추적·성능', href: import.meta.env.VITE_PINPOINT_URL ?? 'http://localhost:8080'},
+    {label: 'Grafana', desc: '로그·서버 지표', href: import.meta.env.VITE_GRAFANA_URL ?? 'http://localhost:3000'},
 ];
 
 function Stat({label, value, sub}) {

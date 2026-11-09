@@ -1,4 +1,5 @@
-// Grafana Alloy: 백엔드·스케줄러 컨테이너 로그(JSON)를 수집해 Loki로 보낸다.
+// Grafana Alloy: 백엔드·스케줄러 컨테이너 로그(JSON)를 수집해 Loki로 보내고,
+// 백엔드 지표(/actuator/prometheus)를 수집해 Prometheus로 보낸다.
 // 백엔드는 LOGGING_STRUCTURED_FORMAT_CONSOLE=logstash 로 실행되어야 JSON으로 출력된다.
 // 스케줄러는 기본이 JSON(log/slog)이고 필드 이름(level, message, @timestamp)을 백엔드와 맞췄다.
 
@@ -116,5 +117,19 @@ loki.process "scheduler" {
 loki.write "local" {
   endpoint {
     url = "http://loki:3100/loki/api/v1/push"
+  }
+}
+
+// ── 백엔드 지표: 관리 포트(8091, 외부 비공개)에서 수집
+prometheus.scrape "backend" {
+  targets         = [{ __address__ = "backend:8091", app = "bitground-backend" }]
+  metrics_path    = "/actuator/prometheus"
+  scrape_interval = "15s"
+  forward_to      = [prometheus.remote_write.local.receiver]
+}
+
+prometheus.remote_write "local" {
+  endpoint {
+    url = "http://prometheus:9090/api/v1/write"
   }
 }

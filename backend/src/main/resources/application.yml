@@ -197,6 +197,11 @@ management:
     metrics:
       export:
         enabled: true
+  metrics:
+    distribution:
+      # 응답 시간 p95·p99를 Grafana에서 구하기 위한 구간별 개수 (histogram_quantile)
+      percentiles-histogram:
+        http.server.requests: true
 
 # logging 설정 (파일 대신 표준 출력으로 남긴다)
 # - 모든 로그에 [traceId,userId] 를 붙인다 (TraceIdFilter, JwtAuthenticationFilter가 MDC에 기록)

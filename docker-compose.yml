@@ -1,11 +1,10 @@
 # 로컬 개발 환경
 #   인프라만 (MySQL, Redis, S3Mock):     docker compose up -d
 #   + 백엔드 컨테이너:                   docker compose --profile app up -d --build
-#   + 모니터링 (Pinpoint APM, 로그 수집):
-#       PINPOINT_ENABLED=true docker compose --profile app --profile monitoring up -d --build
-#       Pinpoint Web: http://localhost:8080   Grafana(Loki 로그): http://localhost:3000
+#   + 모니터링 (로그·지표 수집):          docker compose --profile app --profile monitoring up -d --build
+#       Grafana(Loki 로그, Prometheus 지표): http://localhost:3000
 # 계속 떠 있어야 하는 서비스는 모두 restart: unless-stopped.
-#   (Docker Desktop이 다시 시작되면 일부만 살아나, 의존 대상(MySQL·HBase 등) 없이 오류만 반복하던 문제가 있었다)
+#   (Docker Desktop이 다시 시작되면 일부만 살아나, 의존 대상(MySQL 등) 없이 오류만 반복하던 문제가 있었다)
 # 컨테이너 출력 로그(json-file)는 호스트에 따로 쌓이므로 크기를 제한한다.
 # 백엔드 로그에는 접속 IP 등이 들어가며, 회전된 옛 파일은 지워져 오래 남지 않는다 (개인정보처리방침 '접속 기록 3개월')
 x-logging: &default-logging
@@ -88,10 +87,6 @@ services:
       STORAGE_ENDPOINT: http://s3:9090
       STORAGE_PUBLIC_URL: http://localhost:9090/bitground # 브라우저에서 이미지를 읽는 주소
       REACT_HOST: http://localhost:5173
-      # Pinpoint (monitoring 프로필과 함께 사용)
-      PINPOINT_ENABLED: ${PINPOINT_ENABLED:-false}
-      PINPOINT_COLLECTOR_HOST: pinpoint-collector
-      PINPOINT_PROFILE: ${PINPOINT_PROFILE:-local}
       # 기본 JSON(logstash): Alloy → Loki 수집용. 텍스트로 보려면 LOG_FORMAT= (빈 값)
       # (텍스트 로그를 Loki가 JSON으로 읽지 못해 스택 트레이스 줄마다 파싱 오류가 나던 문제)
       LOGGING_STRUCTURED_FORMAT_CONSOLE: ${LOG_FORMAT-logstash}
@@ -123,118 +118,9 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
-  # ── monitoring 프로필: Pinpoint 4.0.0 서버 ──────────────────────────────
-  # 공식 pinpoint-docker 구성에서 트랜잭션 추적에 필요한 최소 구성만 사용
-  # (Flink 실시간 통계, 알람 배치, Pinot 메트릭은 제외)
-  zoo1:
-    logging: *default-logging
-    profiles: ["monitoring"]
-    image: zookeeper:3.4.13
-    container_name: pinpoint-zookeeper
-    restart: unless-stopped
-    environment:
-      ZOO_MY_ID: 1
-    networks:
-      default:
-        # pinpoint-hbase 이미지는 zoo1~3 앙상블을 가정하므로 단일 노드에 별칭을 붙임
-        aliases: [zoo2, zoo3]
-
-  pinpoint-hbase:
-    logging: *default-logging
-    profiles: ["monitoring"]
-    image: pinpointdocker/pinpoint-hbase:4.0.0
-    container_name: pinpoint-hbase
-    restart: unless-stopped
-    volumes:
-      - pinpoint-hbase-data:/home/pinpoint/hbase
-      - /home/pinpoint/zookeeper
-    depends_on:
-      - zoo1
-
-  pinpoint-mysql:
-    logging: *default-logging
-    profiles: ["monitoring"]
-    image: mysql:8.4 # Pinpoint 4.0은 MySQL 8.4 이상 필요
-    container_name: pinpoint-mysql
-    restart: unless-stopped
-    environment:
-      MYSQL_ROOT_PASSWORD: pinpoint
-      MYSQL_DATABASE: pinpoint
-      MYSQL_USER: admin
-      MYSQL_PASSWORD: admin
-    volumes:
-      - pinpoint-mysql-data:/var/lib/mysql
-      - ./monitoring/pinpoint/mysql-init:/docker-entrypoint-initdb.d:ro
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      interval: 5s
-      retries: 20
-
-  pinpoint-redis:
-    logging: *default-logging
-    profiles: ["monitoring"]
-    image: redis:7-alpine
-    container_name: pinpoint-redis
-    restart: unless-stopped
-
-  pinpoint-collector:
-    logging: *default-logging
-    profiles: ["monitoring"]
-    image: pinpointdocker/pinpoint-collector:4.0.0
-    container_name: pinpoint-collector
-    restart: unless-stopped # HBase 테이블 생성이 끝날 때까지 재시작하며 대기
-    environment: &pinpoint-server-env
-      SPRING_PROFILES_ACTIVE: release
-      PINPOINT_ZOOKEEPER_ADDRESS: zoo1
-      CLUSTER_ENABLE: "true"
-      FLINK_CLUSTER_ENABLE: "false"
-      SPRING_DATA_REDIS_HOST: pinpoint-redis
-      SPRING_DATA_REDIS_PORT: "6379"
-      JDBC_DRIVERCLASSNAME: com.mysql.cj.jdbc.Driver
-      JDBC_URL: jdbc:mysql://pinpoint-mysql:3306/pinpoint?characterEncoding=UTF-8
-      JDBC_USERNAME: admin
-      JDBC_PASSWORD: admin
-      SPRING_DATASOURCE_HIKARI_JDBCURL: jdbc:mysql://pinpoint-mysql:3306/pinpoint?characterEncoding=UTF-8
-      SPRING_DATASOURCE_HIKARI_USERNAME: admin
-      SPRING_DATASOURCE_HIKARI_PASSWORD: admin
-      SPRING_METADATASOURCE_HIKARI_JDBCURL: jdbc:mysql://pinpoint-mysql:3306/pinpoint?characterEncoding=UTF-8
-      SPRING_METADATASOURCE_HIKARI_USERNAME: admin
-      SPRING_METADATASOURCE_HIKARI_PASSWORD: admin
-      CONFIG_SENDUSAGE: "false"
-    ports:
-      # 호스트에서 직접 실행한 앱의 에이전트도 붙을 수 있도록 gRPC 포트 공개
-      - "9991:9991"
-      - "9992:9992"
-      - "9993:9993"
-    depends_on:
-      pinpoint-hbase:
-        condition: service_started
-      pinpoint-mysql:
-        condition: service_healthy
-      pinpoint-redis:
-        condition: service_started
-
-  pinpoint-web:
-    logging: *default-logging
-    profiles: ["monitoring"]
-    image: pinpointdocker/pinpoint-web:4.0.0
-    container_name: pinpoint-web
-    restart: unless-stopped # HBase 테이블 생성이 끝날 때까지 재시작하며 대기
-    environment:
-      <<: *pinpoint-server-env
-      WEB_SERVER_PORT: "8080"
-      CONFIG_SHOW_APPLICATIONSTAT: "true"
-    ports:
-      - "8080:8080"
-    depends_on:
-      pinpoint-hbase:
-        condition: service_started
-      pinpoint-mysql:
-        condition: service_healthy
-      pinpoint-redis:
-        condition: service_started
-
-  # ── monitoring 프로필: 로그 수집 (Alloy → Loki → Grafana) ────────────────
+  # ── monitoring 프로필: 로그(Loki)·지표(Prometheus)를 Grafana 한 곳에서 본다 ──────
+  # Alloy가 컨테이너 로그는 Loki로, 백엔드 /actuator/prometheus 지표는 Prometheus로 보낸다.
+  # (운영에서 모니터링을 다른 인스턴스로 나눠도 Alloy만 앱 서버에 두고 보내는 주소만 바꾸면 된다)
   loki:
     logging: *default-logging
     profiles: ["monitoring"]
@@ -258,6 +144,23 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro # 컨테이너 로그 수집
     depends_on:
       - loki
+      - prometheus
+
+  # 지표 저장소. 직접 수집하지 않고 Alloy가 보내는 값(remote write)을 받기만 한다
+  prometheus:
+    logging: *default-logging
+    profiles: ["monitoring"]
+    image: prom/prometheus:v3.5.0
+    container_name: prometheus
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=15d # 지표는 추세 확인용이라 짧게
+      - --web.enable-remote-write-receiver
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
 
   grafana:
     logging: *default-logging
@@ -277,11 +180,11 @@ services:
       - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
     depends_on:
       - loki
+      - prometheus
 
 volumes:
   mysql-data:
   redis-data:
   s3-data:
-  pinpoint-hbase-data:
-  pinpoint-mysql-data:
   loki-data:
+  prometheus-data:
