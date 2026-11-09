@@ -35,19 +35,15 @@ const userTotalsCTE = `
 	)`
 
 // UpdateRank 현재 시즌 랭킹을 다시 계산합니다. dailySnapshot이면 일일 자산 스냅샷도 남깁니다.
-// 코인 현재가(시즌 정산의 청산 가격)와 시세(가격 이력 저장용)를 함께 반환합니다.
+// coinPrices 코인 ID → 현재가 (CoinPrices로 만든다. 시즌 정산의 청산 가격과 같은 값)
 //
 // 총자산 계산과 순위·티어 산정을 SQL 집합 연산 한 번(윈도 함수)으로 처리한다.
 // 실행 간 공유하는 임시 테이블·전역 상태가 없어 두 실행이 겹쳐도 서로의 결과를 지우지 않는다.
 // 거래 중에도 매시 돌므로 원본(주문·자산·사용자)을 잠그지 않도록 READ COMMITTED로 실행한다 (readCommitted, db.go).
-func UpdateRank(ctx context.Context, db *sql.DB, symbolMap map[string]int, seasonID int, dailySnapshot bool, now time.Time) (map[int]float64, map[int]model.UpbitCoinPrice, error) {
-	coinPrices, coinPriceHistory, err := getAllCoinsCurrentPrice(ctx, symbolMap)
-	if err != nil {
-		return nil, nil, fmt.Errorf("코인 현재가 조회 실패: %w", err)
-	}
+func UpdateRank(ctx context.Context, db *sql.DB, coinPrices map[int]float64, seasonID int, dailySnapshot bool, now time.Time) error {
 	prices, err := pricesJSON(coinPrices)
 	if err != nil {
-		return nil, nil, err
+		return err
 	}
 
 	txCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
@@ -69,11 +65,7 @@ func UpdateRank(ctx context.Context, db *sql.DB, symbolMap map[string]int, seaso
 		}
 		return nil
 	})
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return coinPrices, coinPriceHistory, nil
+	return err
 }
 
 // upsertRankings 총자산 내림차순으로 순위를 매기고 순위 구간에 따라 티어를 정합니다.
@@ -139,26 +131,17 @@ func rowsAffected(res sql.Result) int64 {
 	return n
 }
 
-func getAllCoinsCurrentPrice(ctx context.Context, symbolMap map[string]int) (map[int]float64, map[int]model.UpbitCoinPrice, error) {
-	apiURL := "https://api.upbit.com/v1/ticker/all?quote_currencies=KRW"
-
-	var upbitPrices []model.UpbitCoinPrice
-	if err := getJSON(ctx, apiURL, 10*time.Second, &upbitPrices); err != nil {
-		return nil, nil, err
-	}
-
-	coinPrices := make(map[int]float64)
-	coinPriceHistory := make(map[int]model.UpbitCoinPrice)
-
-	for _, upbitCoin := range upbitPrices {
-		symbol := upbitCoin.Market
-		if symbolId, exists := symbolMap[symbol]; exists {
-			coinPrices[symbolId] = upbitCoin.TradePrice
-			coinPriceHistory[symbolId] = upbitCoin
+// CoinPrices 업비트 시세(심볼 기준)를 DB 코인 ID 기준 현재가와 가격 기록용 시세로 바꾼다 (DB에 있는 코인만)
+func CoinPrices(symbolMap map[string]int, tickers map[string]model.UpbitCoinPrice) (map[int]float64, map[int]model.UpbitCoinPrice) {
+	prices := make(map[int]float64, len(symbolMap))
+	history := make(map[int]model.UpbitCoinPrice, len(symbolMap))
+	for symbol, ticker := range tickers {
+		if id, ok := symbolMap[symbol]; ok {
+			prices[id] = ticker.TradePrice
+			history[id] = ticker
 		}
 	}
-
-	return coinPrices, coinPriceHistory, nil
+	return prices, history
 }
 
 // GetActiveCoinsSymbols 데이터베이스에서 활성화된 코인 심볼들을 가져오는 함수

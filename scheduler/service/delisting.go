@@ -1,6 +1,7 @@
 package service
 
 import (
+	"Bitground-go/model"
 	"Bitground-go/util"
 	"context"
 	"database/sql"
@@ -22,13 +23,9 @@ const maxDelistRatio = 0.1
 // 목록에서 사라진 코인(거래지원 종료)은 상장 폐지로 표시하고, 실제 거래소처럼 매수·매도를 막는다(백엔드).
 // 게임에는 출금이 없으므로 보유분은 마지막 시세로 팔아 현금으로 돌려주고, 그 코인의 예약 주문은 취소한 뒤 알린다.
 // 목록에 다시 나타난 코인은 표시를 푼다.
-func SyncDelistings(ctx context.Context, db *sql.DB) error {
-	details, err := getCoinDetails(ctx)
-	if err != nil {
-		return fmt.Errorf("업비트 시세 목록 조회 실패: %w", err)
-	}
-	listed := make(map[string]bool, len(details))
-	for symbol := range details {
+func ApplyDelistings(ctx context.Context, db *sql.DB, tickers map[string]model.UpbitCoinPrice) error {
+	listed := make(map[string]bool, len(tickers))
+	for symbol := range tickers {
 		listed[symbol] = true
 	}
 

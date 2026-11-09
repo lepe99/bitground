@@ -9,8 +9,19 @@ import (
 	_ "time/tzdata" // Lambda 런타임에는 tz 데이터가 없으므로 바이너리에 포함
 )
 
+// 실행 역할 (SCHEDULER_ROLE). 운영에서는 Lambda 두 개로 나눠 DB 접속 정보와 외부 API 키를 서로 갖지 않게 한다
+const (
+	RoleAll       = ""          // 한 프로세스에서 둘 다 (로컬 매시 실행, 테스트)
+	RoleCollector = "collector" // 수집 단계 (Lambda A, VPC 밖): 외부 API만, DB 접속 정보 없음
+	RoleWriter    = "writer"    // 쓰기 단계 (Lambda B, VPC 안): DB만, 외부 API 키 없음
+)
+
 // Config 스케줄러 실행 설정 (환경변수에서 읽음)
 type Config struct {
+	Role string
+	// WriterFunction 수집 단계가 호출할 쓰기 Lambda 이름 또는 ARN (collector 역할에서 필수)
+	WriterFunction string
+
 	DB DBConfig
 
 	// TestTime 기준 시각 고정(테스트용). 비어 있거나 "0000-00-00 00:00:00"이면 현재 시각 사용
@@ -48,6 +59,8 @@ type Config struct {
 // Load 환경변수에서 설정을 읽고 필수값을 검증합니다.
 func Load() (Config, error) {
 	cfg := Config{
+		Role:           os.Getenv("SCHEDULER_ROLE"),
+		WriterFunction: os.Getenv("WRITER_FUNCTION"),
 		DB: DBConfig{
 			Host:     os.Getenv("DB_HOST"),
 			User:     os.Getenv("DB_USER"),
@@ -95,14 +108,25 @@ func Load() (Config, error) {
 		cfg.NewsEmbedPerMinute = rpm
 	}
 
-	var missing []string
-	for name, value := range map[string]string{
+	// 역할마다 필요한 값만 요구한다 (수집 단계에는 DB 접속 정보를 주지 않는다)
+	required := map[string]string{}
+	writer := map[string]string{
 		"DB_HOST":           cfg.DB.Host,
 		"DB_USER":           cfg.DB.User,
 		"DB_NAME":           cfg.DB.DBName,
 		"BACKEND_URL":       cfg.BackendURL,
 		"SEASON_UPDATE_KEY": cfg.SchedulerKey,
-	} {
+	}
+	switch cfg.Role {
+	case RoleAll, RoleWriter:
+		required = writer
+	case RoleCollector:
+		required["WRITER_FUNCTION"] = cfg.WriterFunction
+	default:
+		return Config{}, fmt.Errorf("SCHEDULER_ROLE이 올바르지 않습니다: %q (비우거나 collector, writer)", cfg.Role)
+	}
+	var missing []string
+	for name, value := range required {
 		if value == "" {
 			missing = append(missing, name)
 		}

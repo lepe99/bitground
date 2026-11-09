@@ -61,14 +61,23 @@ type insightJob struct {
 	related                              []NewsItem // 최근 30일 배경 기사 (뉴스 아카이브)
 }
 
-func UpdateInsight(ctx context.Context, db *sql.DB, ic InsightConfig, symbolMap map[string]int, now time.Time) error {
+// InsightBatch 생성한 인사이트 묶음 (수집 단계에서 만들어 저장 단계로 넘긴다)
+type InsightBatch struct {
+	Insights      []Insight `json:"insights"`
+	Failed        []string  `json:"failed,omitempty"` // 생성에 실패한 심볼 (어제 행을 남겨 둔다)
+	Model         string    `json:"model"`
+	PromptVersion string    `json:"promptVersion"`
+}
+
+// BuildInsights 시세·뉴스를 모아 Gemini로 인사이트를 만든다 (DB를 쓰지 않음, 수집 단계)
+func BuildInsights(ctx context.Context, ic InsightConfig, symbolMap map[string]int, now time.Time) (InsightBatch, error) {
 	prompt, err := loadInsightPrompt(ic.PromptVersion)
 	if err != nil {
-		return err
+		return InsightBatch{}, err
 	}
 	snap, err := collectMarketSnapshot(ctx, symbolMap)
 	if err != nil {
-		return err
+		return InsightBatch{}, err
 	}
 	targets := selectInsightTargets(snap)
 	slog.InfoContext(ctx, "인사이트 대상 선정", "count", len(targets), "targets", targetSymbols(targets))
@@ -143,10 +152,15 @@ func UpdateInsight(ctx context.Context, db *sql.DB, ic InsightConfig, symbolMap 
 		}
 	}
 	if len(insights) == 0 {
-		return errors.New("인사이트를 하나도 만들지 못했습니다")
+		return InsightBatch{}, errors.New("인사이트를 하나도 만들지 못했습니다")
 	}
 	slog.InfoContext(ctx, "인사이트 생성", "created", len(insights), "total", len(jobs))
-	return insertInsights(ctx, db, insights, failed, ic.GeminiModel, prompt.Version, now)
+	return InsightBatch{Insights: insights, Failed: failed, Model: ic.GeminiModel, PromptVersion: prompt.Version}, nil
+}
+
+// SaveInsights 생성한 인사이트를 now 날짜로 저장한다 (저장 단계)
+func SaveInsights(ctx context.Context, db *sql.DB, b InsightBatch, now time.Time) error {
+	return insertInsights(ctx, db, b.Insights, b.Failed, b.Model, b.PromptVersion, now)
 }
 
 // collectNews 네이버 키가 없거나 검색이 실패하면 뉴스 없이 진행한다 (시세만으로도 쓸 수 있음)

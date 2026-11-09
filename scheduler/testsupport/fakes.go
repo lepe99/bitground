@@ -17,10 +17,18 @@ import (
 // Market 업비트·CoinGecko 대역. 스케줄러는 기본 HTTP 전송(http.DefaultTransport)을 쓰므로
 // Install로 그것을 바꿔 끼워 실제 네트워크로 나가지 않게 한다 (등록하지 않은 주소를 부르면 테스트 실패)
 type Market struct {
-	mu        sync.Mutex
-	markets   []model.UpbitCoinList
-	tickers   map[string]model.UpbitCoinPrice
-	marketCap []map[string]any
+	mu          sync.Mutex
+	markets     []model.UpbitCoinList
+	tickers     map[string]model.UpbitCoinPrice
+	marketCap   []map[string]any
+	failTickers bool
+}
+
+// FailTickers true면 시세 조회가 500으로 실패한다 (업비트 장애)
+func (m *Market) FailTickers(fail bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.failTickers = fail
 }
 
 func NewMarket() *Market {
@@ -84,6 +92,9 @@ func (m *Market) serve(req *http.Request) (*http.Response, error) {
 	case "api.upbit.com/v1/market/all":
 		body = m.markets
 	case "api.upbit.com/v1/ticker/all":
+		if m.failTickers {
+			return &http.Response{StatusCode: http.StatusInternalServerError, Body: io.NopCloser(strings.NewReader("down")), Request: req}, nil
+		}
 		list := make([]model.UpbitCoinPrice, 0, len(m.tickers))
 		for _, t := range m.tickers {
 			list = append(list, t)

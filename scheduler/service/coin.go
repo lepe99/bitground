@@ -5,49 +5,24 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"golang.org/x/sync/errgroup"
 	"time"
 )
 
-func UpdateCoins(ctx context.Context, db *sql.DB) error {
-	// 고루틴 사용
-	var coinList []model.UpbitCoinList
-	var coinDetailList map[string]model.UpbitCoinPrice
+// FetchMarkets 업비트 원화 마켓 목록 (코인 이름, 유의·주의 지정). 외부 조회만 한다 (수집 단계)
+func FetchMarkets(ctx context.Context) ([]model.UpbitCoinList, error) {
+	return getSymbolList(ctx)
+}
 
-	g, gCtx := errgroup.WithContext(ctx)
-	// 1. API에서 코인 정보를 가져와 "KRW-"로 시작하는 코인 심볼을 필터링 (비동기)
-	g.Go(func() error {
-		symbols, err := getSymbolList(gCtx) // gCtx를 사용
-		if err != nil {
-			return fmt.Errorf("getSymbolList 에러: %w", err)
-		}
-		coinList = symbols // 결과 저장
-		return nil
-	})
+// FetchTickers 업비트 원화 전 종목 시세 (심볼 → 시세). 코인 목록·상장 폐지·랭킹·가격 기록이 함께 쓴다
+func FetchTickers(ctx context.Context) (map[string]model.UpbitCoinPrice, error) {
+	return getCoinDetails(ctx)
+}
 
-	// 2. 심볼에 해당하는 코인 정보들 가져오기 (상장 폐지 표시는 매시간 SyncDelistings가 맡는다)
-	g.Go(func() error {
-		details, err := getCoinDetails(gCtx) // gCtx를 사용
-		if err != nil {
-			return fmt.Errorf("getCoinDetails 에러: %w", err)
-		}
-		coinDetailList = details // 결과 저장
-		return nil
-	})
-
-	if err := g.Wait(); err != nil {
-		// 에러가 발생하면 여기서 처리하고 함수를 종료합니다.
-		return fmt.Errorf("고루틴 수행 중 에러 발생: %w", err)
-	}
-
-	// 4. 데이터들을 가공하여 db에 저장할 수 있는 형태로 변환
-	coinSymbols := prepareCoinSymbols(coinList, coinDetailList)
-
-	// 5. db에 코인 심볼 목록 저장
-	if err := insertCoinSymbols(ctx, db, coinSymbols); err != nil {
+// SaveCoins 마켓 목록과 시세로 코인 목록을 갱신한다 (상장 폐지 표시는 ApplyDelistings가 맡는다)
+func SaveCoins(ctx context.Context, db *sql.DB, markets []model.UpbitCoinList, tickers map[string]model.UpbitCoinPrice) error {
+	if err := insertCoinSymbols(ctx, db, prepareCoinSymbols(markets, tickers)); err != nil {
 		return fmt.Errorf("insertCoinSymbols 에러: %w", err)
 	}
-
 	return nil
 }
 

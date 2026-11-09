@@ -3,9 +3,7 @@ package main
 import (
 	"Bitground-go/applog"
 	"Bitground-go/config"
-	"Bitground-go/model"
 	"Bitground-go/service"
-	"Bitground-go/util"
 	"context"
 	"crypto/rand"
 	"database/sql"
@@ -33,7 +31,12 @@ type Result struct {
 func main() {
 	applog.SetupFromEnv()
 	if os.Getenv("AWS_LAMBDA_RUNTIME_API") != "" {
-		lambda.Start(handler)
+		// 운영: 수집 단계(A)는 EventBridge가 매시 호출, 쓰기 단계(B)는 A가 호출한다 (SCHEDULER_ROLE)
+		if os.Getenv("SCHEDULER_ROLE") == config.RoleWriter {
+			lambda.Start(writerHandler)
+		} else {
+			lambda.Start(handler)
+		}
 		return
 	}
 
@@ -99,7 +102,8 @@ func handler(ctx context.Context) (Result, error) {
 // handleAt at이 비어 있으면 설정의 기준 시각(cfg.Now), 있으면 그 시각이 속한 정시를 기준으로 실행한다.
 // (매시 실행 모드의 첫 실행은 14:42에 시작해도 15시가 아니라 14시 작업을 해야 하므로 반올림하지 않고 내린다)
 func handleAt(ctx context.Context, at time.Time) (Result, error) {
-	ctx = applog.With(ctx, slog.String("run_id", runID(ctx)))
+	runID := newRunID(ctx)
+	ctx = applog.With(ctx, slog.String("run_id", runID))
 	cfg, err := config.Load()
 	if err != nil {
 		slog.ErrorContext(ctx, "설정 오류", "error", err)
@@ -116,22 +120,19 @@ func handleAt(ctx context.Context, at time.Time) (Result, error) {
 	if !at.IsZero() {
 		now = at.In(cfg.Location).Truncate(time.Hour)
 	}
-	ctx = applog.With(ctx, slog.String("period", now.Format("2006-01-02T15")))
+	period := now.Format("2006-01-02T15")
+	ctx = applog.With(ctx, slog.String("period", period))
 
-	db, err := config.ConnectDB(ctx, cfg.DB)
+	w, closeWriter, err := newWriter(ctx, cfg, runID, period)
 	if err != nil {
-		slog.ErrorContext(ctx, "데이터베이스 연결 실패", "error", err)
+		slog.ErrorContext(ctx, "쓰기 단계 준비 실패", "error", err)
 		return Result{}, err
 	}
-	defer func(db *sql.DB) {
-		if err := db.Close(); err != nil {
-			slog.WarnContext(ctx, "데이터베이스 연결 종료 실패", "error", err)
-		}
-	}(db)
+	defer closeWriter()
 
 	started := time.Now()
 	jobs := &jobRunner{}
-	if err := run(ctx, db, cfg, now, jobs); err != nil {
+	if err := collect(ctx, cfg, now, w, jobs); err != nil {
 		// 작업별 에러는 각 작업이 이미 남겼으므로 여기서는 실패한 작업 이름만 모아 한 줄로 남긴다
 		slog.ErrorContext(ctx, "실행 실패", "failed_jobs", jobs.failedNames(), "duration_ms", time.Since(started).Milliseconds())
 		return Result{}, err
@@ -142,8 +143,8 @@ func handleAt(ctx context.Context, at time.Time) (Result, error) {
 	return Result{Message: msg}, nil
 }
 
-// runID Lambda에서는 요청 ID(CloudWatch의 START/END 줄과 같은 값), 로컬에서는 임의 값
-func runID(ctx context.Context) string {
+// newRunID Lambda에서는 요청 ID(CloudWatch의 START/END 줄과 같은 값), 로컬에서는 임의 값
+func newRunID(ctx context.Context) string {
 	if lc, ok := lambdacontext.FromContext(ctx); ok {
 		return lc.AwsRequestID
 	}
@@ -152,130 +153,72 @@ func runID(ctx context.Context) string {
 	return hex.EncodeToString(b)
 }
 
+// run 한 프로세스에서 수집·쓰기를 모두 실행한다 (로컬, 테스트). 쓰기 단계는 JSON 계약을 거친다
 func run(ctx context.Context, db *sql.DB, cfg config.Config, now time.Time, jobs *jobRunner) error {
-	step := func(name string, fn func(ctx context.Context) error) error { return jobs.run(ctx, name, fn) }
-	flags := util.TimeCheck(now)
-	if cfg.InsightEveryHour && !flags.Insight {
-		// 로컬 테스트용: 0시까지 기다리지 않고 매번 인사이트를 다시 만든다 (같은 날짜 행을 덮어씀)
-		flags.Insight = true
-	}
+	return collect(ctx, cfg, now, inProcessWriter{db: db, cfg: cfg}, jobs)
+}
 
-	// 이후 작업이 모두 필요로 하는 값. 실패하면 더 진행하지 않는다
-	symbolMap, err := service.GetActiveCoinsSymbols(ctx, db)
-	if err != nil {
-		return fmt.Errorf("활성화된 코인 심볼 조회 실패: %w", err)
-	}
-	// 시즌 정산·스플릿은 DB의 시즌 일정으로 정한다 (관리자가 바꾸면 다음 정각에 반영)
-	schedule, err := service.GetSeasonSchedule(ctx, db, cfg.Location)
-	if err != nil {
-		return fmt.Errorf("현재 시즌 일정 조회 실패: %w", err)
-	}
-	seasonID := schedule.ID
-	flags.Season = schedule.SeasonDue(now)
-	flags.Split = schedule.SplitDue(now)
-	slog.InfoContext(ctx, "실행 시작", "base_time", now.Format(time.DateTime), "season_id", seasonID,
-		"split_starts_at", formatTime(schedule.SplitAt), "ends_at", formatTime(schedule.EndsAt),
-		"season", flags.Season, "split", flags.Split, "coin", flags.Coin, "insight", flags.Insight)
-
-	// 서로 독립적인 외부 API 작업은 병렬로 돌리고, 각자 자기 에러 변수에만 쓴다
-	var marketErr, insightErr, newsErr error
-	var wg sync.WaitGroup
-	wg.Go(func() {
-		marketErr = step("마켓 인덱스 업데이트", func(ctx context.Context) error {
-			return service.UpdateMarketIndex(ctx, db, cfg.CoinGeckoAPIKey, now)
-		})
-	})
-	newsCfg := newsArchiveConfig(cfg)
-	if newsCfg.Enabled() {
-		// 매시간 새 기사를 쌓고, 0시에는 보관 기간이 지난 기사도 지운다
-		wg.Go(func() {
-			newsErr = step("뉴스 아카이브", func(ctx context.Context) error {
-				return service.ArchiveNews(ctx, newsCfg, symbolMap, now, flags.Coin)
-			})
-		})
-	} else {
-		slog.InfoContext(ctx, "뉴스 아카이브 생략: Gemini·네이버·Pinecone 키 중 없는 것이 있음")
-	}
-	switch {
-	case !flags.Insight:
-		slog.DebugContext(ctx, "인사이트 업데이트 생략 (0시 아님)")
-	case cfg.GeminiAPIKey == "":
-		slog.WarnContext(ctx, "인사이트 업데이트 생략: GEMINI_API_KEY 없음")
-	default:
-		wg.Go(func() {
-			insightErr = step("인사이트 업데이트", func(ctx context.Context) error {
-				return service.UpdateInsight(ctx, db, service.InsightConfig{
-					GeminiAPIKey:      cfg.GeminiAPIKey,
-					GeminiModel:       cfg.GeminiModel,
-					NaverClientID:     cfg.NaverClientID,
-					NaverClientSecret: cfg.NaverClientSecret,
-					PromptVersion:     cfg.InsightPromptVersion,
-					PineconeAPIKey:    cfg.PineconeAPIKey,
-					PineconeIndex:     cfg.PineconeIndex,
-					EmbedModel:        cfg.NewsEmbedModel,
-					EmbedDimension:    cfg.NewsEmbedDimension,
-				}, symbolMap, now)
-			})
-		})
-	}
-
-	// 아래 작업은 같은 테이블을 순서대로 고치므로 차례로 실행한다
-	var errs []error
-	if flags.Coin {
-		errs = append(errs, step("코인 업데이트", func(ctx context.Context) error {
-			return service.UpdateCoins(ctx, db)
-		}))
-	}
-	if flags.Coin { // 매일 0시
-		errs = append(errs, step("오래된 알림 정리", func(ctx context.Context) error {
-			_, err := service.PurgeOldNotifications(ctx, db, now)
-			return err
-		}))
-	}
-	// 업비트 목록에서 사라진 코인(거래지원 종료)은 매시간 상장 폐지로 표시하고 보유분을 정리한다 (랭킹보다 먼저)
-	errs = append(errs, step("상장 폐지 확인", func(ctx context.Context) error {
-		return service.SyncDelistings(ctx, db)
-	}))
-	if flags.Split {
-		errs = append(errs, step("스플릿(현금 지급)", func(ctx context.Context) error {
-			return service.UpdateSplit(ctx, db, cfg, schedule.SplitAt)
-		}))
-	}
-
-	// 랭킹은 매시간, 일일 자산 스냅샷은 0시에만 함께 남긴다
-	var coinPrices map[int]float64
-	var coinPriceHistory map[int]model.UpbitCoinPrice
-	rankErr := step("랭킹 업데이트", func(ctx context.Context) error {
-		var err error
-		coinPrices, coinPriceHistory, err = service.UpdateRank(ctx, db, symbolMap, seasonID, flags.Coin, now)
-		return err
-	})
-	errs = append(errs, rankErr)
-	if rankErr == nil {
-		errs = append(errs, step("코인 가격 히스토리 업데이트", func(ctx context.Context) error {
-			return service.UpdateCoinPriceHistory(ctx, db, coinPriceHistory, now)
-		}))
-	}
-
-	if flags.Season {
-		if rankErr != nil {
-			// 최종 랭킹·청산 가격 없이 정산하면 티어와 자산이 틀어지므로 정산하지 않고 재시도에 맡긴다
-			errs = append(errs, jobs.skip(ctx, "시즌 정산", "랭킹 계산 실패로 시즌 정산을 건너뜀"))
-		} else {
-			errs = append(errs, step("시즌 정산", func(ctx context.Context) error {
-				return service.UpdateSeason(ctx, db, cfg, schedule, coinPrices)
-			}))
+// newWriter 역할에 맞는 쓰기 단계: 한 프로세스면 DB에 직접 연결, 수집 단계(A)면 쓰기 Lambda(B) 호출
+func newWriter(ctx context.Context, cfg config.Config, runID, period string) (Writer, func(), error) {
+	switch cfg.Role {
+	case config.RoleCollector:
+		w, err := newLambdaWriter(ctx, cfg.WriterFunction)
+		if err != nil {
+			return nil, nil, err
 		}
+		return taggedWriter{inner: w, runID: runID, period: period}, func() {}, nil
+	case config.RoleAll:
+		db, err := config.ConnectDB(ctx, cfg.DB)
+		if err != nil {
+			return nil, nil, fmt.Errorf("데이터베이스 연결 실패: %w", err)
+		}
+		closeDB := func() {
+			if err := db.Close(); err != nil {
+				slog.WarnContext(ctx, "데이터베이스 연결 종료 실패", "error", err)
+			}
+		}
+		return inProcessWriter{db: db, cfg: cfg}, closeDB, nil
+	default:
+		return nil, nil, fmt.Errorf("%s 역할은 매시 실행을 시작하지 않음 (수집 단계가 호출함)", cfg.Role)
 	}
+}
 
-	// 이전 실행에서 정산은 됐지만 백엔드에 알리지 못한 기록 (예약 주문 정리·사용자 알림이 빠지지 않게)
-	errs = append(errs, step("백엔드 알림 재시도", func(ctx context.Context) error {
-		return service.RetryPendingNotifications(ctx, db, cfg.BackendURL, cfg.SchedulerKey)
-	}))
+// taggedWriter 쓰기 Lambda 요청에 수집 단계의 run_id·period를 붙인다 (두 Lambda 로그를 같은 실행으로 묶어 보기 위함)
+type taggedWriter struct {
+	inner         Writer
+	runID, period string
+}
 
-	wg.Wait()
-	errs = append(errs, marketErr, insightErr, newsErr)
-	return errors.Join(errs...)
+func (w taggedWriter) Call(ctx context.Context, req WriterRequest) (WriterResponse, error) {
+	req.RunID, req.Period = w.runID, w.period
+	return w.inner.Call(ctx, req)
+}
+
+// writerHandler 쓰기 Lambda(B) 핸들러. 호출마다 DB에 연결하고 닫는다
+func writerHandler(ctx context.Context, req WriterRequest) (WriterResponse, error) {
+	if req.RunID != "" {
+		ctx = applog.With(ctx, slog.String("run_id", req.RunID), slog.String("period", req.Period))
+	}
+	ctx = applog.With(ctx, slog.String("op", req.Op))
+	cfg, err := config.Load()
+	if err != nil {
+		slog.ErrorContext(ctx, "설정 오류", "error", err)
+		return WriterResponse{}, err
+	}
+	time.Local = cfg.Location
+	db, err := config.ConnectDB(ctx, cfg.DB)
+	if err != nil {
+		slog.ErrorContext(ctx, "데이터베이스 연결 실패", "error", err)
+		return WriterResponse{}, err
+	}
+	defer db.Close()
+	resp, err := handleWriter(ctx, db, cfg, req)
+	if err != nil {
+		slog.ErrorContext(ctx, "쓰기 실패", "error", err)
+	} else if resp.Error != "" {
+		slog.ErrorContext(ctx, "쓰기 일부 실패", "failed_jobs", resp.Failed)
+	}
+	return resp, err
 }
 
 func formatTime(t time.Time) string {
@@ -342,7 +285,7 @@ func newsArchiveConfig(cfg config.Config) service.NewsArchiveConfig {
 //
 //	docker compose --profile app --profile scheduler run --rm -e RUN_HOURLY= -e NEWS_REEMBED=all scheduler
 func reembedNews() {
-	ctx := applog.With(context.Background(), slog.String("run_id", runID(context.Background())), slog.String("job", "뉴스 다시 임베딩"))
+	ctx := applog.With(context.Background(), slog.String("run_id", newRunID(context.Background())), slog.String("job", "뉴스 다시 임베딩"))
 	cfg, err := config.Load()
 	if err != nil {
 		slog.ErrorContext(ctx, "설정 오류", "error", err)

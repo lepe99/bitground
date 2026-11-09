@@ -13,24 +13,28 @@ type GeckoCoin struct {
 	MarketCap int64  `json:"market_cap"`
 }
 
-// UpdateMarketIndex 함수는 상위 10개 코인의 마켓 캡 정보를 가져와서 마켓 인덱스와 알트 인덱스를 계산하고, 이를 데이터베이스에 삽입합니다.
+// MarketIndex 상위 코인 시가총액으로 계산한 시장 지수·알트 지수
+type MarketIndex struct {
+	Market int `json:"market"`
+	Alt    int `json:"alt"`
+}
+
+// FetchMarketIndex CoinGecko 시가총액을 받아 지수를 계산한다 (외부 조회만, 수집 단계)
 // coingeckoKey 무료 Demo 키(비우면 키 없이 호출). 키 없는 호출은 IP 기준 제한이라 Lambda처럼 IP를 나눠 쓰면 막힐 수 있다
-// now 실행 기준 정시 (이 시각의 행으로 남긴다)
-func UpdateMarketIndex(ctx context.Context, db *sql.DB, coingeckoKey string, now time.Time) error {
-	// 1. CoinGecko API를 사용하여 상위 10개 코인의 마켓 캡 정보를 가져옵니다.
+func FetchMarketIndex(ctx context.Context, coingeckoKey string) (MarketIndex, error) {
 	coinCaps, err := getMarketCap(ctx, coingeckoKey)
 	if err != nil {
-		return fmt.Errorf("getMarketCap 에러: %w", err)
+		return MarketIndex{}, fmt.Errorf("getMarketCap 에러: %w", err)
 	}
+	market, alt := calcMarketIndex(coinCaps)
+	return MarketIndex{Market: market, Alt: alt}, nil
+}
 
-	// 2. 마켓 인덱스와 알트 인덱스를 계산합니다.
-	marketIndex, altIndex := calcMarketIndex(coinCaps)
-
-	// 3. 데이터베이스에 마켓 인덱스와 알트 인덱스를 삽입합니다.
-	if err := insertMarketIndex(ctx, db, marketIndex, altIndex, now); err != nil {
+// SaveMarketIndex now(실행 기준 정시)의 행으로 저장한다
+func SaveMarketIndex(ctx context.Context, db *sql.DB, idx MarketIndex, now time.Time) error {
+	if err := insertMarketIndex(ctx, db, idx.Market, idx.Alt, now); err != nil {
 		return fmt.Errorf("insertMarketIndex 에러: %w", err)
 	}
-
 	return nil
 }
 
