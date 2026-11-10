@@ -5,7 +5,7 @@ import {fetchAlertCoins, fetchCoinInsight, fetchTodayInsightSymbols, fetchWarnin
 import Card from "../components/ui/Card.jsx";
 import SegmentedTabs from "../components/ui/SegmentedTabs.jsx";
 import TopCoins from "../components/main/TopCoins.jsx";
-import {fetchTopVolumeMarkets} from "../api/upbitApi.js";
+import {fetchTopVolumeMarkets} from "../api/coinApi.js";
 
 // 뉴스 키워드: 비트코인 + 오늘 AI 분석 종목 4개(거래대금 상위 2, 상승률 1위, 하락률 1위) + 가상자산.
 // 분석이 아직 없거나 모자라면 거래대금 상위로 채운다

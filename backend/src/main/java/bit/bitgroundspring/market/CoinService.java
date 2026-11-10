@@ -1,8 +1,12 @@
 package bit.bitgroundspring.market;
 
+import bit.bitgroundspring.config.CacheConfig;
+import bit.bitgroundspring.market.dto.CoinMarket;
 import bit.bitgroundspring.market.dto.CoinResponse;
 import bit.bitgroundspring.market.dto.CoinSymbolDto;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -46,6 +50,19 @@ public class CoinService {
 
     public List<CoinSymbolDto> getSymbols() {
         return coinRepository.findAllSymbols();
+    }
+
+    /**
+     * 원화 마켓 전체 (거래대금 순, 유의·주의 포함). 스케줄러가 매시 갱신하므로 그 사이에는 같은 결과라 캐시한다.
+     * 스케줄러의 매시 갱신 알림에 비우고({@link #evictMarkets}), 알림이 빠져도 TTL이 지나면 다시 읽는다
+     */
+    @Cacheable(cacheNames = CacheConfig.COIN_MARKETS, key = "'all'")
+    public List<CoinMarket> getMarkets() {
+        return coinRepository.findByIsDeletedFalseOrderByTradePrice24hDesc().stream().map(CoinMarket::from).toList();
+    }
+
+    @CacheEvict(cacheNames = CacheConfig.COIN_MARKETS, allEntries = true)
+    public void evictMarkets() {
     }
 
     private static List<CoinResponse> toResponses(List<Coin> coins) {

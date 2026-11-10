@@ -232,6 +232,7 @@ gemini:
 upbit:
   api:
     ticker-url: https://api.upbit.com/v1/ticker?markets={symbol}
+    hourly-candles-url: https://api.upbit.com/v1/candles/minutes/60?market={symbol}&count={count}
   websocket:
     ticker-url: wss://api.upbit.com/websocket/v1
     connection-timeout: 10000

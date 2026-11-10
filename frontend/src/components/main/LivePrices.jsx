@@ -4,7 +4,7 @@ import Card from '../ui/Card.jsx';
 import CoinIcon from '../ui/CoinIcon.jsx';
 import Sparkline from '../ui/Sparkline.jsx';
 import {useUpbitTickers} from '../../hooks/useUpbitTickers.js';
-import {fetchHourlyCandles, fetchTopVolumeMarkets} from '../../api/upbitApi.js';
+import {fetchHourlyCloses, fetchTopVolumeMarkets} from '../../api/coinApi.js';
 import {changeColor, formatKRW, formatPercent} from '../../utils/format.js';
 
 // 비트코인은 고정, 나머지는 원화 마켓 24시간 거래대금 상위 (스테이블코인 제외)
@@ -28,8 +28,8 @@ export default function LivePrices() {
     useEffect(() => {
         Promise.all(
             marketKey.split(',').map((market) =>
-                fetchHourlyCandles(market, 24)
-                    .then((candles) => [market, candles.map((c) => c.trade_price).reverse()])
+                fetchHourlyCloses(market)
+                    .then((closes) => [market, closes])
                     .catch(() => [market, []]),
             ),
         ).then((entries) => setSparks((prev) => ({...prev, ...Object.fromEntries(entries)})));

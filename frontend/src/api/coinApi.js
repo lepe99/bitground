@@ -71,6 +71,36 @@ export const fetchCoinSymbols = async () => {
     }
 };
 
+// 원화 마켓 전체 [{symbol, koreanName, tradePrice24h, changeRate, warning, caution}] (거래대금 순, 매시 갱신, 서버 캐시)
+// 업비트 /market/all·/ticker/all을 브라우저가 직접 부르지 않는다 (Origin 헤더 요청은 약 10초에 1회 제한)
+let marketsRequest = null;
+export const fetchCoinMarkets = () => {
+    // 한 화면에서 여러 컴포넌트가 동시에 불러도 요청은 한 번 (실패하면 다음에 다시 시도)
+    marketsRequest ??= api.get('/coins/markets')
+        .then((response) => response.data)
+        .catch((error) => {
+            console.error('Error fetching coin markets:', error);
+            marketsRequest = null;
+            return [];
+        });
+    return marketsRequest;
+};
+
+// 가격이 원화에 묶여 거래대금만 큰 스테이블코인 (거래대금 순위에서 뺀다. 스케줄러 stableCoins와 같은 목록)
+const STABLE_COINS = new Set(['KRW-USDT', 'KRW-USDC', 'KRW-USDS', 'KRW-USDE', 'KRW-USD1', 'KRW-DAI', 'KRW-PYUSD']);
+
+/** 원화 마켓 24시간 거래대금 상위 count개: [{market, name}] (스테이블코인과 exclude는 뺀다) */
+export const fetchTopVolumeMarkets = async (count, exclude = []) => {
+    const skip = new Set(exclude);
+    return (await fetchCoinMarkets())
+        .filter((c) => !STABLE_COINS.has(c.symbol) && !skip.has(c.symbol))
+        .slice(0, count) // 서버가 거래대금 순으로 준다
+        .map((c) => ({market: c.symbol, name: c.koreanName}));
+};
+
+/** 최근 24시간 1시간봉 종가 (오래된 것부터). 추이 그래프용. 서버가 업비트를 대신 불러 캐시한다 */
+export const fetchHourlyCloses = async (symbol) => (await api.get(`/coins/${symbol}/hourly-closes`)).data;
+
 // 8. 특정 코인에 대한 AI 분석 결과 조회 (GET /coins/{symbol}/insight)
 export const fetchCoinInsight = async (symbol) => {
     try {

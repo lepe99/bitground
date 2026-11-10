@@ -1,5 +1,6 @@
 package bit.bitgroundspring.config;
 
+import bit.bitgroundspring.market.dto.CoinMarket;
 import bit.bitgroundspring.market.dto.NewsResponse;
 import bit.bitgroundspring.season.dto.RankEntry;
 import com.fasterxml.jackson.databind.JavaType;
@@ -28,7 +29,10 @@ import java.util.List;
  *   <li>{@value #NEWS}: 네이버 뉴스 검색. 요청마다 외부 API(하루 호출 한도)를 부르던 것을 10분간 재사용</li>
  *   <li>{@value #RANKINGS}: 시즌 랭킹. 스케줄러가 매시 정각에 다시 계산하므로 그 사이에는 같은 결과.
  *       스케줄러가 갱신을 알리면 비우고({@link bit.bitgroundspring.season.RankingCache}), 알림이 빠져도 1시간이면 만료된다</li>
+ *   <li>{@value #COIN_MARKETS}: 원화 마켓 코인 목록(거래대금·유의·주의). 스케줄러가 매시 갱신하고 그 알림에 비운다. TTL 10분</li>
+ *   <li>{@value #HOURLY_CLOSES}: 종목별 1시간봉 종가(추이 그래프). 업비트를 서버가 대신 불러 5분간 재사용</li>
  * </ul>
+ * 화면이 업비트 REST를 직접 부르지 않게 하는 캐시들이다 (브라우저 요청은 Origin 헤더 때문에 약 10초에 1회로 제한됨).
  * 값은 캐시별로 정해진 타입의 JSON으로 저장한다 (타입 정보를 값에 싣는 범용 직렬화를 쓰지 않음).
  * Redis는 토큰·이벤트 스트림과 함께 쓰므로 모든 캐시에 TTL을 두고, 결과 크기가 작은 것만 캐시한다.
  */
@@ -39,6 +43,8 @@ public class CacheConfig implements CachingConfigurer {
 
     public static final String NEWS = "news";
     public static final String RANKINGS = "rankings";
+    public static final String COIN_MARKETS = "coinMarkets";
+    public static final String HOURLY_CLOSES = "hourlyCloses";
 
     @Bean
     RedisCacheManagerBuilderCustomizer cacheConfigurations(RedisConnectionFactory connectionFactory, ObjectMapper objectMapper) {
@@ -48,7 +54,11 @@ public class CacheConfig implements CachingConfigurer {
                 .withCacheConfiguration(NEWS, config(Duration.ofMinutes(10),
                         objectMapper.getTypeFactory().constructCollectionType(List.class, NewsResponse.class), objectMapper))
                 .withCacheConfiguration(RANKINGS, config(Duration.ofHours(1),
-                        objectMapper.getTypeFactory().constructCollectionType(List.class, RankEntry.class), objectMapper));
+                        objectMapper.getTypeFactory().constructCollectionType(List.class, RankEntry.class), objectMapper))
+                .withCacheConfiguration(COIN_MARKETS, config(Duration.ofMinutes(10),
+                        objectMapper.getTypeFactory().constructCollectionType(List.class, CoinMarket.class), objectMapper))
+                .withCacheConfiguration(HOURLY_CLOSES, config(Duration.ofMinutes(5),
+                        objectMapper.getTypeFactory().constructCollectionType(List.class, Double.class), objectMapper));
     }
 
     private static RedisCacheConfiguration config(Duration ttl, JavaType type, ObjectMapper objectMapper) {

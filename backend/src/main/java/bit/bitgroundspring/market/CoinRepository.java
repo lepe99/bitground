@@ -23,6 +23,9 @@ public interface CoinRepository extends JpaRepository<Coin, Integer> {
     
     List<Coin> findByIsDeletedFalse();
 
+    // 원화 마켓 전체 (거래대금 순). 화면의 종목 목록·거래대금 상위 고르기에 쓴다
+    List<Coin> findByIsDeletedFalseOrderByTradePrice24hDesc();
+
     // 메인 화면 상위 5개: 전체를 읽어 자바에서 정렬하지 않고 DB에서 정렬·LIMIT (상장 폐지 코인 제외)
     List<Coin> findTop5ByIsDeletedFalseOrderByTradePrice24hDesc();
 

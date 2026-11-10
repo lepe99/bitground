@@ -1,5 +1,4 @@
 import {useEffect, useState} from 'react';
-import {fetchTickers} from '../api/upbitApi.js';
 import {subscribeTickers} from '../ticker/upbitSocket.js';
 
 // 시세 메시지는 초당 여러 건 오므로 모아 두었다가 이 간격으로 한 번에 반영한다
@@ -14,7 +13,8 @@ const toTicker = (t) => ({
 
 /**
  * 몇 개 종목의 실시간 현재가 (메인 화면처럼 종목이 적을 때용. 거래소·투자내역은 TickerProvider를 쓴다)
- * 처음 값은 REST로 바로 채우고, 이후로는 공용 WebSocket으로 갱신한다
+ * 탭 공용 WebSocket으로 받는다. 업비트가 구독 직후 현재 시세를 먼저 보내므로 따로 REST로 채우지 않는다
+ * (브라우저의 업비트 REST 호출은 약 10초에 1회로 제한된다)
  * @returns {{[market]: {price, changeRate(%), changePrice, volume}}}
  */
 export function useUpbitTickers(markets) {
@@ -23,19 +23,9 @@ export function useUpbitTickers(markets) {
 
     useEffect(() => {
         if (!key) return;
-        const codes = key.split(',');
-        let alive = true;
         let pending = {};
 
-        fetchTickers(codes)
-            .then((list) => {
-                if (!alive) return;
-                // WebSocket 값이 먼저 와 있으면 그쪽이 더 최신이다
-                setTickers((prev) => ({...Object.fromEntries(list.map((t) => [t.market, toTicker(t)])), ...prev}));
-            })
-            .catch((error) => console.warn('업비트 시세 조회 실패:', error.message));
-
-        const unsubscribe = subscribeTickers(codes, (tick) => {
+        const unsubscribe = subscribeTickers(key.split(','), (tick) => {
             pending[tick.code] = toTicker(tick);
         });
         const flushTimer = setInterval(() => {
@@ -46,7 +36,6 @@ export function useUpbitTickers(markets) {
         }, FLUSH_MS);
 
         return () => {
-            alive = false;
             unsubscribe();
             clearInterval(flushTimer);
         };
