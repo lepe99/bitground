@@ -30,6 +30,11 @@ services:
     environment:
       API_DOMAIN: ${API_DOMAIN:?API_DOMAIN 필요}
       ACME_EMAIL: ${ACME_EMAIL:?ACME_EMAIL 필요}
+      # Grafana 중계 (모니터링 서버 3000). 해시는 base64(bcrypt) (bcrypt의 '$'가 .env에서 변수로 해석되지 않게)
+      GRAFANA_DOMAIN: ${GRAFANA_DOMAIN:?GRAFANA_DOMAIN 필요}
+      GRAFANA_BASIC_AUTH_USER: ${GRAFANA_BASIC_AUTH_USER:?GRAFANA_BASIC_AUTH_USER 필요}
+      GRAFANA_BASIC_AUTH_HASH: ${GRAFANA_BASIC_AUTH_HASH:?GRAFANA_BASIC_AUTH_HASH 필요}
+      MONITORING_HOST: ${MONITORING_HOST:?MONITORING_HOST 필요 (모니터링 서버 프라이빗 IP)}
     ports:
       - "80:80"
       - "443:443"
