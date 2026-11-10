@@ -147,11 +147,21 @@ func nextSeasonName(start time.Time, prevName string) string {
 // NotifySeasonUpdate 백엔드에 시즌/스플릿 완료를 알립니다. (예약 주문 정리, 사용자 알림)
 // 공유 키는 본문이 아니라 헤더로 보낸다.
 func NotifySeasonUpdate(ctx context.Context, backendURL, schedulerKey, seasonFlag string) error {
+	form := url.Values{"seasonFlag": {seasonFlag}}
+	return postBackend(ctx, backendURL+"/seasons/update", schedulerKey, form)
+}
+
+// NotifyRankingsRefreshed 백엔드에 매시 랭킹 갱신을 알립니다. 백엔드는 랭킹 캐시를 비운다
+// (알리지 못해도 캐시는 1시간이면 만료되므로 실패를 작업 실패로 보지 않는다)
+func NotifyRankingsRefreshed(ctx context.Context, backendURL, schedulerKey string) error {
+	return postBackend(ctx, backendURL+"/rank/refreshed", schedulerKey, url.Values{})
+}
+
+func postBackend(ctx context.Context, endpoint, schedulerKey string, form url.Values) error {
 	reqCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	form := url.Values{"seasonFlag": {seasonFlag}}
-	req, err := http.NewRequestWithContext(reqCtx, http.MethodPost, backendURL+"/seasons/update", strings.NewReader(form.Encode()))
+	req, err := http.NewRequestWithContext(reqCtx, http.MethodPost, endpoint, strings.NewReader(form.Encode()))
 	if err != nil {
 		return fmt.Errorf("HTTP 요청 생성 에러: %w", err)
 	}

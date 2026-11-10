@@ -77,6 +77,9 @@ func TestTickerOutageStopsOnlyPriceDependentJobs(t *testing.T) {
 	if n := e.f.Int(`SELECT COUNT(*) FROM user_rankings`); n != 0 {
 		t.Errorf("시세 없이 랭킹이 계산됨: %d행", n)
 	}
+	if n := e.backend.RankingRefreshes(); n != 0 {
+		t.Errorf("랭킹이 바뀌지 않았는데 랭킹 갱신 알림 %d번", n)
+	}
 
 	// 업비트가 돌아오면 다음 실행에서 랭킹이 계산된다 (스플릿은 다시 지급하지 않음)
 	e.market.FailTickers(false)
@@ -85,6 +88,9 @@ func TestTickerOutageStopsOnlyPriceDependentJobs(t *testing.T) {
 	}
 	if n := e.f.Int(`SELECT COUNT(*) FROM user_rankings`); n != 7 {
 		t.Errorf("복구 후 랭킹 %d행", n)
+	}
+	if n := e.backend.RankingRefreshes(); n != 1 {
+		t.Errorf("복구 후 랭킹 갱신 알림 %d번", n)
 	}
 	if v := e.f.Int(`SELECT cash FROM users WHERE id = ?`, users[1]); v != 22_000_000 {
 		t.Errorf("스플릿이 다시 지급됨: %d", v)

@@ -153,6 +153,10 @@ func TestHourlyRun(t *testing.T) {
 	if got := e.backend.Received(); got != "" {
 		t.Errorf("정산·스플릿이 없는데 백엔드 알림 %q", got)
 	}
+	// 랭킹을 다시 계산할 때마다 백엔드 랭킹 캐시를 비우라고 알린다 (두 번 실행)
+	if n := e.backend.RankingRefreshes(); n != 2 {
+		t.Errorf("랭킹 갱신 알림 %d번", n)
+	}
 }
 
 func TestMidnightRun(t *testing.T) {

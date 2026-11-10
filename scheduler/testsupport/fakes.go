@@ -117,13 +117,14 @@ type roundTripper func(*http.Request) (*http.Response, error)
 
 func (f roundTripper) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
 
-// Backend 시즌·스플릿 완료 알림(POST /seasons/update)을 받는 가짜 백엔드
+// Backend 시즌·스플릿 완료 알림(POST /seasons/update)과 랭킹 갱신 알림(POST /rank/refreshed)을 받는 가짜 백엔드
 type Backend struct {
-	URL  string
-	Key  string
-	mu   sync.Mutex
-	got  []string
-	down bool
+	URL       string
+	Key       string
+	mu        sync.Mutex
+	got       []string
+	refreshes int
+	down      bool
 }
 
 func NewBackend(t *testing.T, key string) *Backend {
@@ -134,6 +135,11 @@ func NewBackend(t *testing.T, key string) *Backend {
 		defer b.mu.Unlock()
 		if b.down {
 			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+		if r.Header.Get("X-Scheduler-Key") == b.Key && r.URL.Path == "/rank/refreshed" {
+			b.refreshes++
+			w.WriteHeader(http.StatusNoContent)
 			return
 		}
 		body, _ := io.ReadAll(r.Body)
@@ -162,4 +168,11 @@ func (b *Backend) Received() string {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	return strings.Join(b.got, ",")
+}
+
+// RankingRefreshes 받은 랭킹 갱신 알림 수
+func (b *Backend) RankingRefreshes() int {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.refreshes
 }

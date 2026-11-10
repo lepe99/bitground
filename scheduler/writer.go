@@ -167,6 +167,13 @@ func applyHourly(ctx context.Context, db *sql.DB, cfg config.Config, req ApplyRe
 		}
 	}
 
+	// 랭킹이 바뀌었으니 백엔드의 랭킹 캐시를 비운다 (시즌 정산까지 끝난 뒤. 실패해도 캐시 TTL이 받쳐 주므로 경고만)
+	if rankErr == nil && cfg.BackendURL != "" {
+		if err := service.NotifyRankingsRefreshed(ctx, cfg.BackendURL, cfg.SchedulerKey); err != nil {
+			slog.WarnContext(ctx, "랭킹 갱신 알림 실패 (백엔드 캐시는 TTL로 만료)", "error", err)
+		}
+	}
+
 	// 이전 실행에서 정산은 됐지만 백엔드에 알리지 못한 기록 (예약 주문 정리·사용자 알림이 빠지지 않게)
 	errs = append(errs, step("백엔드 알림 재시도", func(ctx context.Context) error {
 		return service.RetryPendingNotifications(ctx, db, cfg.BackendURL, cfg.SchedulerKey)

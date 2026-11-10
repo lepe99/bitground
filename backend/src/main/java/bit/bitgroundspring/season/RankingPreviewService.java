@@ -3,7 +3,7 @@ package bit.bitgroundspring.season;
 import bit.bitgroundspring.common.Status;
 import bit.bitgroundspring.season.dto.PublicRankingDto;
 import bit.bitgroundspring.season.dto.PublicRankingResponse;
-import bit.bitgroundspring.season.dto.RankProjection;
+import bit.bitgroundspring.season.dto.RankEntry;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -15,11 +15,11 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class RankingPreviewService {
 
-    private final UserRankingRepository userRankingRepository;
+    private final RankService rankService; // 캐시된 현재 시즌 랭킹을 함께 쓴다
     private final SeasonRepository seasonRepository;
 
     public PublicRankingResponse getPublicRankingPreview() {
-        List<RankProjection> projections = userRankingRepository.findCurrentSeasonRankings();
+        List<RankEntry> projections = rankService.getCurrentRankings();
 
         String seasonName;
         LocalDateTime baseTime;
@@ -31,9 +31,9 @@ public class RankingPreviewService {
             baseTime = LocalDateTime.now();
         } else {
             // 참여한 유저가 있으면 첫 번째 projection에서 시간과 시즌 정보 추출
-            RankProjection first = projections.get(0);
-            seasonName = first.getSeasonName(); // ← 이 줄 중요
-            baseTime = first.getUpdatedAt();
+            RankEntry first = projections.get(0);
+            seasonName = first.seasonName(); // ← 이 줄 중요
+            baseTime = first.updatedAt();
         }
 
         String updatedAtText = formatUpdatedTime(baseTime);
@@ -42,11 +42,11 @@ public class RankingPreviewService {
         List<PublicRankingDto> rankingDtos = projections.stream()
                 .limit(5)
                 .map(p -> PublicRankingDto.builder()
-                        .name(p.getName())
-                        .profileImage(p.getProfileImage())
-                        .tier(p.getTier())
-                        .totalValue(p.getTotalValue())
-                        .ranks(p.getRanks())
+                        .name(p.name())
+                        .profileImage(p.profileImage())
+                        .tier(p.tier())
+                        .totalValue(p.totalValue())
+                        .ranks(p.ranks())
                         .build()
                 ).collect(Collectors.toList());
 

@@ -3,6 +3,7 @@ package bit.bitgroundspring.user;
 import bit.bitgroundspring.aop.Loggable;
 import bit.bitgroundspring.common.error.BusinessException;
 import bit.bitgroundspring.common.error.ErrorCode;
+import bit.bitgroundspring.season.RankingCache;
 import bit.bitgroundspring.season.Season;
 import bit.bitgroundspring.season.SeasonRepository;
 import bit.bitgroundspring.season.UserRankingRepository;
@@ -28,6 +29,7 @@ public class UserService {
     private final AuthTokenService authTokenService;
     private final UserRankingRepository userRankingRepository;
     private final SeasonRepository seasonRepository;
+    private final RankingCache rankingCache;
 
     // 탈퇴하지 않은 사용자 조회 (없으면 USER_NOT_FOUND)
     @Transactional(readOnly = true)
@@ -87,7 +89,9 @@ public class UserService {
             storageService.deleteByUrl(previousImage);
         }
 
-        return userRepository.save(user);
+        User saved = userRepository.save(user);
+        rankingCache.evictAfterCommit(); // 랭킹에 닉네임·사진이 함께 보인다
+        return saved;
     }
 
     //이미지업로드
@@ -111,6 +115,7 @@ public class UserService {
         user.setProviderId(null);
         user.setProfileImage(null);
         userRepository.save(user);
+        rankingCache.evictAfterCommit(); // 랭킹에 실명·사진이 남지 않게
         // 직접 올린 프로필 사진 파일도 지운다 (소셜 프로필 URL은 무시됨). 파일 삭제가 실패해도 탈퇴는 진행한다
         try {
             storageService.deleteByUrl(uploadedImage);

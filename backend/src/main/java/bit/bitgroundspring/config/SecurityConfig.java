@@ -55,7 +55,7 @@ public class SecurityConfig {
                         .dispatcherTypeMatchers(DispatcherType.ASYNC, DispatcherType.ERROR).permitAll()
                         .requestMatchers("/auth/refresh", "/oauth2/**", "/error", "/favicon.ico", "/ws/**", // 인증, WebSocket
                                 "/coins/**", "/coins", "/news", "/market-index/**", "/ai-insights/**", "/public/**", // 공개 API
-                                "/auth/logout", "/seasons/update", "/seasons/current").permitAll()
+                                "/auth/logout", "/seasons/update", "/rank/refreshed", "/seasons/current").permitAll() // 스케줄러 내부 API는 공유 키로 확인
                         // 관리 포트(8091)에서만 열리는 엔드포인트. 외부 노출은 네트워크(보안그룹)로 막는다
                         .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/prometheus").permitAll()
                         .requestMatchers("/api/docs/**").hasRole("ADMIN")

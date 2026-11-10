@@ -78,11 +78,12 @@ spring:
       pool:
         size: 3  # 스케줄링 스레드 개수
 
-  # 캐시 설정
+  # 조회 결과 캐시 (Redis). 캐시별 TTL·직렬화는 CacheConfig
   cache:
     type: redis
     redis:
-      time-to-live: 600000ms # 10분
+      time-to-live: 10m # CacheConfig에 없는 캐시의 기본값
+      enable-statistics: true # 적중·누락 지표 (cache_gets_total{result="hit|miss"})
 
   # 업로드 크기 제한 (이미지 5MB)
   servlet:
