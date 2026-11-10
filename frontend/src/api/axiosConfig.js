@@ -1,70 +1,42 @@
 import axios from 'axios';
 
-// 토큰 갱신 중인지 추적하는 변수 추가
-let isRefreshing = false;
-// 토큰 갱신 대기 중인 요청들을 저장할 배열
-let refreshSubscribers = [];
-
-// 토큰 갱신 후 대기 중인 요청들을 처리하는 함수
-const onRefreshed = () => {
-    refreshSubscribers.forEach(callback => callback());
-    refreshSubscribers = [];
-};
-
-// 토큰 갱신을 기다리는 요청을 추가하는 함수
-const addRefreshSubscriber = (callback) => {
-    refreshSubscribers.push(callback);
-};
-
 const api = axios.create({
     baseURL: import.meta.env.VITE_API_URL,
     withCredentials: true,
 });
 
+// 액세스 토큰(30분)이 만료되면 401이 오고, 리프레시 토큰으로 한 번 재발급받아 원래 요청을 다시 보낸다.
+// 동시에 여러 요청이 401을 받아도 재발급은 한 번만 하고 나머지는 그 결과를 기다린다.
+let refreshing = null; // 진행 중인 재발급 Promise
+
+// 재발급·로그아웃 요청 자체는 다시 재발급을 시도하지 않는다
+const NO_RETRY = new Set(['/auth/refresh', '/auth/logout']);
+
+// 서버가 리프레시 토큰을 거절한 경우만 세션이 끝난 것으로 본다.
+// (절전에서 깨어난 직후의 네트워크 오류나 서버 재시작 중 5xx·429는 세션이 살아 있으므로 로그아웃시키지 않는다)
+const isSessionExpired = (error) => [401, 403].includes(error.response?.status);
+
 api.interceptors.response.use(
     (response) => response,
     async (error) => {
         const originalRequest = error.config;
-
-        // 리프레시 토큰 엔드포인트 요청은 재시도하지 않음
-        if (originalRequest.url === '/auth/refresh') {
-            isRefreshing = false;
+        if (error.response?.status !== 401 || !originalRequest || originalRequest._retry || NO_RETRY.has(originalRequest.url)) {
             return Promise.reject(error);
         }
+        originalRequest._retry = true;
 
-        // 401 에러이고, 재시도한 요청이 아닐 경우
-        if (error.response?.status === 401 && !originalRequest._retry) {
-
-            originalRequest._retry = true;
-
-            // 이미 토큰 갱신 중이라면, 대기열에 추가
-            if (isRefreshing) {
-                return new Promise((resolve) => {
-                    addRefreshSubscriber(() => {
-                        resolve(api(originalRequest));
-                    });
-                });
-            }
-
-            isRefreshing = true;
-
-            try {
-                // 백엔드의 토큰 재발급 API 호출
-                await api.post('/auth/refresh');
-
-                // 토큰 갱신 성공 처리
-                isRefreshing = false;
-                onRefreshed();
-
-                // 원래 요청 재시도
-                return api(originalRequest);
-            } catch (refreshError) {
-                isRefreshing = false;
+        refreshing ??= api.post('/auth/refresh').finally(() => {
+            refreshing = null;
+        });
+        try {
+            await refreshing;
+        } catch (refreshError) {
+            if (isSessionExpired(refreshError)) {
                 window.dispatchEvent(new Event('forceLogout'));
-                return Promise.reject(refreshError);
             }
+            return Promise.reject(refreshError);
         }
-        return Promise.reject(error);
+        return api(originalRequest);
     }
 );
 
