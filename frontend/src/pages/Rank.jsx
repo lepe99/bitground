@@ -31,7 +31,7 @@ export default function Rank() {
     const {user} = useAuth();
     const [view, setView] = useState("current");
     const [current, setCurrent] = useState(null); // null: 불러오는 중
-    const [seasons, setSeasons] = useState([]);   // 지난(완료) 시즌
+    const [seasons, setSeasons] = useState(null); // 지난(완료) 시즌. null: 불러오는 중
     const [pastId, setPastId] = useState(null);
     const [past, setPast] = useState({});         // seasonId → rankings
     const [selected, setSelected] = useState(null);
@@ -53,7 +53,10 @@ export default function Rank() {
                 setSeasons(done);
                 setPastId(done[0]?.id ?? null);
             })
-            .catch((error) => console.error("시즌 목록 조회 실패:", error));
+            .catch((error) => {
+                console.error("시즌 목록 조회 실패:", error);
+                setSeasons([]);
+            });
         const timer = setInterval(() => setNow(Date.now()), 30_000);
         return () => clearInterval(timer);
     }, []);
@@ -68,7 +71,7 @@ export default function Rank() {
     const rankings = view === "current" ? current : past[pastId] ?? null;
     const rows = [...(rankings ?? [])].sort((a, b) => a.ranks - b.ranks);
     const me = current?.find((r) => r.userId === user?.id);
-    const season = view === "current" ? current?.[0]?.seasonName ?? "이번 시즌" : seasons.find((s) => s.id === pastId)?.name;
+    const season = view === "current" ? current?.[0]?.seasonName ?? "이번 시즌" : seasons?.find((s) => s.id === pastId)?.name ?? "지난 시즌";
 
     return (
         <div className="mx-auto flex max-w-[1280px] flex-col gap-4 px-5 pt-4 pb-10 md:gap-6 md:px-8 md:pt-8 md:pb-14">
@@ -83,7 +86,7 @@ export default function Rank() {
                 </div>
                 <div className="flex w-full flex-wrap items-center gap-2 md:w-auto">
                     <SegmentedTabs label="시즌 선택" items={VIEWS} value={view} onChange={setView} fill className="flex-1 md:flex-none"/>
-                    {view === "past" && seasons.length > 0 && (
+                    {view === "past" && seasons?.length > 0 && (
                         <select
                             aria-label="지난 시즌"
                             value={pastId ?? ""}
@@ -101,10 +104,10 @@ export default function Rank() {
             {/* 모바일: 내 위치를 맨 위에 */}
             {view === "current" && current && <div className="md:hidden"><MyPosition me={me} rankings={current}/></div>}
 
-            {rankings === null ? (
-                <p className="py-16 text-center text-sm text-fg-3">불러오는 중…</p>
-            ) : view === "past" && seasons.length === 0 ? (
+            {view === "past" && seasons?.length === 0 ? (
                 <p className="py-16 text-center text-sm text-fg-3">아직 끝난 시즌이 없어요.</p>
+            ) : rankings === null ? (
+                <p className="py-16 text-center text-sm text-fg-3">불러오는 중…</p>
             ) : rows.length === 0 ? (
                 <p className="py-16 text-center text-sm text-fg-3">아직 순위에 오른 참가자가 없어요.</p>
             ) : (
