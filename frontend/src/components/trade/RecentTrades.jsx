@@ -6,6 +6,15 @@ const MAX_ROWS = 30;
 const RECONNECT_BASE_MS = 1000;
 const RECONNECT_MAX_MS = 30000;
 
+// 백엔드 WebSocket 주소. 운영은 프론트(CloudFront)와 API 서버의 도메인이 달라 VITE_API_URL에서 만들고,
+// 개발은 지정이 없으면 Vite 개발 서버 프록시(/ws)를 거친다
+const TRADE_WS_URL = (() => {
+    const base = new URL(import.meta.env.VITE_API_URL || window.location.origin, window.location.origin);
+    base.protocol = base.protocol === 'https:' ? 'wss:' : 'ws:';
+    base.pathname = `${base.pathname.replace(/\/$/, '')}/ws/trade/history`;
+    return base.toString();
+})();
+
 const timeOf = (iso) => {
     const d = new Date(iso);
     return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`;
@@ -27,8 +36,7 @@ export default function RecentTrades({symbol, className = ''}) {
         setHistory([]);
 
         const connect = () => {
-            const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
-            ws = new WebSocket(`${proto}://${window.location.host}/ws/trade/history`);
+            ws = new WebSocket(TRADE_WS_URL);
 
             ws.onopen = () => {
                 attempts = 0;
