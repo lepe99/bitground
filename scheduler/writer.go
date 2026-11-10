@@ -44,7 +44,7 @@ type WriterResponse struct {
 type ApplyRequest struct {
 	Now         time.Time                       `json:"now"`                   // 실행 기준 정시
 	Tickers     map[string]model.UpbitCoinPrice `json:"tickers,omitempty"`     // 업비트 원화 전 종목 시세
-	Markets     []model.UpbitCoinList           `json:"markets,omitempty"`     // 업비트 마켓 목록 (0시에만)
+	Markets     []model.UpbitCoinList           `json:"markets,omitempty"`     // 업비트 마켓 목록 (매시)
 	MarketIndex *service.MarketIndex            `json:"marketIndex,omitempty"` // 시장 지수
 }
 
@@ -122,13 +122,14 @@ func applyHourly(ctx context.Context, db *sql.DB, cfg config.Config, req ApplyRe
 	}
 
 	var errs []error
+	// 코인 목록은 매시 갱신 (새 상장·유의·주의 지정·거래대금이 한 시간 안에 화면에 반영되게)
+	errs = append(errs, step("코인 업데이트", needTickers(func(ctx context.Context) error {
+		if len(req.Markets) == 0 {
+			return errors.New("업비트 마켓 목록이 없음 (수집 단계 조회 실패)")
+		}
+		return service.SaveCoins(ctx, db, req.Markets, req.Tickers)
+	})))
 	if daily {
-		errs = append(errs, step("코인 업데이트", needTickers(func(ctx context.Context) error {
-			if len(req.Markets) == 0 {
-				return errors.New("업비트 마켓 목록이 없음 (수집 단계 조회 실패)")
-			}
-			return service.SaveCoins(ctx, db, req.Markets, req.Tickers)
-		})))
 		errs = append(errs, step("오래된 알림 정리", func(ctx context.Context) error {
 			_, err := service.PurgeOldNotifications(ctx, db, now)
 			return err

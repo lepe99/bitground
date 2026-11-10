@@ -116,6 +116,7 @@ func TestHourlyRun(t *testing.T) {
 		t.Fatal(err)
 	}
 	users := e.rankingFixture(season)
+	e.market.List("KRW-SOL", "솔라나", 200_000) // 새로 상장
 
 	for i := 0; i < 2; i++ { // 같은 시각에 다시 실행돼도 결과가 같다 (Lambda 재시도)
 		if err := e.run(t, now); err != nil {
@@ -138,15 +139,20 @@ func TestHourlyRun(t *testing.T) {
 		t.Errorf("랭킹\n got %v\nwant %v", got, want)
 	}
 
-	// 시간별 시세 기록 (업비트에 있는 코인만, 같은 시각은 한 행)
-	if got := e.f.Rows(`SELECT coin_id, CAST(close_price AS DECIMAL(14,0)) FROM coin_price_history WHERE date = '2026-11-10' AND hour = 14 ORDER BY coin_id`); !reflect.DeepEqual(got,
-		[][]string{{itoa(e.btc), "100000000"}, {itoa(e.eth), "5000000"}, {itoa(e.xrp), "1000"}}) {
+	// 시간별 시세 기록 (업비트에 있는 코인만, 같은 시각은 한 행). 새로 상장된 코인은 목록에 들어간 다음 실행부터 기록된다
+	if got := e.f.Rows(`SELECT c.symbol, CAST(h.close_price AS DECIMAL(14,0)) FROM coin_price_history h JOIN coins c ON c.id = h.coin_id
+		WHERE h.date = '2026-11-10' AND h.hour = 14 ORDER BY c.symbol`); !reflect.DeepEqual(got,
+		[][]string{{"KRW-BTC", "100000000"}, {"KRW-ETH", "5000000"}, {"KRW-SOL", "200000"}, {"KRW-XRP", "1000"}}) {
 		t.Errorf("시세 기록 %v", got)
 	}
 	if n := e.f.Int(`SELECT COUNT(*) FROM market_indices WHERE date = '2026-11-10' AND hour = 14`); n != 1 {
 		t.Errorf("시장 지수 행 %d개", n)
 	}
-	// 0시가 아니면 일일 스냅샷·코인 목록 갱신은 하지 않는다
+	// 코인 목록은 매시 갱신한다 (화면의 종목 목록·거래대금 상위가 이 표를 쓴다)
+	if got := e.f.Rows(`SELECT korean_name, trade_price_24h FROM coins WHERE symbol = 'KRW-SOL'`); !reflect.DeepEqual(got, [][]string{{"솔라나", "200000000"}}) {
+		t.Errorf("새로 상장된 코인 %v", got)
+	}
+	// 0시가 아니면 일일 스냅샷은 남기지 않는다
 	if n := e.f.Int(`SELECT COUNT(*) FROM user_daily_balances`); n != 0 {
 		t.Errorf("일일 스냅샷 %d행 (0시에만)", n)
 	}

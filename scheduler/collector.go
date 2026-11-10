@@ -77,15 +77,14 @@ func collect(ctx context.Context, cfg config.Config, now time.Time, w Writer, jo
 			return err
 		})
 	})
-	if flags.Coin {
-		fetch.Go(func() {
-			fetchErrs[1] = step("업비트 마켓 목록 조회", func(ctx context.Context) error {
-				var err error
-				req.Markets, err = service.FetchMarkets(ctx)
-				return err
-			})
+	// 코인 목록(이름·유의·주의·거래대금)은 매시 갱신한다. 화면이 업비트 REST 대신 이 목록을 쓰므로 (백엔드 /coins/markets)
+	fetch.Go(func() {
+		fetchErrs[1] = step("업비트 마켓 목록 조회", func(ctx context.Context) error {
+			var err error
+			req.Markets, err = service.FetchMarkets(ctx)
+			return err
 		})
-	}
+	})
 	fetch.Go(func() {
 		fetchErrs[2] = step("마켓 인덱스 조회", func(ctx context.Context) error {
 			idx, err := service.FetchMarketIndex(ctx, cfg.CoinGeckoAPIKey)
