@@ -540,6 +540,140 @@
         },
         "overrides": []
       }
+    },
+    {
+      "id": 13,
+      "type": "timeseries",
+      "title": "Redis 메모리",
+      "description": "상한에 닿으면 새 쓰기(토큰·이벤트 스트림·캐시)가 거부된다 (noeviction). 로컬은 상한이 없어 사용량만 보인다",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 36,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "redis_memory_used_bytes{instance=\"redis\"}",
+          "legendFormat": "사용"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "redis_memory_max_bytes{instance=\"redis\"} > 0",
+          "legendFormat": "상한 (maxmemory)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 14,
+      "type": "timeseries",
+      "title": "캐시 적중률 (5분)",
+      "description": "조회 중 캐시에서 바로 응답한 비율. news: 네이버 뉴스 검색(10분), rankings: 시즌 랭킹(매시 갱신 때 비움)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 36,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (cache) (rate(cache_gets_total{app=\"bitground-backend\", result=\"hit\"}[5m])) / sum by (cache) (rate(cache_gets_total{app=\"bitground-backend\"}[5m]))",
+          "legendFormat": "{{cache}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 15,
+      "type": "timeseries",
+      "title": "Redis 키 · 명령",
+      "description": "키 수는 왼쪽 축, 초당 명령은 오른쪽 축",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 36,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(redis_db_keys{instance=\"redis\"})",
+          "legendFormat": "키 수"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "rate(redis_commands_processed_total{instance=\"redis\"}[1m])",
+          "legendFormat": "초당 명령"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "초당 명령"
+            },
+            "properties": [
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "unit",
+                "value": "ops"
+              }
+            ]
+          }
+        ]
+      }
     }
   ]
 }

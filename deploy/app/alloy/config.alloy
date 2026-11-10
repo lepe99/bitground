@@ -139,6 +139,27 @@ prometheus.scrape "host" {
   forward_to      = [prometheus.remote_write.monitoring.receiver]
 }
 
+// ── Redis 지표: 메모리(사용량·상한), 키 수, 명령 처리량, 거부된 연결.
+// Alloy 내장 redis_exporter라 컨테이너를 따로 띄우지 않는다
+prometheus.exporter.redis "redis" {
+  redis_addr = "redis:6379"
+}
+
+discovery.relabel "redis" {
+  targets = prometheus.exporter.redis.redis.targets
+
+  rule {
+    target_label = "instance"
+    replacement  = "redis"
+  }
+}
+
+prometheus.scrape "redis" {
+  targets         = discovery.relabel.redis.output
+  scrape_interval = "30s"
+  forward_to      = [prometheus.remote_write.monitoring.receiver]
+}
+
 prometheus.remote_write "monitoring" {
   endpoint {
     url = string.format("http://%s:9090/api/v1/write", sys.env("MONITORING_HOST"))
