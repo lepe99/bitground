@@ -104,6 +104,7 @@ jobs:
       - run: npm run build
         env:
           VITE_API_URL: ${{ vars.VITE_API_URL }}
+          VITE_GRAFANA_URL: ${{ vars.VITE_GRAFANA_URL }}
       - uses: actions/upload-artifact@v5
         if: github.event_name != 'pull_request'
         with:
