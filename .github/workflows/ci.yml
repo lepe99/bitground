@@ -78,7 +78,7 @@ jobs:
       - name: Lambda zip (arm64, provided.al2023)
         run: ./build-lambda.sh
       - uses: actions/upload-artifact@v5
-        if: github.event_name == 'push'
+        if: github.event_name != 'pull_request'
         with:
           name: scheduler-lambda
           path: scheduler/dist/scheduler-lambda.zip
@@ -105,17 +105,17 @@ jobs:
         env:
           VITE_API_URL: ${{ vars.VITE_API_URL }}
       - uses: actions/upload-artifact@v5
-        if: github.event_name == 'push'
+        if: github.event_name != 'pull_request'
         with:
           name: frontend-dist
           path: frontend/dist
           retention-days: 30
 
-  # 검사를 모두 통과하고 dev·main에 푸시됐을 때만 이미지를 올린다 (PR에서는 올리지 않음)
+  # 검사를 모두 통과하고 dev·main에 푸시됐거나 수동 실행했을 때만 이미지를 올린다 (PR에서는 올리지 않음)
   backend-image:
     name: backend 이미지 (arm64 → GHCR)
     needs: [backend, scheduler, frontend]
-    if: github.event_name == 'push'
+    if: github.event_name != 'pull_request'
     # 운영 서버(t4g, Graviton)와 같은 arm64 러너에서 에뮬레이션 없이 빌드 (공개 저장소 무료)
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 30
