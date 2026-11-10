@@ -44,12 +44,14 @@ export function TickerProvider({ children }) {
         const unsubscribe = subscribeTickers(markets.map((m) => m.market), (tick) => {
             pending[tick.code] = toTicker(tick);
         });
-        const flushTimer = setInterval(() => {
+        const flush = () => {
             if (Object.keys(pending).length === 0) return;
             const batch = pending;
             pending = {};
             setTickerMap(prev => ({...prev, ...batch}));
-        }, FLUSH_INTERVAL_MS);
+        };
+        flush(); // 전에 받아 둔 시세는 바로 반영 (다른 화면에 다녀와도 로딩 없이 보인다)
+        const flushTimer = setInterval(flush, FLUSH_INTERVAL_MS);
 
         return () => {
             unsubscribe();
@@ -57,9 +59,11 @@ export function TickerProvider({ children }) {
         };
     }, [markets]);
 
+    // 시세를 한 번이라도 받았으면 화면을 막지 않는다 (재연결 중에는 마지막 시세를 그대로 보여 준다)
+    const hasTickers = Object.keys(tickerMap).length > 0;
     const value = useMemo(
-        () => ({ markets, selectedMarket, tickerMap, setSelectedMarket, isWsConnected }),
-        [markets, selectedMarket, tickerMap, isWsConnected]
+        () => ({ markets, selectedMarket, tickerMap, setSelectedMarket, isWsConnected, hasTickers }),
+        [markets, selectedMarket, tickerMap, isWsConnected, hasTickers]
     );
 
     return (

@@ -21,7 +21,7 @@ import PendingOrderList from "../components/investments/PendingOrderList.jsx";
 export default function Investments() {
     const navigate = useNavigate();
     const {user} = useContext(AuthContext);
-    const {markets, tickerMap, selectedMarket, setSelectedMarket, isWsConnected} = useContext(TickerContext);
+    const {markets, tickerMap, selectedMarket, setSelectedMarket, hasTickers} = useContext(TickerContext);
     const {userCash} = useNotifications();
 
     const [tab, setTab] = useState("assets");
@@ -68,7 +68,7 @@ export default function Investments() {
 
     return (
         <div className="flex flex-wrap gap-2 px-5 pt-2 pb-8 md:p-2">
-            {!isWsConnected && <Loading/>}
+            {!hasTickers && <Loading/>}
             <div className="flex min-w-0 flex-[999_1_720px] flex-col gap-3 md:gap-2">
                 <h1 className="pt-2 text-xl font-extrabold md:sr-only">투자내역</h1>
                 <SegmentedTabs label="투자내역 보기" items={tabs} value={tab} onChange={setTab} fill className="md:rounded-xl md:border md:border-line md:bg-surface"/>

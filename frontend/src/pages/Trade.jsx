@@ -20,7 +20,7 @@ import MobileCoinDetail from "../components/trade/MobileCoinDetail.jsx";
  */
 export default function Trade() {
     const {user} = useContext(AuthContext);
-    const {markets, selectedMarket, tickerMap, setSelectedMarket, isWsConnected} = useContext(TickerContext);
+    const {markets, selectedMarket, tickerMap, setSelectedMarket, hasTickers} = useContext(TickerContext);
     const {userCash} = useNotifications();
     const isMobile = useIsMobile();
     const [searchParams, setSearchParams] = useSearchParams();
@@ -89,7 +89,7 @@ export default function Trade() {
     if (isMobile) {
         return (
             <div >
-                {!isWsConnected && <Loading/>}
+                {!hasTickers && <Loading/>}
                 {marketParam ? (
                     <MobileCoinDetail
                         market={selectedMarket}
@@ -112,7 +112,7 @@ export default function Trade() {
 
     return (
         <div className="flex flex-wrap gap-2 p-2">
-            {!isWsConnected && <Loading/>}
+            {!hasTickers && <Loading/>}
             <div className="flex min-w-0 flex-[999_1_720px] flex-col gap-2">
                 <CoinSummary
                     market={selectedMarket}

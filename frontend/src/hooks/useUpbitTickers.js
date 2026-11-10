@@ -28,12 +28,14 @@ export function useUpbitTickers(markets) {
         const unsubscribe = subscribeTickers(key.split(','), (tick) => {
             pending[tick.code] = toTicker(tick);
         });
-        const flushTimer = setInterval(() => {
+        const flush = () => {
             if (!Object.keys(pending).length) return;
             const batch = pending;
             pending = {};
             setTickers((prev) => ({...prev, ...batch}));
-        }, FLUSH_MS);
+        };
+        flush(); // 전에 받아 둔 시세는 바로 반영
+        const flushTimer = setInterval(flush, FLUSH_MS);
 
         return () => {
             unsubscribe();
