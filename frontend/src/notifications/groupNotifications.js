@@ -47,7 +47,7 @@ export function summarize(items) {
     if (latest.messageType === 'ORDER_EXECUTION') {
         const buys = items.filter((i) => i.message.includes('매수')).length;
         const sells = items.filter((i) => i.message.includes('매도')).length;
-        const coins = unique(items.map((i) => i.message.match(/수량 : [\d.]+ (\S+)/)?.[1]));
+        const coins = unique(items.map((i) => (i.message.match(/\n[\d.]+ (\S+) · 개당/) ?? i.message.match(/수량 : [\d.]+ (\S+)/))?.[1]));
         const parts = [buys && `매수 ${buys}건`, sells && `매도 ${sells}건`, coins.join(', ')].filter(Boolean);
         return {title: `지정가 주문 ${n}건이 체결되었습니다.`, body: parts.join(' · ')};
     }

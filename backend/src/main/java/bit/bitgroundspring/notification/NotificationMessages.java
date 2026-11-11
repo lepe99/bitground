@@ -1,5 +1,6 @@
 package bit.bitgroundspring.notification;
 
+import bit.bitgroundspring.common.money.Money;
 import bit.bitgroundspring.order.OrderType;
 import bit.bitgroundspring.season.InitialCashPolicy;
 
@@ -17,14 +18,21 @@ public final class NotificationMessages {
     }
 
     /**
-     * 지정가(예약) 주문 체결. 프론트의 알림 묶기가 '지정가'(예전 문구는 '예약')로 시작하는지와 '수량 : 0.1 BTC' 형식을 본다 (groupNotifications.js)
+     * 지정가(예약) 주문 체결. 본문은 2줄: 수량·체결가 / 수수료·실제로 쓴(받은) 금액.
+     * 프론트의 알림 묶기가 '지정가'(예전 문구는 '예약')로 시작하는지와 둘째 줄의 '0.1 BTC · 개당' 형식을 본다 (groupNotifications.js)
      * fee가 null이면(수수료 도입 전 이벤트) 수수료 줄을 넣지 않는다
      */
     public static String orderExecuted(OrderType orderType, String symbol, BigDecimal amount, BigDecimal tradePrice, Long fee) {
         String coin = symbol.contains("-") ? symbol.split("-")[1] : symbol;
-        String text = String.format("지정가 %s 주문이 체결되었습니다.\n수량 : %.7f %s\n체결 : 개당 %s원",
-                side(orderType), amount, coin, price(tradePrice));
-        return fee == null ? text : text + String.format("\n수수료 : %,d원", fee);
+        String text = String.format("지정가 %s 주문이 체결되었습니다.\n%s %s · 개당 %s원",
+                side(orderType), amount.stripTrailingZeros().toPlainString(), coin, price(tradePrice));
+        if (fee == null) {
+            return text;
+        }
+        // 체결과 같은 계산: 매수는 대금(올림) + 수수료를 쓰고, 매도는 대금(내림) − 수수료를 받는다
+        boolean buy = orderType == OrderType.BUY;
+        long settled = buy ? Money.krwCeil(tradePrice, amount) + fee : Money.krwFloor(tradePrice, amount) - fee;
+        return text + String.format("\n수수료 %,d원 · %,d원 %s", fee, settled, buy ? "사용" : "받음");
     }
 
     /** 체결 시점에 잔액(수수료 포함)·보유 수량이 모자라 지정가 주문을 취소함 */
