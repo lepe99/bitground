@@ -16,16 +16,20 @@ public final class NotificationMessages {
     private NotificationMessages() {
     }
 
-    /** 예약 주문 체결. 프론트의 알림 묶기가 '예약'으로 시작하는지와 '수량 : 0.1 BTC' 형식을 본다 (groupNotifications.js) */
-    public static String orderExecuted(OrderType orderType, String symbol, BigDecimal amount, BigDecimal tradePrice) {
+    /**
+     * 지정가(예약) 주문 체결. 프론트의 알림 묶기가 '지정가'(예전 문구는 '예약')로 시작하는지와 '수량 : 0.1 BTC' 형식을 본다 (groupNotifications.js)
+     * fee가 null이면(수수료 도입 전 이벤트) 수수료 줄을 넣지 않는다
+     */
+    public static String orderExecuted(OrderType orderType, String symbol, BigDecimal amount, BigDecimal tradePrice, Long fee) {
         String coin = symbol.contains("-") ? symbol.split("-")[1] : symbol;
-        return String.format("예약 %s 주문이 체결되었습니다.\n수량 : %.7f %s\n체결 : 개당 %s원",
+        String text = String.format("지정가 %s 주문이 체결되었습니다.\n수량 : %.7f %s\n체결 : 개당 %s원",
                 side(orderType), amount, coin, price(tradePrice));
+        return fee == null ? text : text + String.format("\n수수료 : %,d원", fee);
     }
 
-    /** 체결 시점에 잔액·보유 수량이 모자라 예약 주문을 취소함 */
+    /** 체결 시점에 잔액(수수료 포함)·보유 수량이 모자라 지정가 주문을 취소함 */
     public static String orderCancelled(OrderType orderType, String coinName, BigDecimal amount, BigDecimal reservePrice) {
-        return String.format("%s 예약 %s 주문이 취소됐어요.\n%s %s개 · 예약가 %s원",
+        return String.format("%s 지정가 %s 주문이 취소됐어요.\n%s %s개 · 주문 가격 %s원",
                 orderType == OrderType.BUY ? "잔액이 부족해" : "보유 수량이 부족해", side(orderType),
                 coinName, amount.stripTrailingZeros().toPlainString(), price(reservePrice));
     }

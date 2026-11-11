@@ -16,5 +16,6 @@ public class OrderResponseDto {
     private OrderType orderType;
     private BigDecimal amount;
     private BigDecimal tradePrice;
+    private Long fee;           // 낸 거래 수수료 (원)
     private LocalDateTime createdAt;
 }

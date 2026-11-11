@@ -65,6 +65,11 @@ public class Order {
     
     @Column(name = "trade_price", precision = 24, scale = 8)
     private BigDecimal tradePrice;
+
+    // 체결 때 낸 거래 수수료 (원, TradingFee). 미체결·수수료 도입 전 주문·시스템 청산은 0
+    @Column(name = "fee", nullable = false)
+    @Builder.Default
+    private Long fee = 0L;
     
     @Column(name = "amount", nullable = false, precision = 30, scale = 10)
     private BigDecimal amount;

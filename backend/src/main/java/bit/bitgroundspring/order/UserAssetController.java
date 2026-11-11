@@ -44,7 +44,8 @@ public class UserAssetController {
         Long cash = userService.getCashByUserId(userId);
         Long availableCash = assetService.getAvailableCash(userId);
 
-        UserAssetOwnedResponseDto response = new UserAssetOwnedResponseDto(cash, assets, availableCash);
+        UserAssetOwnedResponseDto response = new UserAssetOwnedResponseDto(cash, assets, availableCash,
+                assetService.getSeasonFee(userId));
         return ResponseEntity.ok(response);
     }
 

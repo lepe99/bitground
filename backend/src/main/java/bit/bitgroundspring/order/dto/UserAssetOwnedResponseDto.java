@@ -15,4 +15,5 @@ public class UserAssetOwnedResponseDto {
     private Long cash;
     private List<UserAssetProjection> userAssets;
     private Long availableCash;
+    private Long seasonFee;     // 이번 시즌에 낸 거래 수수료 합계 (원)
 }

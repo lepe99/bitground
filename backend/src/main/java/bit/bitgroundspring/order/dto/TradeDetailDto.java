@@ -16,6 +16,7 @@ public class TradeDetailDto {
     private String symbol;           // KRW-BTC
     private BigDecimal amount;       // 수량
     private BigDecimal price; // 단가
-    private long total;       // 금액 (원)
+    private long total;       // 체결 금액 (원, 단가 × 수량)
+    private long fee;         // 거래 수수료 (원)
     private String koreanName;
 }

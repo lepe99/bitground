@@ -91,10 +91,14 @@ public class InvestmentAnalysisService {
         Map<String, BigDecimal> coinVolume = new HashMap<>();   // 코인별 거래 금액 합
         Map<String, Integer> coinTradeCounts = new HashMap<>();
         BigDecimal totalVolume = BigDecimal.ZERO;
+        long totalFee = 0;
         for (Order order : completedOrders) {
             String symbol = order.getCoin().getSymbol();
             BigDecimal value = order.getTradePrice().multiply(order.getAmount());
-            BigDecimal signed = order.getOrderType() == OrderType.SELL ? value : value.negate();
+            // 손익은 낸 수수료까지 뺀 값 (매수는 대금 + 수수료를 쓰고, 매도는 대금 − 수수료를 받음)
+            BigDecimal signed = (order.getOrderType() == OrderType.SELL ? value : value.negate())
+                    .subtract(BigDecimal.valueOf(order.getFee()));
+            totalFee += order.getFee();
             coinProfit.merge(symbol, signed, BigDecimal::add);
             coinVolume.merge(symbol, value, BigDecimal::add);
             coinTradeCounts.merge(symbol, 1, Integer::sum);
@@ -173,6 +177,7 @@ public class InvestmentAnalysisService {
                 .btcChangePercentage(btcChange)
                 .maxDrawdownPercentage(maxDrawdown)
                 .totalTradeCount(totalTradeCount)
+                .totalFee(totalFee)
                 .buyOrderCount(buyOrderCount)
                 .sellOrderCount(sellOrderCount)
                 .avgTradeAmount(avgTradeAmount)

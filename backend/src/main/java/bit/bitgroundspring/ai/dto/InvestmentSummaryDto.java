@@ -47,7 +47,8 @@ public class InvestmentSummaryDto {
     private Integer buyOrderCount;               // 총 매수 주문 횟수
     private Integer sellOrderCount;              // 총 매도 주문 횟수
     private Long avgTradeAmount;           // 평균 거래 금액
-    private Long totalRealizedProfitLoss;  // 총 매매 손익 (매도 금액 − 매수 금액. 완료 시즌은 청산 포함이라 = 총 손익)
+    private Long totalRealizedProfitLoss;  // 총 매매 손익 (매도 금액 − 매수 금액 − 수수료. 완료 시즌은 청산 포함이라 = 총 손익)
+    private Long totalFee;                 // 낸 거래 수수료 합계 (0.05%, 시즌 종료 청산은 0)
     private Map<String, Long> coinRealizedProfitLoss; // 코인별 매매 손익
     private Map<String, Integer> coinTradeCounts; // 코인별 거래 횟수
 

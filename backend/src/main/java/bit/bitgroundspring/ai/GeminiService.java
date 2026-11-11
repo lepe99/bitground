@@ -261,10 +261,13 @@ public class GeminiService {
                 .append(", 매도 ").append(s.getSellOrderCount()).append(", 시즌 종료 시 보유 코인 일괄 청산 포함)")
                 .append(", 하루 평균 ").append(String.format("%.1f", s.getAvgTradesPerDay())).append("회")
                 .append(", 평균 거래 금액 ").append(won(s.getAvgTradeAmount())).append("\n");
+        if (s.getTotalFee() != null && s.getTotalFee() > 0) {
+            p.append("낸 거래 수수료: ").append(won(s.getTotalFee())).append(" (거래마다 0.05%, 아래 손익에 반영됨)\n");
+        }
         int coinCount = s.getCoinTradeCounts() != null ? s.getCoinTradeCounts().size() : 0;
         p.append("거래한 코인: ").append(coinCount).append("종\n");
         if (s.getCoinRealizedProfitLoss() != null && !s.getCoinRealizedProfitLoss().isEmpty()) {
-            p.append("코인별 손익 (매도 금액 - 매수 금액):\n");
+            p.append("코인별 손익 (매도 금액 - 매수 금액 - 수수료):\n");
             s.getCoinRealizedProfitLoss().entrySet().stream()
                     .sorted(Map.Entry.comparingByValue(Comparator.reverseOrder()))
                     .forEach(e -> {

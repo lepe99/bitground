@@ -20,9 +20,9 @@ const dateTime = (iso) => {
     return `${p(d.getMonth() + 1)}.${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 };
 
-const COLS = 'md:grid-cols-[minmax(0,1.4fr)_70px_repeat(3,minmax(0,1fr))_110px]';
+const COLS = 'md:grid-cols-[minmax(0,1.4fr)_70px_repeat(3,minmax(0,1fr))_minmax(0,0.7fr)_110px]';
 
-/** 시즌별 체결된 주문 내역 (예약 대기 중인 주문은 미체결 탭에서) */
+/** 시즌별 체결된 주문 내역과 낸 수수료 (체결을 기다리는 지정가 주문은 미체결 탭에서) */
 export default function TradeHistory() {
     const [seasons, setSeasons] = useState([]);
     const [seasonId, setSeasonId] = useState(null);
@@ -99,6 +99,7 @@ export default function TradeHistory() {
                 <span className="text-right">수량</span>
                 <span className="text-right">체결가</span>
                 <span className="text-right">체결 금액</span>
+                <span className="text-right">수수료</span>
                 <span className="text-right">체결 시간</span>
             </div>
 
@@ -128,7 +129,9 @@ export default function TradeHistory() {
                             <span className="flex flex-col items-end md:block md:text-right">
                                 <span className={`text-[13px] font-bold md:hidden ${buy ? 'text-up' : 'text-down'}`}>{buy ? '매수' : '매도'}</span>
                                 <span className="font-semibold">{price > 0 ? `${formatKRW(total)}원` : '—'}</span>
+                                <span className="text-xs text-fg-3 md:hidden">수수료 {formatKRW(o.fee ?? 0)}원</span>
                             </span>
+                            <span className="text-right text-fg-2 max-md:hidden">{formatKRW(o.fee ?? 0)}원</span>
                             <span className="text-right text-fg-3 max-md:hidden">{dateTime(o.updatedAt)}</span>
                         </li>
                     );

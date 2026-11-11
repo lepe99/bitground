@@ -109,7 +109,7 @@ class ReservedOrderFlowTest extends IntegrationTest {
         orderExecutionService.processExecutionQueue();
 
         await(() -> orderStatus(order) == Status.COMPLETED);
-        assertThat(userRepository.findById(user.getId()).orElseThrow().getCash()).isEqualTo(1_000_000 - 490_000);
+        assertThat(userRepository.findById(user.getId()).orElseThrow().getCash()).isEqualTo(1_000_000 - 490_000 - 245); // 대금 + 수수료 0.05%
         assertThat(userAssetRepository.findAll()).singleElement().satisfies(a -> assertThat(a.getAmount()).isEqualByComparingTo("0.01"));
         await(() -> notificationRepository.count() == 1);
     }
@@ -247,7 +247,7 @@ class ReservedOrderFlowTest extends IntegrationTest {
 
         await(() -> redis.opsForStream().size(stream) == 0);
         assertThat(orderStatus(order)).isEqualTo(Status.COMPLETED);
-        assertThat(userRepository.findById(user.getId()).orElseThrow().getCash()).isEqualTo(1_000_000 - 490_000);
+        assertThat(userRepository.findById(user.getId()).orElseThrow().getCash()).isEqualTo(1_000_000 - 490_000 - 245); // 대금 + 수수료 0.05%
         assertThat(orderRepository.findById(order.getId()).orElseThrow().getTradePrice()).isEqualByComparingTo("49000000");
     }
 

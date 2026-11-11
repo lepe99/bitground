@@ -87,7 +87,7 @@ export default function AdminUserSheet({id, onClose, onChanged}) {
                                             <span className="w-20 text-fg-3">{shortTime(o.createdAt)}</span>
                                             <span className={o.orderType === 'BUY' ? 'text-up' : 'text-down'}>{o.orderType === 'BUY' ? '매수' : '매도'}</span>
                                             <span className="min-w-0 flex-1 truncate">{o.coin}</span>
-                                            <span className="text-fg-3">{o.reserved ? '예약' : '시장가'}{o.status === 'PENDING' ? '·대기' : ''}</span>
+                                            <span className="text-fg-3">{o.reserved ? '지정가' : '시장가'}{o.status === 'PENDING' ? '·대기' : ''}</span>
                                         </li>
                                     ))}
                                 </ul>

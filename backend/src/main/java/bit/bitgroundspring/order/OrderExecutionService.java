@@ -5,6 +5,7 @@ import bit.bitgroundspring.common.error.BusinessException;
 import bit.bitgroundspring.common.error.ErrorCode;
 import bit.bitgroundspring.common.logging.TraceIdFilter;
 import bit.bitgroundspring.common.money.Money;
+import bit.bitgroundspring.common.money.TradingFee;
 import bit.bitgroundspring.common.tx.AfterCommit;
 import bit.bitgroundspring.event.OrderExecutedEvent;
 import bit.bitgroundspring.event.OutboxEvents;
@@ -227,15 +228,16 @@ public class OrderExecutionService {
         OrderType orderType = order.getOrderType();
         BigDecimal amount = order.getAmount();
         BigDecimal price = Money.price(executionPrice);
-        // 내는 돈은 올림, 받는 돈은 내림 (원 단위)
+        // 내는 돈은 올림, 받는 돈은 내림 (원 단위). 수수료는 매수에 더하고 매도에서 뺀다
         long tradeAmount = orderType == OrderType.BUY ? Money.krwCeil(price, amount) : Money.krwFloor(price, amount);
+        long fee = TradingFee.of(tradeAmount);
 
         // 체결 시점에 잔액·보유 수량을 다시 확인
         User user = userRepository.findByIdWithPessimisticLock(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
         Optional<UserAsset> userAssetOptional = userAssetRepository.findByUserAndCoinWithLock(user, order.getCoin());
         boolean insufficient = orderType == OrderType.BUY
-                ? user.getCash() < tradeAmount
+                ? user.getCash() < tradeAmount + fee
                 : userAssetOptional.map(a -> a.getAmount().compareTo(amount) < 0).orElse(true);
         if (insufficient) {
             orderRepository.delete(order);
@@ -247,9 +249,10 @@ public class OrderExecutionService {
 
         order.setStatus(Status.COMPLETED);
         order.setTradePrice(price);
+        order.setFee(fee);
         order.setUpdatedAt(LocalDateTime.now());
 
-        user.setCash(orderType == OrderType.BUY ? user.getCash() - tradeAmount : user.getCash() + tradeAmount);
+        user.setCash(orderType == OrderType.BUY ? user.getCash() - tradeAmount - fee : user.getCash() + tradeAmount - fee);
 
         if (userAssetOptional.isPresent()) {
             UserAsset userAsset = userAssetOptional.get();
