@@ -26,3 +26,7 @@ Thumbs.db
 
 # AI 평가 보고서 (scheduler: go test -tags eval, backend는 build/reports/ai-eval)
 scheduler/eval-reports/
+
+# 운영 서버에서 배포 스크립트가 남기는 파일
+deploy/app/.deployed-sha
+*.bak-*
