@@ -36,6 +36,9 @@ services:
       GRAFANA_BASIC_AUTH_USER: ${GRAFANA_BASIC_AUTH_USER:?GRAFANA_BASIC_AUTH_USER 필요}
       GRAFANA_BASIC_AUTH_HASH: ${GRAFANA_BASIC_AUTH_HASH:?GRAFANA_BASIC_AUTH_HASH 필요}
       MONITORING_HOST: ${MONITORING_HOST:?MONITORING_HOST 필요 (모니터링 서버 프라이빗 IP)}
+      # 선택: www 없는 주소(예 bitground.kr) → SITE_URL로 리다이렉트 (비우면 쓰지 않음)
+      APEX_DOMAIN: ${APEX_DOMAIN:-}
+      SITE_URL: ${SITE_URL:-}
     ports:
       - "80:80"
       - "443:443"
@@ -56,7 +59,7 @@ services:
     mem_limit: 128m
     entrypoint: ["/bin/sh", "/opt/bitground/certbot.sh"]
     environment:
-      DOMAINS: ${API_DOMAIN} ${GRAFANA_DOMAIN}
+      DOMAINS: ${API_DOMAIN} ${GRAFANA_DOMAIN} ${APEX_DOMAIN:-}
       ACME_EMAIL: ${ACME_EMAIL:?ACME_EMAIL 필요}
     volumes:
       - ./nginx/certbot.sh:/opt/bitground/certbot.sh:ro

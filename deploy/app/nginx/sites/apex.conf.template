@@ -1,0 +1,12 @@
+# www 없는 주소(bitground.kr)는 실제 사이트(www, CloudFront)로 돌려보낸다
+# CloudFront는 apex에 CNAME을 걸 수 없어서(가비아 DNS) apex A 레코드를 이 서버(EIP)로 두고 여기서 리다이렉트한다
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name ${APEX_DOMAIN};
+
+    ssl_certificate     /etc/letsencrypt/live/${APEX_DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${APEX_DOMAIN}/privkey.pem;
+
+    return 301 ${SITE_URL}$request_uri;
+}

@@ -14,17 +14,21 @@ CONF=/etc/nginx/conf.d
 printf '%s:%s\n' "$GRAFANA_BASIC_AUTH_USER" "$(printf '%s' "$GRAFANA_BASIC_AUTH_HASH" | base64 -d)" > /etc/nginx/grafana.htpasswd
 chmod 644 /etc/nginx/grafana.htpasswd
 
+if [ -n "${APEX_DOMAIN:-}" ]; then : "${SITE_URL:?APEX_DOMAIN을 쓰려면 SITE_URL(리다이렉트할 주소)이 필요}"; fi
+
 render() {
     rm -f "$CONF"/*.conf
     cp /etc/bitground/base.conf "$CONF/00-base.conf"
-    for site in api grafana; do
+    for site in api grafana apex; do
         case $site in
             api) domain=$API_DOMAIN ;;
             grafana) domain=$GRAFANA_DOMAIN ;;
+            apex) domain=${APEX_DOMAIN:-} ;; # 선택: www 없는 주소 → SITE_URL 리다이렉트
         esac
+        [ -n "$domain" ] || continue
         if [ -s "$LIVE/$domain/fullchain.pem" ]; then
-            # 템플릿의 nginx 변수($host 등)는 그대로 두고 이 셋만 채운다
-            envsubst '${API_DOMAIN} ${GRAFANA_DOMAIN} ${MONITORING_HOST}' < "$SITES/$site.conf.template" > "$CONF/$site.conf"
+            # 템플릿의 nginx 변수($host 등)는 그대로 두고 이 값들만 채운다
+            envsubst '${API_DOMAIN} ${GRAFANA_DOMAIN} ${MONITORING_HOST} ${APEX_DOMAIN} ${SITE_URL}' < "$SITES/$site.conf.template" > "$CONF/$site.conf"
             echo "[bitground] $domain: HTTPS"
         else
             echo "[bitground] $domain: 인증서 없음, 발급될 때까지 80번만"
