@@ -1,7 +1,7 @@
 import {useState, useEffect, useMemo} from 'react';
 import {TickerContext} from './TickerContext.js';
 import {fetchCoinMarkets} from "../api/coinApi.js";
-import {subscribeConnection, subscribeTickers} from "./upbitSocket.js";
+import {subscribeTickers} from "./upbitSocket.js";
 
 // 시세 메시지는 초당 수십 건이 오므로 모아 두었다가 이 간격으로 한 번에 화면에 반영한다
 const FLUSH_INTERVAL_MS = 200;
@@ -20,7 +20,6 @@ export function TickerProvider({ children }) {
     const [markets, setMarkets] = useState([]);
     const [selectedMarket, setSelectedMarket] = useState('KRW-BTC');
     const [tickerMap, setTickerMap] = useState({});
-    const [isWsConnected, setIsWsConnected] = useState(false);
 
     // (1) 종목 목록 (유의·주의 지정 포함)
     useEffect(() => {
@@ -33,8 +32,6 @@ export function TickerProvider({ children }) {
             })));
         });
     }, []);
-
-    useEffect(() => subscribeConnection(setIsWsConnected), []);
 
     // (2) 시세 구독
     useEffect(() => {
@@ -62,8 +59,8 @@ export function TickerProvider({ children }) {
     // 시세를 한 번이라도 받았으면 화면을 막지 않는다 (재연결 중에는 마지막 시세를 그대로 보여 준다)
     const hasTickers = Object.keys(tickerMap).length > 0;
     const value = useMemo(
-        () => ({ markets, selectedMarket, tickerMap, setSelectedMarket, isWsConnected, hasTickers }),
-        [markets, selectedMarket, tickerMap, isWsConnected, hasTickers]
+        () => ({ markets, selectedMarket, tickerMap, setSelectedMarket, hasTickers }),
+        [markets, selectedMarket, tickerMap, hasTickers]
     );
 
     return (

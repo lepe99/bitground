@@ -13,7 +13,6 @@ const IDLE_CLOSE_MS = 60_000;
 const STALE_MS = 15_000;
 
 const listeners = new Set(); // {codes: Set<string>, onTick}
-const statusListeners = new Set(); // (connected: boolean) => void
 const lastTicks = new Map(); // 종목별 마지막 시세. 새 구독자에게 바로 넘겨 재연결을 기다리지 않고 화면을 채운다
 const decoder = new TextDecoder();
 let ws = null;
@@ -24,12 +23,6 @@ let failures = 0; // 열리지 못하고 끝난 연속 시도 수
 let lastAttemptAt = 0;
 let lastMessageAt = 0;
 let idleTimer = null;
-
-const setConnected = (value) => {
-    if (connected === value) return;
-    connected = value;
-    for (const l of statusListeners) l(value);
-};
 
 const wantedCodes = () => [...new Set([...listeners].flatMap((l) => [...l.codes]))].sort();
 
@@ -64,7 +57,7 @@ const connect = () => {
         opened = true;
         failures = 0;
         lastMessageAt = Date.now();
-        setConnected(true);
+        connected = true;
         sendSubscription();
     };
     socket.onmessage = (e) => {
@@ -80,7 +73,7 @@ const connect = () => {
         // 이미 닫고 새로 연결한 뒤에 늦게 온 close라면 새 연결을 건드리지 않는다
         if (ws !== socket) return;
         ws = null;
-        setConnected(false);
+        connected = false;
         if (!opened) failures += 1;
         scheduleReconnect();
     };
@@ -104,7 +97,7 @@ const revive = () => {
         const socket = ws;
         ws = null;
         socket.close();
-        setConnected(false);
+        connected = false;
     }
     if (!ws) scheduleReconnect({ignoreBackoff: true});
 };
@@ -141,14 +134,7 @@ export function subscribeTickers(codes, onTick) {
             const socket = ws;
             ws = null;
             socket?.close();
-            setConnected(false);
+            connected = false;
         }, IDLE_CLOSE_MS);
     };
-}
-
-/** 연결 상태가 바뀔 때마다 onChange(connected)를 부르고, 지금 상태로 한 번 바로 부른다. 반환값을 부르면 해제 */
-export function subscribeConnection(onChange) {
-    statusListeners.add(onChange);
-    onChange(connected);
-    return () => statusListeners.delete(onChange);
 }
