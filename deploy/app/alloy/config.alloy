@@ -1,12 +1,12 @@
 // 운영 앱 서버의 Grafana Alloy.
-// 백엔드·Caddy 컨테이너 로그 → 모니터링 서버 Loki, 백엔드·호스트 지표 → 모니터링 서버 Prometheus.
+// 백엔드·Nginx·certbot 컨테이너 로그 → 모니터링 서버 Loki, 백엔드·호스트 지표 → 모니터링 서버 Prometheus.
 // 모니터링 서버 주소는 환경변수 MONITORING_HOST (프라이빗 IP). 로컬 개발용 설정은 monitoring/alloy/config.alloy
 
 // ── 컨테이너 로그 ──────────────────────────────────────────────
 discovery.docker "app" {
   host = "unix:///var/run/docker.sock"
 
-  // 같은 compose 프로젝트(기본 bitground)의 컨테이너만. backend·caddy만 남기는 것은 아래 relabel
+  // 같은 compose 프로젝트(기본 bitground)의 컨테이너만. backend·nginx·certbot만 남기는 것은 아래 relabel
   filter {
     name   = "label"
     values = [string.format("com.docker.compose.project=%s", coalesce(sys.env("COMPOSE_PROJECT"), "bitground"))]
@@ -18,7 +18,7 @@ discovery.relabel "app" {
 
   rule {
     source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
-    regex         = "backend|caddy"
+    regex         = "backend|nginx|certbot"
     action        = "keep"
   }
 
@@ -73,9 +73,10 @@ loki.process "app" {
     }
   }
 
-  // ── Caddy 접속 로그 (JSON). 상태 코드만 라벨로 쓰지 않고 구조화 메타데이터로 둔다
+  // ── Nginx 접속 로그 (JSON, nginx/base.conf의 log_format). 상태 코드만 라벨로 쓰지 않고 구조화 메타데이터로 둔다
+  // (JSON이 아닌 nginx 오류 로그·시작 메시지는 필드 추출 없이 그대로 남는다)
   stage.match {
-    selector = "{app=\"bitground-caddy\"}"
+    selector = "{app=\"bitground-nginx\"}"
 
     stage.json {
       expressions = {

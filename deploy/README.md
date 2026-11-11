@@ -4,7 +4,7 @@
 
 ```
 인터넷 ──443──▶ 앱 서버 (t4g.small, 퍼블릭 서브넷)          모니터링 서버 (t4g.micro, 프라이빗 서브넷)
-               caddy ─▶ backend ─▶ mysql, redis             loki ◀── 앱 서버 alloy (로그)
+               nginx ─▶ backend ─▶ mysql, redis             loki ◀── 앱 서버 alloy (로그)
                alloy ──────────────────────────────────────▶ prometheus ◀── 앱 서버 alloy (지표)
                tinyproxy ◀── 모니터링 서버의 외부 통신        alloy:3500 ◀── lambda-promtail (Lambda 로그)
                                                             grafana ◀── SSM 포트 포워딩
@@ -14,8 +14,8 @@ CloudFront ─▶ S3 (프론트)
 
 | 경로 | 내용 |
 |---|---|
-| `app/compose.yml` | 앱 서버: caddy, backend, mysql, redis, alloy, tinyproxy |
-| `app/Caddyfile` | HTTPS(Let's Encrypt), `/healthz` |
+| `app/compose.yml` | 앱 서버: nginx, certbot, backend, mysql, redis, alloy, tinyproxy |
+| `app/nginx/` | HTTPS 종료·프록시(`/healthz`, API·WebSocket·SSE, Grafana 기본 인증), certbot 발급·갱신 스크립트 |
 | `app/alloy/config.alloy` | 컨테이너 로그·백엔드 지표·호스트 지표 → 모니터링 서버 |
 | `app/tinyproxy/` | 모니터링 서버용 외부 통신 프록시 |
 | `app/backup.sh` | MySQL → S3 백업 (호스트 cron) |

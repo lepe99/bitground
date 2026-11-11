@@ -2,14 +2,14 @@
 #   cd /opt/bitground/deploy/app && docker compose up -d
 #
 # 메모리 상한 (부하 테스트로 정한 값, 합계 약 1.7GiB):
-#   backend 1000M · mysql 400M · redis 64M · alloy 160M · caddy 64M · tinyproxy 32M
+#   backend 1000M · mysql 400M · redis 64M · alloy 160M · nginx 32M · certbot 128M · tinyproxy 32M
 #
 # 외부에 여는 포트 (보안 그룹으로 출발지를 제한):
-#   80, 443  caddy      인터넷 전체 (HTTPS, Let's Encrypt 인증서 발급)
+#   80, 443  nginx      인터넷 전체 (HTTPS, Let's Encrypt 인증서 발급)
 #   3306     mysql      쓰기 Lambda(B) 보안 그룹만
 #   8090     backend    쓰기 Lambda(B) 보안 그룹만 (시즌·스플릿 완료 알림)
 #   8888     tinyproxy  모니터링 서버 보안 그룹만 (모니터링 서버의 외부 통신 출구)
-# 관리 포트 8091(actuator)은 열지 않는다. 같은 네트워크의 alloy·caddy만 접근한다.
+# 관리 포트 8091(actuator)은 열지 않는다. 같은 네트워크의 alloy·nginx만 접근한다.
 #
 # 비밀값은 배포할 때 SSM Parameter Store에서 읽어 .env / backend.env 로 만든다 (커밋 금지, .env.example 참고)
 
@@ -22,14 +22,15 @@ x-logging: &default-logging
     max-file: "5"
 
 services:
-  caddy:
+  # HTTPS 종료 + 리버스 프록시 (api → backend, grafana → 모니터링 서버). 설정은 nginx/
+  # 인증서는 certbot 서비스가 받아 오고, entrypoint.sh가 인증서가 생기거나 갱신되면 reload한다
+  nginx:
     logging: *default-logging
-    image: caddy:2.10.2-alpine
+    image: nginx:1.30.5-alpine
     restart: unless-stopped
-    mem_limit: 64m
+    mem_limit: 32m
     environment:
       API_DOMAIN: ${API_DOMAIN:?API_DOMAIN 필요}
-      ACME_EMAIL: ${ACME_EMAIL:?ACME_EMAIL 필요}
       # Grafana 중계 (모니터링 서버 3000). 해시는 base64(bcrypt) (bcrypt의 '$'가 .env에서 변수로 해석되지 않게)
       GRAFANA_DOMAIN: ${GRAFANA_DOMAIN:?GRAFANA_DOMAIN 필요}
       GRAFANA_BASIC_AUTH_USER: ${GRAFANA_BASIC_AUTH_USER:?GRAFANA_BASIC_AUTH_USER 필요}
@@ -38,13 +39,31 @@ services:
     ports:
       - "80:80"
       - "443:443"
-      - "443:443/udp" # HTTP/3
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy-data:/data # 발급받은 인증서 (지우면 재발급되며, Let's Encrypt 발급 횟수 제한에 걸릴 수 있다)
-      - caddy-config:/config
+      - ./nginx/base.conf:/etc/bitground/base.conf:ro
+      - ./nginx/sites:/etc/bitground/sites:ro
+      - ./nginx/entrypoint.sh:/docker-entrypoint.d/40-bitground.sh:ro
+      - letsencrypt:/etc/letsencrypt:ro
+      - acme-webroot:/var/www/certbot:ro
     depends_on:
       - backend
+
+  # Let's Encrypt 인증서 발급·12시간마다 갱신 (HTTP-01, nginx가 검증 파일을 서빙)
+  certbot:
+    logging: *default-logging
+    image: certbot/certbot:v5.9.0
+    restart: unless-stopped
+    mem_limit: 128m
+    entrypoint: ["/bin/sh", "/opt/bitground/certbot.sh"]
+    environment:
+      DOMAINS: ${API_DOMAIN} ${GRAFANA_DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL:?ACME_EMAIL 필요}
+    volumes:
+      - ./nginx/certbot.sh:/opt/bitground/certbot.sh:ro
+      - letsencrypt:/etc/letsencrypt # 발급받은 인증서·계정 (지우면 재발급되며, Let's Encrypt 발급 횟수 제한에 걸릴 수 있다)
+      - acme-webroot:/var/www/certbot
+    depends_on:
+      - nginx
 
   backend:
     logging: *default-logging
@@ -60,7 +79,7 @@ services:
       SERVER_TOMCAT_THREADS_MAX: "80" # 2 vCPU에서 200보다 지연이 짧았다 (부하 테스트 500명 p95 402ms vs 650ms)
       LOGGING_STRUCTURED_FORMAT_CONSOLE: logstash # JSON 로그 → Alloy → Loki
     ports:
-      - "8090:8090" # 쓰기 Lambda(B)의 완료 알림용. 인터넷에는 보안 그룹으로 막는다 (사용자 요청은 caddy 443)
+      - "8090:8090" # 쓰기 Lambda(B)의 완료 알림용. 인터넷에는 보안 그룹으로 막는다 (사용자 요청은 nginx 443)
     depends_on:
       mysql:
         condition: service_healthy
@@ -143,8 +162,8 @@ services:
       - "8888:8888"
 
 volumes:
-  caddy-data:
-  caddy-config:
+  letsencrypt:
+  acme-webroot:
   mysql-data:
   redis-data:
   alloy-data:
