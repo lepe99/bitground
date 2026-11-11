@@ -1,7 +1,10 @@
 # Changelog
 
 버전은 [Semantic Versioning](https://semver.org/lang/ko/)을 따른다 (주.부.수 = 호환이 깨지는 변경 · 기능 추가 · 버그 수정).
-릴리즈마다 `main`에 `release: vX.Y.Z` 병합 커밋과 `vX.Y.Z` 태그를 남기고, 상세 커밋은 `dev`에 있다.
+릴리즈마다 `main`에 `release: vX.Y.Z` 병합 커밋을 남기고, 상세 커밋은 `dev`에 있다.
+
+릴리즈 방법: `dev`에서 `frontend/package.json`·`backend/build.gradle` 버전을 올리고 이 파일 맨 위에 새 항목을 쓴 뒤 `main`으로 PR을 병합한다.
+PR에서 세 곳의 버전이 같은지와 새 버전인지 검사하고, 병합 후 운영 배포가 성공하면 `vX.Y.Z` 태그와 GitHub Release(본문은 아래 항목)가 자동으로 만들어진다.
 
 ## [2.0.0] - 2026-11-11
 

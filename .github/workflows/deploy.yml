@@ -2,6 +2,7 @@
 #   1) 앱 서버(SSM Run Command): 저장소를 그 커밋으로 맞추고 deploy/app/deploy.sh 실행 (백엔드 이미지 = 커밋 해시 태그, DB 마이그레이션은 백엔드 기동 때)
 #   2) 스케줄러 Lambda 두 개: CI가 만든 zip으로 코드 교체
 #   3) 프론트: CI가 만든 dist를 S3에 동기화하고 CloudFront 캐시 무효화
+#   4) 배포가 끝나면 그 커밋에 vX.Y.Z 태그와 GitHub Release (본문은 CHANGELOG.md의 그 버전 항목)
 # AWS 권한은 OIDC로 받는다 (역할 bitground-prod-github-deploy는 main 브랜치에서만 맡을 수 있다)
 # 필요한 저장소 변수: AWS_ROLE_ARN, APP_INSTANCE_ID, FRONTEND_BUCKET, CLOUDFRONT_DISTRIBUTION_ID
 name: Deploy
@@ -18,7 +19,7 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  contents: read
+  contents: write # 배포 후 태그·릴리즈 생성
   actions: read   # CI 실행의 산출물(Lambda zip, 프론트 dist) 내려받기
   id-token: write # AWS OIDC
 
@@ -120,3 +121,31 @@ jobs:
           curl -fsS --retry 5 --retry-delay 5 https://api.bitground.kr/healthz
           echo
           curl -fsS -o /dev/null -w 'www %{http_code}\n' https://www.bitground.kr/
+
+      # 4) 운영에 나간 커밋에만 릴리즈를 남긴다 (배포가 실패하면 여기까지 오지 않음)
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ env.SHA }}
+          path: release
+          sparse-checkout: |
+            .github/scripts
+            CHANGELOG.md
+            frontend/package.json
+            backend/build.gradle
+          sparse-checkout-cone-mode: false
+
+      - name: 태그·GitHub Release
+        working-directory: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=$(bash .github/scripts/release-version.sh)
+          tag="v$version"
+          # 같은 버전을 다시 배포한 경우(재실행 등)에는 릴리즈를 새로 만들지 않는다
+          if git ls-remote --exit-code --tags origin "refs/tags/$tag" > /dev/null; then
+            echo "$tag 태그가 이미 있어 릴리즈를 건너뜁니다" | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          bash .github/scripts/release-notes.sh "$version" > "$RUNNER_TEMP/notes.md"
+          gh release create "$tag" --target "$SHA" --title "$tag" --notes-file "$RUNNER_TEMP/notes.md" --latest
+          echo "릴리즈: $(gh release view "$tag" --json url -q .url)" | tee -a "$GITHUB_STEP_SUMMARY"
