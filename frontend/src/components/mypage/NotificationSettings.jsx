@@ -5,7 +5,7 @@ import {useToast} from '../toastContext.js';
 
 // 받을 알림 종류 (끄면 저장도 실시간 전송도 하지 않는다)
 const KINDS = [
-    {key: 'orderExecution', label: '예약 주문 체결', desc: '걸어 둔 예약 매수·매도가 체결됐을 때'},
+    {key: 'orderExecution', label: '지정가 주문 체결', desc: '걸어 둔 지정가 매수·매도가 체결되거나 취소됐을 때'},
     {key: 'comment', label: '댓글·답글', desc: '내 글에 댓글, 내 댓글에 답글, 내 문의에 답변이 달렸을 때'},
     {key: 'notice', label: '공지사항', desc: '새 공지가 올라왔을 때'},
     {key: 'seasonUpdate', label: '시즌', desc: '새 시즌과 스플릿 2가 시작될 때'},

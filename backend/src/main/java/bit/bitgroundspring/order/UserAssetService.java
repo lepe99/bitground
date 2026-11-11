@@ -41,6 +41,11 @@ public class UserAssetService {
         return userAssetRepository.findByUserId(userId);
     }
 
+    /** 이번 시즌에 낸 거래 수수료 합계 (원) */
+    public long getSeasonFee(Integer userId) {
+        return orderRepository.sumCurrentSeasonFee(userId);
+    }
+
     public Long getAvailableCash(Integer userId) {
         // 사용자 현금에서 예약 매수에 묶인 금액을 뺀 주문 가능 금액
         long cash = userRepository.findById(userId)

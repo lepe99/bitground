@@ -375,6 +375,7 @@ export default function SeasonReport() {
                                             ['총 매도', formatKRW(s.sellAmount)],
                                             ['평균 매수가', formatPrice(s.avgBuy)],
                                             ['평균 매도가', s.avgSell ? formatPrice(s.avgSell) : '—'],
+                                            ['수수료', formatKRW(s.fee ?? 0)],
                                         ].map(([label, value]) => (
                                             // 이름을 값 위에 두어 1억 단위 가격도 잘리지 않게
                                             <div key={label} className="flex min-w-0 flex-col">
@@ -390,7 +391,7 @@ export default function SeasonReport() {
                             <table className="num w-full min-w-[640px] text-sm whitespace-nowrap">
                                 <thead className="text-xs text-fg-3">
                                     <tr className="border-t border-line">
-                                        {['종목', '최초 매수', '총 매수', '총 매도', '평균 매수가', '평균 매도가', '수익률', '수익금'].map((h, i) => (
+                                        {['종목', '최초 매수', '총 매수', '총 매도', '평균 매수가', '평균 매도가', '수수료', '수익률', '수익금'].map((h, i) => (
                                             <th key={h} scope="col" className={`px-5 py-2 font-medium ${i === 0 ? 'text-left' : 'text-right'}`}>{h}</th>
                                         ))}
                                     </tr>
@@ -404,6 +405,7 @@ export default function SeasonReport() {
                                             <td className="px-5 py-3 text-right">{formatKRW(s.sellAmount)}</td>
                                             <td className="px-5 py-3 text-right text-fg-2">{formatPrice(s.avgBuy)}</td>
                                             <td className="px-5 py-3 text-right text-fg-2">{s.avgSell ? formatPrice(s.avgSell) : '—'}</td>
+                                            <td className="px-5 py-3 text-right text-fg-3">{formatKRW(s.fee ?? 0)}</td>
                                             <td className={`px-5 py-3 text-right font-bold ${changeColor(s.returnRate)}`}>{formatPercent(s.returnRate)}</td>
                                             <td className={`px-5 py-3 text-right ${changeColor(Math.round(s.profit))}`}>{formatSignedKRW(s.profit)}</td>
                                         </tr>
@@ -425,7 +427,10 @@ export default function SeasonReport() {
                                     <span className={`w-9 font-bold ${d.orderType === 'BUY' ? 'text-up' : 'text-down'}`}>{d.orderType === 'BUY' ? '매수' : '매도'}</span>
                                     <span className="min-w-0 flex-1 truncate font-semibold">{d.koreanName}</span>
                                     <span className="hidden text-right text-fg-2 @md:inline">{formatAmount(d.amount)} {d.symbol?.replace('KRW-', '')}</span>
-                                    <span className="w-28 text-right font-semibold">{formatKRW(d.total)}원</span>
+                                    <span className="flex w-28 flex-col items-end">
+                                        <span className="font-semibold">{formatKRW(d.total)}원</span>
+                                        {d.fee > 0 && <span className="text-[11px] text-fg-3">수수료 {formatKRW(d.fee)}원</span>}
+                                    </span>
                                 </li>
                             ))}
                         </ul>

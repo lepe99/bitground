@@ -219,7 +219,7 @@ func liquidateDelisted(ctx context.Context, tx *sql.Tx, coins []coinRow) error {
 		return fmt.Errorf("예약 주문 읽기 실패: %w", err)
 	}
 	for _, c := range cancels {
-		msg := fmt.Sprintf("상장 폐지로 예약 주문이 취소됐어요.\n%s 예약 주문 %d건", names[c.coinID], c.count)
+		msg := fmt.Sprintf("상장 폐지로 지정가 주문이 취소됐어요.\n%s 지정가 주문 %d건", names[c.coinID], c.count)
 		if _, err := tx.ExecContext(ctx, `INSERT INTO notifications (user_id, message, message_type, is_read) VALUES (?, ?, 'ORDER_EXECUTION', 0)`,
 			c.userID, msg); err != nil {
 			return fmt.Errorf("예약 취소 알림 실패: %w", err)

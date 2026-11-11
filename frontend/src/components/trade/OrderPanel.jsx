@@ -6,11 +6,12 @@ import {useToast} from '../toastContext.js';
 import Button from '../ui/Button.jsx';
 import SegmentedTabs from '../ui/SegmentedTabs.jsx';
 import {formatAmount, formatKRW} from '../../utils/format.js';
+import {buyCost, feeOf, FEE_RATE_LABEL, maxBuyTotal, sellProceeds} from '../../utils/tradingFee.js';
 import OrderHistory from './OrderHistory.jsx';
 
 const MODES = [
     {value: 'market', label: '시장가'},
-    {value: 'reserve', label: '예약 주문'},
+    {value: 'reserve', label: '지정가'}, // 서버·API 이름은 예약 주문(/orders/reserve)
 ];
 const PERCENTS = [10, 25, 50, 100];
 const SIDES = [
@@ -129,8 +130,32 @@ function NumberField({label, unit, value, onChange, onBlur, readOnly = false, pa
 }
 
 /**
- * 매수·매도 주문 (시장가 / 예약 주문)
- * 시장가 매수는 주문 총액, 시장가 매도는 수량, 예약 주문은 가격과 수량으로 낸다.
+ * 주문 금액 아래의 수수료 안내 (0.05%, 원 단위 올림. 실제 금액은 서버가 체결 때 정한다)
+ * 매수: 대금 + 수수료 = 총 사용 금액 / 매도: 대금 − 수수료 = 받을 금액
+ */
+function FeeSummary({isBuy, tradeKrw, estimated}) {
+    if (!(tradeKrw > 0)) return null;
+    const fee = feeOf(tradeKrw);
+    const prefix = estimated ? '≈ ' : '';
+    const rows = isBuy
+        ? [[`수수료 (${FEE_RATE_LABEL})`, `+${formatKRW(fee)}`], ['총 사용 금액', `${prefix}${formatKRW(buyCost(tradeKrw))}`]]
+        : [[`예상 매도 금액`, `${prefix}${formatKRW(tradeKrw)}`], [`수수료 (${FEE_RATE_LABEL})`, `−${formatKRW(fee)}`],
+            ['받을 금액', `${prefix}${formatKRW(sellProceeds(tradeKrw))}`]];
+    return (
+        <dl className="flex flex-col gap-1 rounded-[10px] bg-surface-2 px-3 py-2.5 text-[13px]">
+            {rows.map(([label, value], i) => (
+                <div key={label} className="flex justify-between">
+                    <dt className="text-fg-3">{label}</dt>
+                    <dd className={`num ${i === rows.length - 1 ? 'font-bold' : 'font-semibold'}`}>{value}원</dd>
+                </div>
+            ))}
+        </dl>
+    );
+}
+
+/**
+ * 매수·매도 주문 (시장가 / 지정가)
+ * 시장가 매수는 주문 총액, 시장가 매도는 수량, 지정가는 가격과 수량으로 낸다. 모든 주문에 수수료 0.05%
  */
 // 시즌 종료 시각 전후의 거래 마감 안내 (서버도 종료 시각부터 정산이 끝날 때까지 주문을 받지 않는다)
 function SettlementNotice({closed, closingSoon, endsAt, now}) {
@@ -145,7 +170,7 @@ function SettlementNotice({closed, closingSoon, endsAt, now}) {
         const minutes = Math.max(1, Math.ceil((endsAt - now) / 60_000));
         return (
             <p role="status" className="rounded-[10px] bg-brand-soft px-3 py-2.5 text-[13px] font-semibold text-brand-fg">
-                {minutes}분 뒤 시즌이 끝나요. 종료 시각부터 정산이 끝날 때까지 거래가 멈추고, 체결되지 않은 예약 주문은 취소돼요.
+                {minutes}분 뒤 시즌이 끝나요. 종료 시각부터 정산이 끝날 때까지 거래가 멈추고, 체결되지 않은 지정가 주문은 취소돼요.
             </p>
         );
     }
@@ -184,7 +209,7 @@ export default function OrderPanel({market, currentPrice, cash, holdings, onOrde
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [side, mode, market]);
 
-    // 예약 주문은 가격 × 수량으로 총액을 계산한다 (매수는 올림, 매도는 내림)
+    // 지정가는 가격 × 수량으로 총액을 계산한다 (매수는 올림, 매도는 내림). 수수료는 아래에 따로 보여 준다
     useEffect(() => {
         if (!isReserve) return;
         const p = toNumber(price);
@@ -204,7 +229,8 @@ export default function OrderPanel({market, currentPrice, cash, holdings, onOrde
         setCustomPercent(custom ? percent : null);
         const ratio = percent / 100;
         if (isBuy) {
-            const budget = Math.floor(cash * ratio);
+            // 대금 + 수수료가 비율만큼의 현금을 넘지 않는 가장 큰 대금 (100%를 눌러도 수수료 때문에 잔액이 모자라지 않게)
+            const budget = maxBuyTotal(Math.floor(cash * ratio));
             const unitPrice = isReserve ? toNumber(price) : currentPrice;
             if (!isReserve) setTotal(display(budget));
             setAmount(unitPrice > 0 ? display(floor8(budget / unitPrice)) : '');
@@ -220,11 +246,11 @@ export default function OrderPanel({market, currentPrice, cash, holdings, onOrde
         const rawTotal = toNumber(total);
 
         if (isReserve) {
-            if (!(rawAmount > 0)) return errorAlert('예약 주문 수량을 입력해주세요.');
-            if (!(rawPrice > 0)) return errorAlert('예약 가격을 입력해주세요.');
-            if (isBuy && cash < rawAmount * rawPrice) {
-                setAmount(display(Math.floor((cash / rawPrice) * 1e10) / 1e10));
-                errorAlert('잔액이 부족합니다.');
+            if (!(rawAmount > 0)) return errorAlert('주문 수량을 입력해주세요.');
+            if (!(rawPrice > 0)) return errorAlert('주문 가격을 입력해주세요.');
+            if (isBuy && cash < buyCost(Math.ceil(rawAmount * rawPrice))) {
+                setAmount(display(floor8(maxBuyTotal(cash) / rawPrice)));
+                errorAlert('잔액이 부족합니다. (수수료 포함)');
                 return infoAlert('보유 현금에 맞게 수량이 자동 조정되었습니다.');
             }
             if (!isBuy && holdings < rawAmount) {
@@ -234,7 +260,7 @@ export default function OrderPanel({market, currentPrice, cash, holdings, onOrde
             }
         } else if (isBuy) {
             if (!(rawTotal > 0)) return errorAlert('주문 총액을 입력해주세요.');
-            if (cash < rawTotal) return errorAlert('잔액이 부족합니다.');
+            if (cash < buyCost(rawTotal)) return errorAlert(`잔액이 부족합니다. 수수료 ${formatKRW(feeOf(rawTotal))}원을 포함해 ${formatKRW(buyCost(rawTotal))}원이 필요해요.`);
         } else if (!(rawAmount > 0)) {
             return errorAlert('매도 수량을 입력해주세요.');
         }
@@ -250,9 +276,11 @@ export default function OrderPanel({market, currentPrice, cash, holdings, onOrde
         setLoading(true);
         try {
             const result = isReserve ? await placeReserveOrder(payload) : await placeOrder(payload);
-            if (isReserve) infoAlert('예약 주문이 접수되었습니다.');
-            else if (isBuy) infoAlert(`${formatAmount(result.amount)} ${symbol} 매수 주문이 체결되었습니다.`);
-            else infoAlert(`${formatKRW(Math.floor(result.tradePrice * result.amount))}원에 매도 주문이 체결되었습니다.`);
+            // 시장가는 서버가 실제로 받은 수수료를 그대로 보여 준다
+            const fee = formatKRW(result.fee ?? 0);
+            if (isReserve) infoAlert('지정가 주문이 접수되었습니다. 체결될 때 수수료 0.05%가 함께 정산돼요.');
+            else if (isBuy) infoAlert(`${formatAmount(result.amount)} ${symbol} 매수 주문이 체결되었습니다. (수수료 ${fee}원)`);
+            else infoAlert(`매도 주문이 체결되어 ${formatKRW(Math.floor(result.tradePrice * result.amount) - (result.fee ?? 0))}원을 받았어요. (수수료 ${fee}원)`);
             onOrderPlaced?.(result);
             setAmount('');
             setTotal('');
@@ -265,6 +293,10 @@ export default function OrderPanel({market, currentPrice, cash, holdings, onOrde
     };
 
     const estimatedQty = !isReserve && isBuy && currentPrice > 0 && toNumber(total) > 0 ? toNumber(total) / currentPrice : null;
+    // 수수료를 매길 대금: 지정가는 계산된 총액, 시장가 매수는 입력한 총액, 시장가 매도는 현재가 기준 예상 대금
+    const tradeKrw = isReserve || isBuy
+        ? toNumber(total)
+        : currentPrice > 0 && toNumber(amount) > 0 ? Math.floor(currentPrice * toNumber(amount)) : 0;
 
     return (
         <section className={`flex flex-col overflow-hidden rounded-xl border border-line bg-surface ${className}`}>
@@ -337,9 +369,12 @@ export default function OrderPanel({market, currentPrice, cash, holdings, onOrde
                         </div>
                     )}
 
+                    <FeeSummary isBuy={isBuy} tradeKrw={tradeKrw} estimated={!isReserve && !isBuy}/>
+
                     <Button type="submit" variant={isBuy ? 'buy' : 'sell'} disabled={loading || closed} className="mt-1 h-12 rounded-[10px]">
-                        {closed ? '정산 중 · 거래 마감' : loading ? '주문 처리 중…' : `${isReserve ? '예약 ' : '시장가 '}${isBuy ? '매수' : '매도'}`}
+                        {closed ? '정산 중 · 거래 마감' : loading ? '주문 처리 중…' : `${isReserve ? '지정가 ' : '시장가 '}${isBuy ? '매수' : '매도'}`}
                     </Button>
+                    <p className="text-center text-xs text-fg-3">거래 수수료 {FEE_RATE_LABEL} (시장가·지정가 동일)</p>
                 </form>
             )}
         </section>

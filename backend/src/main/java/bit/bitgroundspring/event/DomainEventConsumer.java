@@ -121,7 +121,7 @@ public class DomainEventConsumer {
 
         // 접속하지 않은 사이 체결돼도 알림이 남도록 먼저 저장한다. 같은 이벤트가 다시 오면 저장하지 않고,
         // 체결 알림을 끈 사용자에게는 저장도 실시간 전송도 하지 않는다 (알림 설정)
-        String text = NotificationMessages.orderExecuted(event.orderType(), event.symbol(), event.amount(), event.tradePrice());
+        String text = NotificationMessages.orderExecuted(event.orderType(), event.symbol(), event.amount(), event.tradePrice(), event.fee());
         int inserted = jdbc.update("""
                 INSERT IGNORE INTO notifications (user_id, message, message_type, event_id, is_read)
                 SELECT ?, ?, ?, ?, 0 FROM DUAL

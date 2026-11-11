@@ -9,6 +9,7 @@ public interface OrderProjection {
     String getCoinName();       // coin 테이블
     BigDecimal getAmount();         // orders 테이블
     BigDecimal getTradePrice();     // orders 테이블
+    Long getFee();                  // 거래 수수료 (원)
     String getStatus();
     LocalDateTime getCreatedAt();
     LocalDateTime getUpdatedAt();

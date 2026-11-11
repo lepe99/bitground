@@ -103,7 +103,7 @@ class OrderValidationTest extends IntegrationTest {
             // 기존: 시세와 0.5% 안쪽 차이면 그 가격으로 즉시 체결돼 싸게 사고 비싸게 팔기를 반복할 수 있었다
             marketOrder("{\"symbol\":\"KRW-BTC\",\"orderType\":\"BUY\",\"totalPrice\":1000000,\"reservePrice\":%s}".formatted(PRICE * 0.996))
                     .andExpect(problem(ErrorCode.INVALID_ORDER));
-            marketOrder("{\"symbol\":\"KRW-BTC\",\"orderType\":\"BUY\",\"totalPrice\":1000000}")
+            marketOrder("{\"symbol\":\"KRW-BTC\",\"orderType\":\"BUY\",\"totalPrice\":900000}")
                     .andExpect(status().isCreated());
             marketOrder("{\"symbol\":\"KRW-BTC\",\"orderType\":\"SELL\",\"amount\":0.001,\"reservePrice\":%s}".formatted(PRICE * 1.004))
                     .andExpect(problem(ErrorCode.INVALID_ORDER));
@@ -150,7 +150,7 @@ class OrderValidationTest extends IntegrationTest {
                     .andExpect(status().isCreated())
                     .andExpect(jsonPath("$.orderType").value("BUY"));
 
-            assertThat(cash()).isEqualTo(CASH - 500_000);
+            assertThat(cash()).isEqualTo(CASH - 500_000 - 250); // 주문 금액 + 수수료 0.05%
             assertThat(btcAmount()).isCloseTo(0.005, within(1e-12));
         }
 
@@ -234,7 +234,7 @@ class OrderValidationTest extends IntegrationTest {
             // 앞 테스트의 비동기 이벤트 처리가 남긴 알림이 섞일 수 있어 이 사용자 것만 본다
             assertThat(notificationRepository.findAll()).filteredOn(n -> n.getUser().getId().equals(user.getId()))
                     .singleElement()
-                    .satisfies(n -> assertThat(n.getMessage()).startsWith("잔액이 부족해 예약 매수 주문이 취소됐어요."));
+                    .satisfies(n -> assertThat(n.getMessage()).startsWith("잔액이 부족해 지정가 매수 주문이 취소됐어요."));
         }
 
         @Test
@@ -244,7 +244,7 @@ class OrderValidationTest extends IntegrationTest {
 
             assertThat(orderRepository.findById(order.getId())).get()
                     .extracting(Order::getStatus).isEqualTo(Status.COMPLETED);
-            assertThat(cash()).isEqualTo(CASH - 100_000);
+            assertThat(cash()).isEqualTo(CASH - 100_000 - 50); // 대금 + 수수료 0.05%
             assertThat(btcAmount()).isCloseTo(0.001, within(1e-12));
         }
     }

@@ -38,7 +38,7 @@ export default function PendingOrderList({orders, tickerMap, onChanged}) {
         setCancelling(order.id);
         try {
             await cancelReserveOrder(order.id);
-            infoAlert('예약 주문이 취소되었습니다.');
+            infoAlert('지정가 주문이 취소되었습니다.');
             onChanged?.();
         } catch (err) {
             errorAlert(getErrorMessage(err, '주문 취소에 실패했습니다.'));
@@ -50,11 +50,11 @@ export default function PendingOrderList({orders, tickerMap, onChanged}) {
     return (
         <Card className="overflow-hidden md:rounded-xl">
             <div className="flex items-center justify-between gap-3 px-5 py-3.5">
-                <h2 className="text-[15px] font-bold">예약 주문</h2>
+                <h2 className="text-[15px] font-bold">미체결 주문</h2>
                 <SegmentedTabs label="주문 종류" items={TYPES} value={type} onChange={setType} className="[&>button]:h-8 [&>button]:px-3 [&>button]:text-xs"/>
             </div>
             {orders === null && <p className="px-5 py-10 text-center text-sm text-fg-3">불러오는 중…</p>}
-            {orders !== null && rows.length === 0 && <p className="border-t border-line px-5 py-10 text-center text-sm text-fg-3">대기 중인 예약 주문이 없어요.</p>}
+            {orders !== null && rows.length === 0 && <p className="border-t border-line px-5 py-10 text-center text-sm text-fg-3">체결을 기다리는 지정가 주문이 없어요.</p>}
             <ul>
                 {rows.map((o) => {
                     const symbol = o.symbol.includes('KRW-') ? o.symbol : `KRW-${o.symbol}`;
@@ -74,7 +74,7 @@ export default function PendingOrderList({orders, tickerMap, onChanged}) {
                             </span>
                             <dl className="grid flex-[2_1_320px] grid-cols-3 gap-3 text-right">
                                 <div><dt className="text-xs text-fg-3">수량</dt><dd className="font-semibold">{formatAmount(o.amount)}</dd></div>
-                                <div><dt className="text-xs text-fg-3">예약가 / 현재가</dt><dd className="font-semibold">{formatPrice(o.reservePrice)} <span className="font-normal text-fg-3">/ {formatPrice(current)}</span></dd></div>
+                                <div><dt className="text-xs text-fg-3">주문 가격 / 현재가</dt><dd className="font-semibold">{formatPrice(o.reservePrice)} <span className="font-normal text-fg-3">/ {formatPrice(current)}</span></dd></div>
                                 <div><dt className="text-xs text-fg-3">주문 금액</dt><dd className="font-semibold">{formatKRW(total)}원</dd></div>
                             </dl>
                             <Button variant="secondary" size="sm" onClick={() => cancel(o)} disabled={cancelling === o.id} className="ml-auto">

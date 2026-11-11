@@ -17,7 +17,7 @@ const ADMIN_MENU = {tab: "admin", label: "관리자"};
 
 // 모바일은 하단 탭에 없는 화면을 여기서 연다
 const MOBILE_LINKS = [
-    {to: "/investments", label: "투자내역", desc: "보유 자산 · 거래내역 · 예약 주문"},
+    {to: "/investments", label: "투자내역", desc: "보유 자산 · 거래내역 · 미체결 주문"},
     {to: "/trends", label: "최신동향", desc: "코인 뉴스와 AI 시장 분석"},
     {to: "/notice", label: "공지사항", desc: "시즌 일정과 서비스 소식"},
     {to: "/mypage?tab=notifications", label: "알림 설정", desc: "받을 알림 종류 · 실시간 팝업"},

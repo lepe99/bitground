@@ -5,6 +5,7 @@ import bit.bitgroundspring.common.Status;
 import bit.bitgroundspring.common.error.BusinessException;
 import bit.bitgroundspring.common.error.ErrorCode;
 import bit.bitgroundspring.common.money.Money;
+import bit.bitgroundspring.common.money.TradingFee;
 import bit.bitgroundspring.common.tx.AfterCommit;
 import bit.bitgroundspring.market.Coin;
 import bit.bitgroundspring.market.CoinRepository;
@@ -84,9 +85,11 @@ public class OrderService {
             double buyQty = sumQuantity(buys).doubleValue();
             double sellQty = sumQuantity(sells).doubleValue();
 
+            // 평균가는 체결가 기준(수수료 제외), 손익은 낸 수수료까지 뺀 값
+            long feeTotal = coinOrders.stream().mapToLong(Order::getFee).sum();
             double avgBuy = buyQty == 0 ? 0 : buyTotal / buyQty;
             double avgSell = sellQty == 0 ? 0 : sellTotal / sellQty;
-            double profit = sellTotal - buyTotal;
+            double profit = sellTotal - buyTotal - feeTotal;
             double returnRate = buyTotal == 0 ? 0 : profit / buyTotal * 100;
 
             LocalDateTime firstBuyAt = buys.stream()
@@ -105,6 +108,7 @@ public class OrderService {
                     .avgBuy(avgBuy)
                     .avgSell(avgSell)
                     .profit(profit)
+                    .fee(feeTotal)
                     .returnRate(returnRate)
                     .build());
         }
@@ -130,6 +134,7 @@ public class OrderService {
                     .amount(order.getAmount().stripTrailingZeros())
                     .price(price)
                     .total(total)
+                    .fee(order.getFee())
                     .koreanName(koreanName)
                     .build();
         }).toList();
@@ -139,7 +144,7 @@ public class OrderService {
     // 예약 주문 생성 메서드
     // 매도 예약은 보유 자산 행을 잠가 확인한다. 행이 없을 때 빈 구간까지 잠그지 않도록 READ COMMITTED (OrderTransactions 참고)
     @Transactional(isolation = Isolation.READ_COMMITTED)
-    @Loggable("예약 주문 접수")
+    @Loggable("지정가 주문 접수")
     public Order createReserveOrder(Integer userId, CreateOrderRequest request) {
         validateOrderRequest(request);
         tradingWindow.ensureOpen(); // 시즌 종료 시각부터 정산이 끝날 때까지 거래 마감
@@ -170,7 +175,8 @@ public class OrderService {
         
         // 주문 유효성 검사 (현재 시즌 미체결 예약 주문에 이미 묶인 현금·수량을 빼고 확인)
         if (request.getOrderType() == OrderType.BUY) {
-            long cost = Money.krwCeil(order.getReservePrice(), order.getAmount());
+            // 주문 가격 그대로 체결될 때 낼 대금 + 수수료만큼 있어야 한다 (실제 체결은 그 가격 이하)
+            long cost = TradingFee.buyCost(Money.krwCeil(order.getReservePrice(), order.getAmount()));
             if (orderRepository.reservedBuyCash(user.getId()) + cost > user.getCash()) {
                 throw new BusinessException(ErrorCode.INSUFFICIENT_CASH);
             }
@@ -198,7 +204,7 @@ public class OrderService {
             throw new BusinessException(ErrorCode.INVALID_ORDER, "주문 수량은 0보다 커야 합니다.");
         }
         if (request.getReservePrice() == null || request.getReservePrice() <= 0) {
-            throw new BusinessException(ErrorCode.INVALID_ORDER, "예약 가격은 0보다 커야 합니다.");
+            throw new BusinessException(ErrorCode.INVALID_ORDER, "주문 가격은 0보다 커야 합니다.");
         }
         if (request.getSymbol() == null) {
             throw new BusinessException(ErrorCode.INVALID_ORDER, "종목은 필수입니다.");
@@ -209,7 +215,7 @@ public class OrderService {
     }
     
     @Transactional
-    @Loggable("예약 주문 취소")
+    @Loggable("지정가 주문 취소")
     public void cancelOrder(Integer orderId, Integer userId) {
         // 체결과 동시에 처리되지 않도록 주문 행을 잠금 (체결이 먼저 끝났으면 아래에서 ORDER_NOT_PENDING)
         Order order = orderRepository.findByIdForUpdate(orderId)

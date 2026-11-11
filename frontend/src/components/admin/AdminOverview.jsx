@@ -66,8 +66,8 @@ export default function AdminOverview() {
             <Section title="거래 (오늘)">
                 <div className="grid grid-cols-[repeat(auto-fit,minmax(7rem,1fr))] gap-2">
                     <Stat label="시장가 체결" value={formatNumber(trades.marketToday)}/>
-                    <Stat label="예약 체결" value={formatNumber(trades.reservedToday)}/>
-                    <Stat label="대기 중인 예약" value={formatNumber(trades.pendingReserved)}/>
+                    <Stat label="지정가 체결" value={formatNumber(trades.reservedToday)}/>
+                    <Stat label="미체결 주문" value={formatNumber(trades.pendingReserved)}/>
                 </div>
             </Section>
 

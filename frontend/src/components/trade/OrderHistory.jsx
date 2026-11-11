@@ -65,7 +65,7 @@ export default function OrderHistory({market, onChanged}) {
         setCancelling(order.id);
         try {
             await cancelReserveOrder(order.id);
-            infoAlert('예약 주문이 취소되었습니다.');
+            infoAlert('지정가 주문이 취소되었습니다.');
             setPending((prev) => prev.filter((o) => o.id !== order.id));
             onChanged?.();
         } catch (err) {
@@ -107,7 +107,10 @@ export default function OrderHistory({market, onChanged}) {
                             </span>
                             <span className="flex flex-col items-end gap-0.5 text-right">
                                 <span className="font-semibold">{price > 0 ? formatPrice(price) : '—'}<span className="ml-0.5 text-[11px] font-normal text-fg-3">원</span></span>
-                                <span className="text-[11px] text-fg-3">{formatAmount(amount)} {tickerOf(o.symbol)} · {formatKRW(total)}원</span>
+                                <span className="text-[11px] text-fg-3">
+                                    {formatAmount(amount)} {tickerOf(o.symbol)} · {formatKRW(total)}원
+                                    {!isPending && ` · 수수료 ${formatKRW(o.fee ?? 0)}원`}
+                                </span>
                             </span>
                             {isPending && (
                                 <button

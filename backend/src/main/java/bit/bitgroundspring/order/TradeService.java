@@ -5,6 +5,7 @@ import bit.bitgroundspring.common.Status;
 import bit.bitgroundspring.common.error.BusinessException;
 import bit.bitgroundspring.common.error.ErrorCode;
 import bit.bitgroundspring.common.money.Money;
+import bit.bitgroundspring.common.money.TradingFee;
 import bit.bitgroundspring.event.OrderExecutedEvent;
 import bit.bitgroundspring.event.OutboxEvents;
 import bit.bitgroundspring.market.Coin;
@@ -82,18 +83,20 @@ public class TradeService {
                         .avgPrice(BigDecimal.ZERO)
                         .build());
 
+        long fee;
         if (isBuy) {
-            // 주문 금액(원)으로 살 수 있는 수량을 버림으로 계산하고, 평균 매입가에는 실제 낸 금액을 반영
+            // 주문 금액(원)으로 살 수 있는 수량을 버림으로 계산하고, 평균 매입가에는 수수료를 뺀 주문 금액을 반영 (업비트처럼)
             long totalPrice = req.getTotalPrice();
-            // 예약 매수에 묶인 금액을 제외한 가용 현금 기준으로 확인
-            if (user.getCash() - orderRepository.reservedBuyCash(userId) < totalPrice) {
+            fee = TradingFee.of(totalPrice);
+            // 지정가 매수에 묶인 금액을 제외한 가용 현금으로 주문 금액 + 수수료를 낼 수 있는지 확인
+            if (user.getCash() - orderRepository.reservedBuyCash(userId) < totalPrice + fee) {
                 throw new BusinessException(ErrorCode.INSUFFICIENT_CASH);
             }
             qty = Money.quantityFor(totalPrice, execPrice);
             if (qty.signum() == 0) {
                 throw new BusinessException(ErrorCode.INVALID_ORDER, "주문 금액이 너무 적습니다.");
             }
-            user.setCash(user.getCash() - totalPrice);
+            user.setCash(user.getCash() - totalPrice - fee);
 
             BigDecimal newQty = asset.getAmount().add(qty);
             BigDecimal newCost = asset.getAmount().multiply(asset.getAvgPrice()).add(BigDecimal.valueOf(totalPrice));
@@ -111,8 +114,10 @@ public class TradeService {
                 throw new BusinessException(ErrorCode.INSUFFICIENT_ASSET);
             }
 
-            // 받는 돈은 원 단위 내림
-            user.setCash(user.getCash() + Money.krwFloor(execPrice, qty));
+            // 받는 돈은 원 단위 내림, 거기서 수수료를 뺀다
+            long proceeds = Money.krwFloor(execPrice, qty);
+            fee = TradingFee.of(proceeds);
+            user.setCash(user.getCash() + proceeds - fee);
 
             BigDecimal remaining = currentAmt.subtract(qty);
             if (remaining.signum() == 0) {
@@ -129,6 +134,7 @@ public class TradeService {
                 .orderType(req.getOrderType())
                 .status(Status.COMPLETED)
                 .tradePrice(execPrice)
+                .fee(fee)
                 .amount(qty)
                 .createdAt(now)
                 .updatedAt(now)
@@ -144,6 +150,7 @@ public class TradeService {
                 order.getOrderType(),
                 order.getAmount(),
                 order.getTradePrice(),
+                order.getFee(),
                 order.getCreatedAt()
         );
     }
@@ -154,9 +161,9 @@ public class TradeService {
             throw new BusinessException(ErrorCode.INVALID_ORDER, "종목과 주문 종류는 필수입니다.");
         }
         // 기존: 지정가를 함께 보내면 시세와 0.5% 안쪽 차이인 그 가격으로 즉시 체결돼,
-        // 싸게 사고 비싸게 팔기를 반복해 자산을 늘릴 수 있었다. 지정가 주문은 예약 주문(/orders/reserve)으로만 받는다
+        // 싸게 사고 비싸게 팔기를 반복해 자산을 늘릴 수 있었다. 지정가 주문은 예약 주문 API(/orders/reserve, 화면 이름 "지정가")로만 받는다
         if (req.getReservePrice() != null) {
-            throw new BusinessException(ErrorCode.INVALID_ORDER, "지정가 주문은 예약 주문으로 넣어 주세요.");
+            throw new BusinessException(ErrorCode.INVALID_ORDER, "시장가 주문에는 가격을 보낼 수 없습니다. 지정가로 주문해 주세요.");
         }
         if (req.getOrderType() == OrderType.BUY) {
             if (req.getTotalPrice() == null || req.getTotalPrice() <= 0) {

@@ -15,7 +15,7 @@ import TradeHistory from "../components/investments/TradeHistory.jsx";
 import PendingOrderList from "../components/investments/PendingOrderList.jsx";
 
 /**
- * 투자내역: 보유자산(요약·비중·보유 코인) / 거래내역 / 미체결(예약 주문)
+ * 투자내역: 보유자산(요약·비중·보유 코인·이번 시즌 수수료) / 거래내역 / 미체결(지정가 주문)
  * PC는 거래소처럼 오른쪽에 코인 목록(보유 탭)을 둔다
  */
 export default function Investments() {
@@ -25,13 +25,13 @@ export default function Investments() {
     const {userCash} = useNotifications();
 
     const [tab, setTab] = useState("assets");
-    const [assets, setAssets] = useState({userAssets: [], cash: 0, availableCash: 0});
+    const [assets, setAssets] = useState({userAssets: [], cash: 0, availableCash: 0, seasonFee: 0});
     const [pending, setPending] = useState(null);
     const [favorites, setFavorites] = useState([]);
 
     const reload = useCallback(() => {
         fetchOwnedAssets()
-            .then((data) => setAssets({userAssets: data?.userAssets ?? [], cash: data?.cash ?? 0, availableCash: data?.availableCash ?? 0}))
+            .then((data) => setAssets({userAssets: data?.userAssets ?? [], cash: data?.cash ?? 0, availableCash: data?.availableCash ?? 0, seasonFee: data?.seasonFee ?? 0}))
             .catch((error) => console.error("보유 자산 조회 실패:", error));
         fetchPendingOrders()
             .then((list) => setPending(Array.isArray(list) ? list : []))
@@ -75,7 +75,7 @@ export default function Investments() {
 
                 {tab === "assets" && (
                     <>
-                        <AssetOverview portfolio={portfolio} availableCash={assets.availableCash} reserved={Math.max(0, assets.cash - assets.availableCash)}/>
+                        <AssetOverview portfolio={portfolio} availableCash={assets.availableCash} reserved={Math.max(0, assets.cash - assets.availableCash)} seasonFee={assets.seasonFee}/>
                         <HoldingsTable rows={portfolio.rows}/>
                     </>
                 )}

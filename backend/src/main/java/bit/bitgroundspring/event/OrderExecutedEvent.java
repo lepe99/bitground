@@ -12,11 +12,12 @@ import java.time.LocalDateTime;
  * 주문이 체결됨 (시장가·예약 모두). 아웃박스에 남겨 커밋 뒤 이벤트 스트림으로 전달된다.
  * 받는 쪽: 체결 내역 실시간 방송, 예약 주문이면 체결 알림 저장·전송
  *
- * @param reserved 예약 주문 체결이면 true (알림 대상)
+ * @param reserved 예약(화면 이름 "지정가") 주문 체결이면 true (알림 대상)
+ * @param fee      낸 거래 수수료 (원). 수수료 도입 전에 쌓인 이벤트에는 없어 null
  */
 public record OrderExecutedEvent(int orderId, int userId, String symbol, String koreanName, OrderType orderType,
                                  BigDecimal amount, BigDecimal tradePrice, LocalDateTime createdAt,
-                                 LocalDateTime updatedAt, boolean reserved) {
+                                 LocalDateTime updatedAt, boolean reserved, Long fee) {
 
     public static final String TYPE = "ORDER_EXECUTED";
 
@@ -24,7 +25,7 @@ public record OrderExecutedEvent(int orderId, int userId, String symbol, String 
         Coin coin = order.getCoin();
         return new OrderExecutedEvent(order.getId(), order.getUser().getId(), coin.getSymbol(), coin.getKoreanName(),
                 order.getOrderType(), order.getAmount(), order.getTradePrice(), order.getCreatedAt(),
-                order.getUpdatedAt(), reserved);
+                order.getUpdatedAt(), reserved, order.getFee());
     }
 
     public TradeDto toTrade() {

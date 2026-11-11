@@ -70,5 +70,5 @@ public class AiInsight {
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, columnDefinition = "datetime(6) DEFAULT CURRENT_TIMESTAMP(6)")
-    private LocalDateTime createdAt=LocalDateTime.now();
+    private LocalDateTime createdAt; // 저장할 때 @CreationTimestamp가 채운다
 }

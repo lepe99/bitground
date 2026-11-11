@@ -13,7 +13,8 @@ export function splitMessage(message = '') {
  */
 export function groupKey({messageType, postId, message = ''}) {
     if ((messageType === 'COMMENT' || messageType === 'INQUIRY') && postId) return `post:${postId}`;
-    if (messageType === 'ORDER_EXECUTION' && message.startsWith('예약')) return 'order';
+    // 지정가 체결 알림 (수수료 도입 전에 저장된 알림은 '예약'으로 시작)
+    if (messageType === 'ORDER_EXECUTION' && (message.startsWith('지정가') || message.startsWith('예약'))) return 'order';
     return null;
 }
 
@@ -48,7 +49,7 @@ export function summarize(items) {
         const sells = items.filter((i) => i.message.includes('매도')).length;
         const coins = unique(items.map((i) => i.message.match(/수량 : [\d.]+ (\S+)/)?.[1]));
         const parts = [buys && `매수 ${buys}건`, sells && `매도 ${sells}건`, coins.join(', ')].filter(Boolean);
-        return {title: `예약 주문 ${n}건이 체결되었습니다.`, body: parts.join(' · ')};
+        return {title: `지정가 주문 ${n}건이 체결되었습니다.`, body: parts.join(' · ')};
     }
 
     const {body} = splitMessage(latest.message);

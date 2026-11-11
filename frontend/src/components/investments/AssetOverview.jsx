@@ -29,16 +29,17 @@ function allocation(portfolio) {
 }
 
 /** 총 보유자산 · 손익 · 원화/코인 비중 */
-export default function AssetOverview({portfolio, availableCash, reserved}) {
+export default function AssetOverview({portfolio, availableCash, reserved, seasonFee = 0}) {
     const parts = allocation(portfolio);
     const coinRatio = portfolio.total ? (portfolio.evalTotal / portfolio.total) * 100 : 0;
     const summary = [
         ['보유 KRW', `${formatKRW(portfolio.cash)}`],
         ['주문 가능', `${formatKRW(availableCash)}`],
-        ['예약 주문 묶임', `${formatKRW(reserved)}`],
+        ['미체결 주문 묶임', `${formatKRW(reserved)}`],
         ['총 매수', `${formatKRW(portfolio.buyTotal)}`],
         ['총 평가', `${formatKRW(portfolio.evalTotal)}`],
         ['평가손익', formatSignedKRW(portfolio.pnl), changeColor(Math.round(portfolio.pnl))],
+        ['이번 시즌 수수료', `${formatKRW(seasonFee)}`], // 매수·매도 0.05%. 평가손익(체결가 기준)에는 들어 있지 않다
     ];
     let offset = 0;
 
