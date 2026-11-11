@@ -7,7 +7,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 /**
- * 게시글 작성 요청 (기존: Post 엔티티를 요청 본문으로 직접 받음)
+ * 게시글 작성·수정 요청 (기존: Post 엔티티를 요청 본문으로 직접 받음)
  */
 public record PostCreateRequest(
         @NotNull(message = "카테고리를 선택해주세요.") Category category,

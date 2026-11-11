@@ -37,6 +37,7 @@ public class PostDto {
     // 이 두 개는 상세 보기용에서만 사용
     private int highestTier;
     private List<PastSeasonTierProjection> pastSeasonTiers;
+    private LocalDateTime editedAt; // 작성자가 수정한 시각 (상세에서만 채움, 수정한 적 없으면 null)
 
     // 목록 조회용 생성자 (본문 제외, PostRepository.findPostList JPQL에서 사용)
     public PostDto(Integer id, Integer userId, String name, String profileImage,

@@ -63,7 +63,8 @@ export const router = createBrowserRouter([
                         children: [
                             {index: true, element: page(<PostList/>)},     // /community
                             {path: "write", element: page(<PostWrite/>)},  // /community/write
-                            {path: ":id", element: page(<PostDetail/>)}    // /community/:id
+                            {path: ":id", element: page(<PostDetail/>)},
+                            {path: ":id/edit", element: page(<PostWrite/>)} // 작성자 본인만 (서버가 확인)    // /community/:id
                         ]
                     }
                 ]

@@ -55,6 +55,14 @@ public class PostController {
         return postService.getPostDetail(id, authUser);
     }
 
+    // 게시글 수정 (작성자 본인만, 본문 형식은 등록과 같다)
+    @PutMapping("/{id}")
+    public ResponseEntity<Void> updatePost(@AuthenticationPrincipal AuthUser authUser, @PathVariable Integer id,
+                                           @Valid @RequestBody PostCreateRequest request) {
+        postService.updatePost(id, authUser, request);
+        return ResponseEntity.noContent().build();
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deletePost(@AuthenticationPrincipal AuthUser authUser, @PathVariable Integer id) {
         postService.deletePost(id, authUser);

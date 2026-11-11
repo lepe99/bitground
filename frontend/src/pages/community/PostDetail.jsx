@@ -83,12 +83,24 @@ export default function PostDetail() {
                         <Avatar src={post.profileImage} name={post.name} tier={post.tier} size="sm"/>
                         <span className="flex flex-col">
                             <span className="text-sm font-semibold">{post.name}</span>
-                            <span className="num text-xs text-fg-3">{fullTime(post.createdAt)}{!inquiry && ` · 조회 ${post.views}`}</span>
+                            <span className="num text-xs text-fg-3">
+                                {fullTime(post.createdAt)}
+                                {post.editedAt && <span title={`수정 ${fullTime(post.editedAt)}`}> · 수정됨</span>}
+                                {!inquiry && ` · 조회 ${post.views}`}
+                            </span>
                         </span>
                         {user?.id === post.userId && (
-                            <button type="button" onClick={remove} className="ml-auto rounded-lg px-2.5 py-1.5 text-[13px] font-semibold text-fg-3 hover:bg-surface-2 hover:text-up">
-                                삭제
-                            </button>
+                            <span className="ml-auto flex gap-1">
+                                {/* 답변이 달린 문의는 답변과 어긋나지 않게 고칠 수 없다 */}
+                                {!(inquiry && post.answered) && (
+                                    <Link to={`/community/${postId}/edit`} className="rounded-lg px-2.5 py-1.5 text-[13px] font-semibold text-fg-3 hover:bg-surface-2 hover:text-fg">
+                                        수정
+                                    </Link>
+                                )}
+                                <button type="button" onClick={remove} className="rounded-lg px-2.5 py-1.5 text-[13px] font-semibold text-fg-3 hover:bg-surface-2 hover:text-up">
+                                    삭제
+                                </button>
+                            </span>
                         )}
                     </div>
                 </header>

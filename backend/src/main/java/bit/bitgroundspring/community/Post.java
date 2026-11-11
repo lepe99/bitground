@@ -49,6 +49,9 @@ public class Post {
 
     @Column(name = "answered_at")
     private LocalDateTime answeredAt; // 문의에 관리자가 처음 답한 시각 (비면 답변 대기)
+
+    @Column(name = "edited_at")
+    private LocalDateTime editedAt; // 작성자가 마지막으로 수정한 시각 (updated_at은 조회수·좋아요에도 바뀌어 쓸 수 없다)
     
     @Column(name = "views", nullable = false, columnDefinition = "int default 0")
     @Builder.Default

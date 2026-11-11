@@ -11,6 +11,10 @@ export const fetchPost = async (postId) => (await api.get(`/posts/${postId}`)).d
 export const createPost = async ({title, content, category, inquiryType}) =>
     (await api.post('/posts/form', {title, content, category, inquiryType})).data;
 
+// 작성자 본인만. 문의와 일반 글은 서로 바꿀 수 없고, 답변이 달린 문의는 고칠 수 없다
+export const updatePost = ({postId, title, content, category, inquiryType}) =>
+    api.put(`/posts/${postId}`, {title, content, category, inquiryType});
+
 export const deletePost = (postId) => api.delete(`/posts/${postId}`);
 
 // 댓글
