@@ -1,48 +1,33 @@
-import React, { useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../auth/useAuth';
+import {useEffect, useRef} from 'react';
+import {useNavigate} from 'react-router-dom';
+import {useAuth} from '../../auth/useAuth';
 import {useToast} from "../../components/toastContext.js";
 import Loading from "../../components/Loading.jsx";
 
+/** 소셜 로그인 후 돌아오는 화면. 처음 가입한 사용자는 프로필 확인 화면으로, 나머지는 홈으로 보낸다 */
 const Callback = () => {
     const navigate = useNavigate();
-    const { checkAuthState, user } = useAuth();
-    const { infoAlert } = useToast();
-    const hasProcessed = useRef(false);
-    const hasShownWelcome = useRef(false);
+    const {checkAuthState} = useAuth();
+    const {infoAlert} = useToast();
+    const handled = useRef(false);
 
     useEffect(() => {
-        // 컴포넌트 마운트 시 초기화
-        hasProcessed.current = false;
-        hasShownWelcome.current = false;
-    }, []);
+        if (handled.current) return;
+        handled.current = true;
 
-    useEffect(() => {
-        if (hasProcessed.current) return;
+        checkAuthState().then((me) => {
+            if (!me) {
+                navigate('/login', {replace: true});
+            } else if (!me.onboarded) {
+                navigate('/welcome', {replace: true}); // 환영 인사는 프로필을 확인한 뒤에
+            } else {
+                infoAlert(`${me.name}님, 환영합니다!`);
+                navigate('/', {replace: true});
+            }
+        });
+    }, [checkAuthState, navigate, infoAlert]);
 
-        hasProcessed.current = true;
-
-        checkAuthState()
-            .then(() => navigate('/'))
-            .catch((error) => {
-                console.error('Error processing auth callback:', error);
-                navigate('/login');
-            });
-    }, [checkAuthState, navigate]);
-
-    // 사용자 정보가 로드된 후 환영 메시지 표시 (한 번만)
-    useEffect(() => {
-        if (user && user.name && hasProcessed.current && !hasShownWelcome.current) {
-            hasShownWelcome.current = true;
-            infoAlert(`${user.name}님, 환영합니다!`);
-        }
-    }, [user, infoAlert]);
-
-    return (
-        <div>
-            <Loading/>
-        </div>
-    );
+    return <Loading/>;
 };
 
 export default Callback;

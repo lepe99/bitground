@@ -15,8 +15,20 @@ const COLUMNS = [
     {key: 'volume', label: '거래대금', align: 'text-right'},
 ];
 
+// 유의·주의 종목 표시 (업비트 market_event)
+const MarketBadge = ({label, title, className}) => (
+    <span title={title} className={`flex size-4 shrink-0 items-center justify-center rounded-[3px] text-[10px] font-bold leading-none text-white ${className}`}>
+        <span aria-hidden="true">{label}</span>
+        <span className="sr-only">{title}</span>
+    </span>
+);
+
+// 머리글과 행이 같은 칸 너비를 쓰도록 숫자 칸은 고정 폭, 이름 칸은 나머지 (fr만 쓰면 비트코인처럼 긴 가격이 그 행의 칸만 넓혀 줄이 어긋났다)
+// 현재가 96px는 1억 단위(103,308,000)까지 들어간다
+const GRID = 'grid grid-cols-[minmax(0,1fr)_96px_62px_56px] gap-2';
+
 // 가격이 바뀐 행을 잠깐 표시하는 시간
-const FLASH_MS = 500;
+const FLASH_MS = 300;
 
 /**
  * 원화 마켓 코인 목록 (검색 · 원화/보유/관심 · 정렬). 거래소·투자내역 오른쪽, 모바일 거래 첫 화면
@@ -38,8 +50,10 @@ export default function MarketList({
     const [sort, setSort] = useState({key: 'volume', desc: true});
     const [flash, setFlash] = useState({});
     const prevPrices = useRef({});
+    const flashTimers = useRef({});
 
-    // 직전 가격과 비교해 오르면 빨강, 내리면 파랑 테두리를 잠깐 보여준다
+    // 직전 가격과 비교해 오르면 빨강, 내리면 파랑 테두리를 잠깐 보여준다.
+    // 종목마다 타이머를 따로 둔다. (시세가 200ms마다 갱신되므로 effect 정리에서 타이머를 지우면 테두리가 꺼지지 않는다)
     useEffect(() => {
         const changed = {};
         for (const [market, t] of Object.entries(tickerMap)) {
@@ -49,15 +63,20 @@ export default function MarketList({
         }
         if (Object.keys(changed).length === 0) return;
         setFlash((f) => ({...f, ...changed}));
-        const timer = setTimeout(() => {
-            setFlash((f) => {
-                const next = {...f};
-                for (const m of Object.keys(changed)) delete next[m];
-                return next;
-            });
-        }, FLASH_MS);
-        return () => clearTimeout(timer);
+        for (const market of Object.keys(changed)) {
+            clearTimeout(flashTimers.current[market]);
+            flashTimers.current[market] = setTimeout(() => {
+                delete flashTimers.current[market];
+                setFlash((f) => {
+                    const next = {...f};
+                    delete next[market];
+                    return next;
+                });
+            }, FLASH_MS);
+        }
     }, [tickerMap]);
+
+    useEffect(() => () => Object.values(flashTimers.current).forEach(clearTimeout), []);
 
     const rows = useMemo(() => {
         const term = query.trim().toLowerCase();
@@ -108,29 +127,30 @@ export default function MarketList({
                 </div>
             </div>
 
-            <div className="grid grid-cols-[1.5fr_1.2fr_0.8fr_0.9fr] gap-2 border-b border-line px-3 py-2 text-[11px] text-fg-3">
+            {/* 목록의 스크롤바 폭만큼 머리글에도 자리를 남겨 두어 칸이 맞게 한다 */}
+            <div className={`${GRID} overflow-hidden border-b border-line px-3 py-2 text-[11px] text-fg-3 [scrollbar-gutter:stable]`}>
                 {COLUMNS.map((c) => (
-                    <button key={c.key} type="button" onClick={() => onSort(c.key)} className={`${c.align} hover:text-fg-2`} aria-label={`${c.label} 순 정렬`}>
+                    <button key={c.key} type="button" onClick={() => onSort(c.key)} className={`${c.align} whitespace-nowrap hover:text-fg-2 ${c.key === 'price' ? 'pr-1' : ''}`} aria-label={`${c.label} 순 정렬`}>
                         {c.label}
                         {sort.key === c.key && <span aria-hidden="true"> {sort.desc ? '▼' : '▲'}</span>}
                     </button>
                 ))}
             </div>
 
-            <ul className="min-h-0 flex-1 overflow-y-auto">
+            <ul className="min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-gutter:stable]">
                 {rows.length === 0 && (
                     <li className="px-3 py-10 text-center text-sm text-fg-3">
                         {filter === 'owned' ? '보유한 코인이 없어요.' : filter === 'fav' ? '관심 코인을 별표로 추가해 보세요.' : '검색 결과가 없어요.'}
                     </li>
                 )}
-                {rows.map(({market, name}) => {
+                {rows.map(({market, name, warning, caution}) => {
                     const t = tickerMap[market];
                     const color = changeColor(t?.changeRate);
                     const fav = favoriteMarkets.includes(market);
                     const selected = market === selectedMarket;
                     return (
                         <li key={market} className={`border-b border-line ${selected ? 'bg-brand-soft' : 'hover:bg-surface-2'}`}>
-                            <div onClick={() => onSelectMarket(market)} className="grid cursor-pointer grid-cols-[1.5fr_1.2fr_0.8fr_0.9fr] items-center gap-2 px-3 py-2">
+                            <div onClick={() => onSelectMarket(market)} className={`${GRID} cursor-pointer items-center px-3 py-2`}>
                                 <span className="flex min-w-0 items-center gap-1.5">
                                     {onToggleFav && (
                                         <button
@@ -147,19 +167,23 @@ export default function MarketList({
                                         </button>
                                     )}
                                     <button type="button" aria-current={selected || undefined} className="flex min-w-0 flex-col text-left">
-                                        <span className="truncate text-[13px] font-semibold">{name}</span>
+                                        <span className="flex min-w-0 items-center gap-1">
+                                            <span title={name} className="truncate text-[13px] font-semibold">{name}</span>
+                                            {warning && <MarketBadge label="유" title="유의 종목" className="bg-up"/>}
+                                            {caution && <MarketBadge label="주" title="투자 주의 종목" className="bg-[#F08A00]"/>}
+                                        </span>
                                         <span className="text-[11px] text-fg-3">{market.replace('KRW-', '')}/KRW</span>
                                     </button>
                                 </span>
-                                <span className={`num justify-self-end rounded px-1 text-right text-[13px] font-semibold ring-1 ${color} ${
+                                <span className={`num justify-self-end whitespace-nowrap rounded px-1 text-right text-[13px] font-semibold ring-1 ${color} ${
                                     flash[market] === 'up' ? 'ring-up' : flash[market] === 'down' ? 'ring-down' : 'ring-transparent'
                                 }`}>
                                     {formatPrice(t?.price)}
                                 </span>
-                                <span className={`num text-right text-xs font-semibold ${color}`}>
+                                <span className={`num whitespace-nowrap text-right text-xs font-semibold ${color}`}>
                                     {t ? `${t.changeRate > 0 ? '+' : ''}${(t.changeRate * 100).toFixed(2)}%` : '—'}
                                 </span>
-                                <span className="num text-right text-xs text-fg-2">{t ? formatCompactKRW(t.volume) : '—'}</span>
+                                <span className="num whitespace-nowrap text-right text-xs text-fg-2">{t ? formatCompactKRW(t.volume) : '—'}</span>
                             </div>
                         </li>
                     );

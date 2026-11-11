@@ -20,7 +20,7 @@ import MobileCoinDetail from "../components/trade/MobileCoinDetail.jsx";
  */
 export default function Trade() {
     const {user} = useContext(AuthContext);
-    const {markets, selectedMarket, tickerMap, setSelectedMarket, isWsConnected} = useContext(TickerContext);
+    const {markets, selectedMarket, tickerMap, setSelectedMarket, hasTickers} = useContext(TickerContext);
     const {userCash} = useNotifications();
     const isMobile = useIsMobile();
     const [searchParams, setSearchParams] = useSearchParams();
@@ -89,7 +89,7 @@ export default function Trade() {
     if (isMobile) {
         return (
             <div >
-                {!isWsConnected && <Loading/>}
+                {!hasTickers && <Loading/>}
                 {marketParam ? (
                     <MobileCoinDetail
                         market={selectedMarket}
@@ -102,7 +102,9 @@ export default function Trade() {
                         onOrderPlaced={reloadAssets}
                     />
                 ) : (
-                    list("h-[calc(100dvh-56px-72px-env(safe-area-inset-bottom))]")
+                    // 헤더(57px)와 하단 메뉴(57px) 사이에 고정해 목록만 스크롤되게 한다.
+                    // (높이를 100dvh로 계산하면 1px 넘쳐 페이지도 같이 스크롤됐고, 주소창이 접히며 100dvh가 바뀌면 목록이 잘려 보였다)
+                    list("fixed inset-x-0 top-[57px] bottom-[calc(57px+env(safe-area-inset-bottom))]")
                 )}
             </div>
         );
@@ -110,7 +112,7 @@ export default function Trade() {
 
     return (
         <div className="flex flex-wrap gap-2 p-2">
-            {!isWsConnected && <Loading/>}
+            {!hasTickers && <Loading/>}
             <div className="flex min-w-0 flex-[999_1_720px] flex-col gap-2">
                 <CoinSummary
                     market={selectedMarket}
@@ -134,7 +136,7 @@ export default function Trade() {
                     <RecentTrades symbol={selectedMarket} className="h-[468px] min-w-0 flex-[1_1_340px]"/>
                 </div>
             </div>
-            {list("sticky top-[64px] h-[calc(100dvh-72px)] min-w-0 flex-[1_1_340px] overflow-hidden rounded-xl border border-line")}
+            {list("sticky top-[64px] h-[calc(100dvh-72px)] min-w-0 flex-[1_1_420px] overflow-hidden rounded-xl border border-line")}
         </div>
     );
 }

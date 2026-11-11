@@ -9,7 +9,8 @@ import Avatar from "../../components/ui/Avatar.jsx";
 import TierBadge from "../../components/ui/TierBadge.jsx";
 import RichContent from "../../components/ui/RichContent.jsx";
 import CommentSection from "../../components/community/CommentSection.jsx";
-import {CATEGORY_LABEL, CATEGORY_STYLE, fullTime} from "../../components/community/post.js";
+import {CATEGORY_LABEL, CATEGORY_STYLE, INQUIRY, INQUIRY_TYPE_LABEL, fullTime} from "../../components/community/post.js";
+import {AnswerBadge} from "./PostList.jsx";
 import {TIER_NAMES, TIER_TEXT} from "../../constants/tiers.js";
 
 /** 게시글 본문 · 글쓴이 티어 기록 · 좋아요/싫어요 · 댓글 */
@@ -57,37 +58,56 @@ export default function PostDetail() {
     };
 
     if (!post) return <p className="py-20 text-center text-sm text-fg-3">불러오는 중…</p>;
+    // 문의: 작성자와 관리자만 보는 글이라 반응·조회수·티어 기록을 빼고 유형과 답변 상태를 보여 준다
+    const inquiry = post.category === INQUIRY;
 
     return (
         <div className="mx-auto flex max-w-[800px] flex-col gap-4 px-5 pt-3 pb-12 md:gap-5 md:pt-8">
-            <Link to="/community" className="flex w-fit items-center gap-1 text-sm font-semibold text-fg-2 hover:text-fg">
+            <Link to={inquiry ? "/community?category=INQUIRY" : "/community"} className="flex w-fit items-center gap-1 text-sm font-semibold text-fg-2 hover:text-fg">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>
-                커뮤니티
+                {inquiry ? "문의" : "커뮤니티"}
             </Link>
 
             <Card as="article" className="flex flex-col gap-5 p-5 md:p-8">
                 <header className="flex flex-col gap-3 border-b border-line pb-5">
-                    <span className={`w-fit rounded-md px-1.5 py-0.5 text-xs font-bold ${CATEGORY_STYLE[post.category] ?? "bg-surface-2 text-fg-2"}`}>
-                        {CATEGORY_LABEL[post.category] ?? post.category}
+                    <span className="flex flex-wrap items-center gap-1.5">
+                        <span className={`w-fit rounded-md px-1.5 py-0.5 text-xs font-bold ${CATEGORY_STYLE[post.category] ?? "bg-surface-2 text-fg-2"}`}>
+                            {CATEGORY_LABEL[post.category] ?? post.category}
+                            {inquiry && ` · ${INQUIRY_TYPE_LABEL[post.inquiryType] ?? "기타"}`}
+                        </span>
+                        {inquiry && <AnswerBadge answered={post.answered}/>}
+                        {inquiry && <span className="text-xs text-fg-3">비공개 · 작성자와 관리자만 볼 수 있어요</span>}
                     </span>
                     <h1 className="text-xl leading-snug font-extrabold tracking-[-0.01em] md:text-2xl">{post.title}</h1>
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
                         <Avatar src={post.profileImage} name={post.name} tier={post.tier} size="sm"/>
                         <span className="flex flex-col">
                             <span className="text-sm font-semibold">{post.name}</span>
-                            <span className="num text-xs text-fg-3">{fullTime(post.createdAt)} · 조회 {post.views}</span>
+                            <span className="num text-xs text-fg-3">
+                                {fullTime(post.createdAt)}
+                                {post.editedAt && <span title={`수정 ${fullTime(post.editedAt)}`}> · 수정됨</span>}
+                                {!inquiry && ` · 조회 ${post.views}`}
+                            </span>
                         </span>
                         {user?.id === post.userId && (
-                            <button type="button" onClick={remove} className="ml-auto rounded-lg px-2.5 py-1.5 text-[13px] font-semibold text-fg-3 hover:bg-surface-2 hover:text-up">
-                                삭제
-                            </button>
+                            <span className="ml-auto flex gap-1">
+                                {/* 답변이 달린 문의는 답변과 어긋나지 않게 고칠 수 없다 */}
+                                {!(inquiry && post.answered) && (
+                                    <Link to={`/community/${postId}/edit`} className="rounded-lg px-2.5 py-1.5 text-[13px] font-semibold text-fg-3 hover:bg-surface-2 hover:text-fg">
+                                        수정
+                                    </Link>
+                                )}
+                                <button type="button" onClick={remove} className="rounded-lg px-2.5 py-1.5 text-[13px] font-semibold text-fg-3 hover:bg-surface-2 hover:text-up">
+                                    삭제
+                                </button>
+                            </span>
                         )}
                     </div>
                 </header>
 
                 <RichContent html={post.content}/>
 
-                <div className="flex justify-center gap-2 pt-2">
+                {!inquiry && <div className="flex justify-center gap-2 pt-2">
                     <button type="button" onClick={() => react(true)} className="num flex h-11 items-center gap-1.5 rounded-full border border-line px-5 text-sm font-semibold hover:border-up hover:text-up">
                         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M7 10v11H3V10zM7 10l4-8a3 3 0 0 1 3 3v4h6a2 2 0 0 1 2 2.3l-1.4 8A2 2 0 0 1 18.6 21H7"/></svg>
                         좋아요 {post.likes}
@@ -96,13 +116,13 @@ export default function PostDetail() {
                         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="rotate-180" aria-hidden="true"><path d="M7 10v11H3V10zM7 10l4-8a3 3 0 0 1 3 3v4h6a2 2 0 0 1 2 2.3l-1.4 8A2 2 0 0 1 18.6 21H7"/></svg>
                         싫어요 {post.dislikes}
                     </button>
-                </div>
+                </div>}
 
-                {/* 글쓴이 티어 기록 */}
-                <div className="flex flex-wrap items-center gap-3 rounded-2xl bg-surface-2 p-4">
+                {/* 글쓴이 티어 기록 (문의는 제외) */}
+                {!inquiry && <div className="flex flex-wrap items-center gap-3 rounded-2xl bg-surface-2 p-4">
                     <Avatar src={post.profileImage} name={post.name} tier={post.tier} size="md" outline="text-surface-2"/>
-                    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                        <span className="text-sm font-semibold">{post.name}</span>
+                    <span className="flex min-w-[8rem] flex-1 flex-col gap-0.5">
+                        <span className="truncate text-sm font-semibold">{post.name}</span>
                         <span className="text-xs text-fg-3">
                             최고 티어{" "}
                             {post.highestTier ? <strong className={TIER_TEXT[post.highestTier]}>{TIER_NAMES[post.highestTier]}</strong> : "기록 없음"}
@@ -117,11 +137,11 @@ export default function PostDetail() {
                             ))}
                         </ul>
                     )}
-                </div>
+                </div>}
             </Card>
 
             <Card className="p-5 md:p-8">
-                <CommentSection postId={postId}/>
+                <CommentSection postId={postId} inquiry={inquiry}/>
             </Card>
         </div>
     );

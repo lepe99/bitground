@@ -1,11 +1,21 @@
 import {useEffect, useState} from 'react';
-import {fetchTickers} from '../api/upbitApi.js';
+import {subscribeTickers} from '../ticker/upbitSocket.js';
 
-const POLL_MS = 5000;
+// 시세 메시지는 초당 여러 건 오므로 모아 두었다가 이 간격으로 한 번에 반영한다
+const FLUSH_MS = 300;
+
+const toTicker = (t) => ({
+    price: t.trade_price,
+    changeRate: t.signed_change_rate * 100,
+    changePrice: t.signed_change_price,
+    volume: t.acc_trade_price_24h,
+});
 
 /**
- * 몇 개 종목의 현재가를 주기적으로 불러온다 (메인 화면처럼 종목이 적을 때용. 거래소는 TickerProvider의 WebSocket을 쓴다)
- * @returns {{[market]: {price, changeRate, changePrice, volume}}}
+ * 몇 개 종목의 실시간 현재가 (메인 화면처럼 종목이 적을 때용. 거래소·투자내역은 TickerProvider를 쓴다)
+ * 탭 공용 WebSocket으로 받는다. 업비트가 구독 직후 현재 시세를 먼저 보내므로 따로 REST로 채우지 않는다
+ * (브라우저의 업비트 REST 호출은 약 10초에 1회로 제한된다)
+ * @returns {{[market]: {price, changeRate(%), changePrice, volume}}}
  */
 export function useUpbitTickers(markets) {
     const [tickers, setTickers] = useState({});
@@ -13,29 +23,23 @@ export function useUpbitTickers(markets) {
 
     useEffect(() => {
         if (!key) return;
-        let alive = true;
-        const load = () =>
-            fetchTickers(key.split(','))
-                .then((list) => {
-                    if (!alive) return;
-                    const next = {};
-                    for (const t of list) {
-                        next[t.market] = {
-                            price: t.trade_price,
-                            changeRate: t.signed_change_rate * 100,
-                            changePrice: t.signed_change_price,
-                            volume: t.acc_trade_price_24h,
-                        };
-                    }
-                    setTickers(next);
-                })
-                .catch((error) => console.warn('업비트 시세 조회 실패:', error.message));
+        let pending = {};
 
-        void load();
-        const timer = setInterval(load, POLL_MS);
+        const unsubscribe = subscribeTickers(key.split(','), (tick) => {
+            pending[tick.code] = toTicker(tick);
+        });
+        const flush = () => {
+            if (!Object.keys(pending).length) return;
+            const batch = pending;
+            pending = {};
+            setTickers((prev) => ({...prev, ...batch}));
+        };
+        flush(); // 전에 받아 둔 시세는 바로 반영
+        const flushTimer = setInterval(flush, FLUSH_MS);
+
         return () => {
-            alive = false;
-            clearInterval(timer);
+            unsubscribe();
+            clearInterval(flushTimer);
         };
     }, [key]);
 

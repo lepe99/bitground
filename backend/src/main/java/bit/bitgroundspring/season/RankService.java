@@ -1,0 +1,60 @@
+package bit.bitgroundspring.season;
+
+import bit.bitgroundspring.common.Status;
+import bit.bitgroundspring.config.CacheConfig;
+import bit.bitgroundspring.season.dto.PastSeasonTierProjection;
+import bit.bitgroundspring.season.dto.RankDetailResponse;
+import bit.bitgroundspring.season.dto.RankEntry;
+import bit.bitgroundspring.user.User;
+import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+
+@Service
+@RequiredArgsConstructor
+public class RankService {
+
+    private final UserRankingRepository userRankingRepository;
+
+    /**
+     * 현 시즌 랭킹 조회 (매시 갱신 → 캐시. 스케줄러가 갱신을 알리면 비운다)
+     */
+    @Cacheable(cacheNames = CacheConfig.RANKINGS, key = "'current'")
+    public List<RankEntry> getCurrentRankings() {
+        return userRankingRepository.findCurrentSeasonRankings().stream().map(RankEntry::from).toList();
+    }
+
+    /**
+     * 특정 시즌 랭킹 조회
+     */
+    @Cacheable(cacheNames = CacheConfig.RANKINGS, key = "'season:' + #seasonId")
+    public List<RankEntry> getSeasonRankings(int seasonId) {
+        return userRankingRepository.findRankingsBySeasonId(seasonId).stream().map(RankEntry::from).toList();
+    }
+
+    /**
+     * 유저의 최고 티어, 참여한 최근 5시즌 기록(티어·순위·자산), 참여 시즌 수 조회
+     */
+    public RankDetailResponse getUserTierDetails(Integer userId) {
+        User user = User.builder().id(userId).build();
+
+        Integer highestTier = userRankingRepository.findHighestTierByUser(user);
+
+        List<PastSeasonTierProjection> pastSeasonTiers = userRankingRepository.findTop5CompletedSeasonsByUser(
+                user,
+                Status.COMPLETED,
+                PageRequest.of(0, 5)
+        );
+
+        long seasonCount = userRankingRepository.countSeasonsByUser(user, Status.COMPLETED);
+
+        return RankDetailResponse.builder()
+                .highestTier(highestTier != null ? highestTier : 0)
+                .pastSeasonTiers(pastSeasonTiers)
+                .seasonCount(seasonCount)
+                .build();
+    }
+}

@@ -1,12 +1,13 @@
 package bit.bitgroundspring.auth;
 
 import bit.bitgroundspring.common.error.ErrorCode;
-import bit.bitgroundspring.entity.Role;
-import bit.bitgroundspring.entity.User;
-import bit.bitgroundspring.repository.UserRepository;
 import bit.bitgroundspring.security.token.AuthTokenService;
 import bit.bitgroundspring.security.token.JwtTokenProvider;
 import bit.bitgroundspring.support.IntegrationTest;
+import bit.bitgroundspring.user.Role;
+import bit.bitgroundspring.user.User;
+import bit.bitgroundspring.user.UserRepository;
+import static bit.bitgroundspring.support.ProblemMatchers.problem;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -15,7 +16,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.mock.web.MockHttpServletResponse;
 
-import static bit.bitgroundspring.support.ProblemMatchers.problem;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;

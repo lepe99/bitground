@@ -1,20 +1,25 @@
 import api from './axiosConfig.js';
 
 // 게시글
-export const fetchPosts = async ({page, size, category, sort}) =>
-    (await api.get('/posts/list', {params: {page, size, category, sort}})).data;
+// answered: 문의 탭의 답변 완료(true)·대기(false). 비우면 전체
+export const fetchPosts = async ({page, size, category, sort, answered}) =>
+    (await api.get('/posts/list', {params: {page, size, category, sort, answered}})).data;
 
 export const fetchPost = async (postId) => (await api.get(`/posts/${postId}`)).data;
 
-export const createPost = async ({title, content, category}) =>
-    (await api.post('/posts/form', {title, content, category})).data;
+// inquiryType: 문의 글만 (BUG·ACCOUNT·SUGGESTION·ETC)
+export const createPost = async ({title, content, category, inquiryType}) =>
+    (await api.post('/posts/form', {title, content, category, inquiryType})).data;
+
+// 작성자 본인만. 문의와 일반 글은 서로 바꿀 수 없고, 답변이 달린 문의는 고칠 수 없다
+export const updatePost = ({postId, title, content, category, inquiryType}) =>
+    api.put(`/posts/${postId}`, {title, content, category, inquiryType});
 
 export const deletePost = (postId) => api.delete(`/posts/${postId}`);
 
 // 댓글
 export const fetchComments = async (postId) => (await api.get(`/comments/post/${postId}`)).data;
 
-export const fetchCommentCount = async (postId) => (await api.get(`/comments/post/${postId}/count`)).data;
 
 export const createComment = ({postId, content, parentId = null}) =>
     api.post('/comments', {postId, content, parentId});

@@ -21,10 +21,12 @@ export const AuthProvider = ({children}) => {
                 setUser(me);
                 setIsLoggedIn(true);
             }
+            return me;
         } catch (error) {
             console.warn('Not authenticated or error fetching user info:', error.response?.data?.detail || error.message);
             setUser(null);
             setIsLoggedIn(false);
+            return null;
             // 401이 아닌 다른 네트워크 오류일 수도 있으므로, 무조건 로그아웃 시키기보다는 상태만 업데이트
         } finally {
             checkedRef.current = true;
@@ -41,36 +43,38 @@ export const AuthProvider = ({children}) => {
     }, []);
 
 
-    const logout = useCallback(async () => {
+    // 서버 세션(쿠키)을 지우고 첫 화면으로. 여러 곳에서 동시에 불려도 한 번만 처리한다
+    const loggingOutRef = useRef(false);
+    const endSession = useCallback(async ({silent}) => {
+        if (loggingOutRef.current) return;
+        loggingOutRef.current = true;
         try {
             await logoutRequest();
         } catch (error) {
-            alert("로그아웃 중 오류가 발생했습니다. 다시 시도해주세요.");
             console.error('Logout failed:', error);
-            // 실패하더라도 프론트엔드 상태는 로그아웃 처리
+            // 사용자가 누른 로그아웃이 실패하면 알린다 (세션 만료로 인한 자동 로그아웃은 이미 끝난 세션이라 알리지 않는다)
+            if (!silent) alert("로그아웃 중 오류가 발생했습니다. 다시 시도해주세요.");
         } finally {
             setUser(null);
             setIsLoggedIn(false);
             // 쿠키는 백엔드에서 HttpOnly로 제거하므로 프론트에서 할 일 없음
-
-            // 필요시 로그인 페이지로 리디렉션
             window.location.href = '/?logout=true';
         }
     }, []);
 
+    const logout = useCallback(() => endSession({silent: false}), [endSession]);
+
     useEffect(() => {
-        // Axios 인터셉터에서 발생하는 강제 로그아웃 이벤트 리스너 (선택적 고급 처리)
+        // 리프레시 토큰이 만료·폐기되어 재발급이 거절되면 axios 인터셉터가 보내는 이벤트
         const handleForceLogout = () => {
             if (!isLoggedIn) return;
-            console.log("Force logout event received");
-            void logout();
+            void endSession({silent: true});
         };
         window.addEventListener('forceLogout', handleForceLogout);
         return () => {
             window.removeEventListener('forceLogout', handleForceLogout);
         };
-
-    }, [isLoggedIn, logout]);
+    }, [isLoggedIn, endSession]);
 
 
     const value = {

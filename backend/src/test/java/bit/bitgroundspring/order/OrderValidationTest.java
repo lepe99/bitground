@@ -1,12 +1,15 @@
 package bit.bitgroundspring.order;
 
+import bit.bitgroundspring.common.Status;
 import bit.bitgroundspring.common.error.ErrorCode;
-import bit.bitgroundspring.entity.*;
-import bit.bitgroundspring.repository.OrderRepository;
-import bit.bitgroundspring.repository.UserAssetRepository;
-import bit.bitgroundspring.repository.UserRepository;
-import bit.bitgroundspring.service.OrderExecutionService;
+import bit.bitgroundspring.market.Coin;
+import bit.bitgroundspring.market.CoinRepository;
+import bit.bitgroundspring.notification.NotificationRepository;
+import bit.bitgroundspring.season.Season;
 import bit.bitgroundspring.support.IntegrationTest;
+import bit.bitgroundspring.user.User;
+import bit.bitgroundspring.user.UserRepository;
+import static bit.bitgroundspring.support.ProblemMatchers.problem;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -25,7 +28,6 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 
-import static bit.bitgroundspring.support.ProblemMatchers.problem;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
 import static org.mockito.ArgumentMatchers.*;
@@ -48,6 +50,10 @@ class OrderValidationTest extends IntegrationTest {
     UserAssetRepository userAssetRepository;
     @Autowired
     OrderRepository orderRepository;
+    @Autowired
+    CoinRepository coinRepository;
+    @Autowired
+    NotificationRepository notificationRepository;
     @Autowired
     OrderExecutionService orderExecutionService;
     @Autowired
@@ -91,6 +97,33 @@ class OrderValidationTest extends IntegrationTest {
     @Nested
     @DisplayName("시장가 주문")
     class MarketOrder {
+
+        @Test
+        void 지정가를_붙인_시장가_주문은_거부된다_시세보다_싸게_즉시_체결되지_않게() throws Exception {
+            // 기존: 시세와 0.5% 안쪽 차이면 그 가격으로 즉시 체결돼 싸게 사고 비싸게 팔기를 반복할 수 있었다
+            marketOrder("{\"symbol\":\"KRW-BTC\",\"orderType\":\"BUY\",\"totalPrice\":1000000,\"reservePrice\":%s}".formatted(PRICE * 0.996))
+                    .andExpect(problem(ErrorCode.INVALID_ORDER));
+            marketOrder("{\"symbol\":\"KRW-BTC\",\"orderType\":\"BUY\",\"totalPrice\":1000000}")
+                    .andExpect(status().isCreated());
+            marketOrder("{\"symbol\":\"KRW-BTC\",\"orderType\":\"SELL\",\"amount\":0.001,\"reservePrice\":%s}".formatted(PRICE * 1.004))
+                    .andExpect(problem(ErrorCode.INVALID_ORDER));
+            assertThat(orderRepository.findAll()).hasSize(1)
+                    .allSatisfy(o -> assertThat(o.getTradePrice()).isEqualByComparingTo(String.valueOf(PRICE)));
+        }
+
+        @Test
+        void 상장_폐지된_코인은_시장가로_사지도_팔지도_못한다() throws Exception {
+            fixtures.asset(user, btc, 0.01, PRICE);
+            btc.setIsDeleted(true);
+            coinRepository.save(btc);
+
+            marketOrder("{\"symbol\":\"KRW-BTC\",\"orderType\":\"BUY\",\"totalPrice\":100000}")
+                    .andExpect(problem(ErrorCode.COIN_DELISTED));
+            marketOrder("{\"symbol\":\"KRW-BTC\",\"orderType\":\"SELL\",\"amount\":0.001}")
+                    .andExpect(problem(ErrorCode.COIN_DELISTED));
+            assertThat(cash()).isEqualTo(CASH);
+            assertThat(orderRepository.findAll()).isEmpty();
+        }
 
         @Test
         void 음수_금액_매수는_거부되고_현금이_늘지_않는다() throws Exception {
@@ -192,12 +225,16 @@ class OrderValidationTest extends IntegrationTest {
         }
 
         @Test
-        void 현금이_부족해진_예약_매수는_취소된다() {
+        void 현금이_부족해진_예약_매수는_취소되고_사용자에게_알린다() {
             Order order = pendingOrder(OrderType.BUY, 1.0); // 1억 원 필요
             execute(order);
 
             assertThat(orderRepository.findById(order.getId())).isEmpty();
             assertThat(cash()).isEqualTo(CASH);
+            // 앞 테스트의 비동기 이벤트 처리가 남긴 알림이 섞일 수 있어 이 사용자 것만 본다
+            assertThat(notificationRepository.findAll()).filteredOn(n -> n.getUser().getId().equals(user.getId()))
+                    .singleElement()
+                    .satisfies(n -> assertThat(n.getMessage()).startsWith("잔액이 부족해 예약 매수 주문이 취소됐어요."));
         }
 
         @Test

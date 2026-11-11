@@ -7,6 +7,7 @@ import Hero from "../components/main/Hero.jsx";
 import MySummary from "../components/main/MySummary.jsx";
 import LivePrices from "../components/main/LivePrices.jsx";
 import MarketIndexCard from "../components/main/MarketIndexCard.jsx";
+import SeasonSchedule from "../components/season/SeasonSchedule.jsx";
 import TopCoins from "../components/main/TopCoins.jsx";
 import SeasonRankingPreview from "../components/main/SeasonRankingPreview.jsx";
 
@@ -45,7 +46,9 @@ export default function Main() {
                 </div>
             </section>
 
-            <section className="grid gap-4 md:grid-cols-[repeat(auto-fit,minmax(300px,1fr))] md:gap-5">
+            <SeasonSchedule/>
+
+            <section className="grid grid-cols-[minmax(0,1fr)] gap-4 md:grid-cols-[repeat(auto-fit,minmax(300px,1fr))] md:gap-5">
                 <MarketIndexCard/>
                 <TopCoins/>
                 <SeasonRankingPreview ranking={ranking}/>

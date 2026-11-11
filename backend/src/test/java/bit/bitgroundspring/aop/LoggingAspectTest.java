@@ -1,6 +1,9 @@
 package bit.bitgroundspring.aop;
 
+import bit.bitgroundspring.common.error.BusinessException;
+import bit.bitgroundspring.common.error.ErrorCode;
 import org.junit.jupiter.api.BeforeEach;
+import org.slf4j.event.Level;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -60,5 +63,12 @@ class LoggingAspectTest {
             }
         };
         assertThat(aspect.formatValue(broken)).isNotBlank();
+    }
+
+    @Test
+    void 예상된_클라이언트_실패는_INFO_서버_쪽_실패는_WARN으로_남긴다() {
+        assertThat(LoggingAspect.failureLevel(new BusinessException(ErrorCode.REFRESH_TOKEN_MISSING))).isEqualTo(Level.INFO);
+        assertThat(LoggingAspect.failureLevel(new BusinessException(ErrorCode.INSUFFICIENT_CASH))).isEqualTo(Level.INFO);
+        assertThat(LoggingAspect.failureLevel(new BusinessException(ErrorCode.EXTERNAL_API_ERROR))).isEqualTo(Level.WARN);
     }
 }

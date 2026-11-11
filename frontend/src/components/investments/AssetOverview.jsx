@@ -47,7 +47,7 @@ export default function AssetOverview({portfolio, availableCash, reserved}) {
             <div className="flex min-w-0 flex-col gap-4 md:flex-[1_1_380px]">
                 <div className="flex flex-col gap-1">
                     <span className="text-[13px] text-fg-3">총 보유자산</span>
-                    <span className="num text-[30px] font-extrabold tracking-[-0.02em] md:text-[32px]">
+                    <span className="num text-[clamp(22px,8vw,30px)] font-extrabold tracking-[-0.02em] [overflow-wrap:anywhere] md:text-[32px]">
                         {formatKRW(portfolio.total)} <span className="text-base font-semibold text-fg-3">KRW</span>
                     </span>
                     <span className={`num text-sm font-semibold ${changeColor(Math.round(portfolio.pnl))}`}>
@@ -56,9 +56,9 @@ export default function AssetOverview({portfolio, availableCash, reserved}) {
                 </div>
                 <dl className="grid grid-cols-2 gap-x-6 gap-y-3.5 border-t border-line pt-4 sm:grid-cols-3">
                     {summary.map(([label, value, tone]) => (
-                        <div key={label} className="flex flex-col gap-0.5">
+                        <div key={label} className="flex min-w-0 flex-col gap-0.5">
                             <dt className="text-xs text-fg-3">{label}</dt>
-                            <dd className={`num text-[15px] font-semibold ${tone ?? ''}`}>{value}</dd>
+                            <dd className={`num text-[15px] font-semibold [overflow-wrap:anywhere] ${tone ?? ''}`}>{value}</dd>
                         </div>
                     ))}
                 </dl>

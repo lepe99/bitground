@@ -1,0 +1,51 @@
+package bit.bitgroundspring.community;
+
+import bit.bitgroundspring.common.response.IdResponse;
+import bit.bitgroundspring.common.response.PageResponse;
+import bit.bitgroundspring.community.dto.NoticeRequestDto;
+import bit.bitgroundspring.community.dto.NoticeResponseDto;
+import bit.bitgroundspring.security.token.AuthUser;
+import jakarta.validation.Valid;
+import java.net.URI;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.*;
+
+
+@RestController
+@RequestMapping("/notices")
+@RequiredArgsConstructor
+public class NoticeController {
+    private final NoticeService noticeService;
+
+    @PostMapping
+    public ResponseEntity<IdResponse> create(@AuthenticationPrincipal AuthUser authUser,
+                                             @Valid @RequestBody NoticeRequestDto dto) {
+        Notice saved = noticeService.createNotice(authUser.id(), dto);
+        return ResponseEntity.created(URI.create("/notices/" + saved.getId())).body(new IdResponse(saved.getId()));
+    }
+
+    @GetMapping
+    public PageResponse<NoticeResponseDto> getNotices(
+            @RequestParam(defaultValue = "") String keyword,
+            @PageableDefault(size = 10) Pageable pageable
+    ) {
+        return PageResponse.of(noticeService.searchNotices(keyword, pageable));
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<Void> updateNotice(@AuthenticationPrincipal AuthUser authUser, @PathVariable Integer id,
+                                             @Valid @RequestBody NoticeRequestDto dto) {
+        noticeService.updateNotice(authUser.id(), id, dto);
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteNotice(@AuthenticationPrincipal AuthUser authUser, @PathVariable Integer id) {
+        noticeService.deleteNotice(authUser.id(), id);
+        return ResponseEntity.noContent().build();
+    }
+}

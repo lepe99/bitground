@@ -78,11 +78,12 @@ spring:
       pool:
         size: 3  # 스케줄링 스레드 개수
 
-  # 캐시 설정
+  # 조회 결과 캐시 (Redis). 캐시별 TTL·직렬화는 CacheConfig
   cache:
     type: redis
     redis:
-      time-to-live: 600000ms # 10분
+      time-to-live: 10m # CacheConfig에 없는 캐시의 기본값
+      enable-statistics: true # 적중·누락 지표 (cache_gets_total{result="hit|miss"})
 
   # 업로드 크기 제한 (이미지 5MB)
   servlet:
@@ -127,7 +128,9 @@ spring:
           kakao:
             authorization-uri: https://kauth.kakao.com/oauth/authorize
             token-uri: https://kauth.kakao.com/oauth/token
-            user-info-uri: https://kapi.kakao.com/v2/user/me
+            # OIDC 표준 userinfo (https://kauth.kakao.com/.well-known/openid-configuration). /v2/user/me는 카카오 고유 형식이라 sub가 없다
+            user-info-uri: https://kapi.kakao.com/v1/oidc/userinfo
+            user-name-attribute: sub
             jwk-set-uri: https://kauth.kakao.com/.well-known/jwks.json
             issuer-uri: https://kauth.kakao.com
 
@@ -195,6 +198,11 @@ management:
     metrics:
       export:
         enabled: true
+  metrics:
+    distribution:
+      # 응답 시간 p95·p99를 Grafana에서 구하기 위한 구간별 개수 (histogram_quantile)
+      percentiles-histogram:
+        http.server.requests: true
 
 # logging 설정 (파일 대신 표준 출력으로 남긴다)
 # - 모든 로그에 [traceId,userId] 를 붙인다 (TraceIdFilter, JwtAuthenticationFilter가 MDC에 기록)
@@ -216,15 +224,15 @@ logging:
 
 gemini:
   api-key: ${GEMINI_API_KEY:}
-  model-name: ${GEMINI_MODEL:gemini-2.5-flash}
-
-# dev: 6시간 주기 시즌/스플릿, prod: 월 2회 시즌
-scheduler:
-  setting: ${SCHEDULER_SETTING:dev}
+  model-name: ${GEMINI_MODEL:gemini-3.5-flash-lite}
+  # AI 시즌 리뷰 프롬프트 버전 (resources/prompts/{버전}/). 새 버전을 만들면 여기만 바꾸고, 문제가 있으면 되돌린다
+  season-review:
+    prompt-version: ${GEMINI_SEASON_REVIEW_PROMPT:season-review-v2}
 
 upbit:
   api:
     ticker-url: https://api.upbit.com/v1/ticker?markets={symbol}
+    hourly-candles-url: https://api.upbit.com/v1/candles/minutes/60?market={symbol}&count={count}
   websocket:
     ticker-url: wss://api.upbit.com/websocket/v1
     connection-timeout: 10000
@@ -233,7 +241,19 @@ upbit:
       max-delay: 60000
   order:
     execution:
-      queue: order-execution-queue
+      # 체결 요청 스트림 (Redis Stream). 구독 그룹으로 읽고 체결 커밋 뒤 확인(ack)
+      stream: order-execution-stream
+      group: order-executors
+
+# 이벤트 스트림 (Redis Stream)
+events:
+  # 도메인 이벤트: 아웃박스 → 구독 그룹으로 서버 중 한 곳이 처리 (체결 알림 저장 등)
+  domain:
+    stream: events-domain
+    group: event-handlers
+  # 실시간 전송: 모든 서버가 전부 읽고 자기에게 연결된 사용자에게 보냄 (SSE·WebSocket)
+  realtime:
+    stream: events-realtime
 
 # 스케줄러(Go)가 시즌 갱신 알림을 보낼 때 쓰는 공유 키
 season:

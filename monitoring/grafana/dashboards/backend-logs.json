@@ -84,7 +84,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "{app=\"bitground-backend\", level=\"WARN\"} |~ \"SLOW|FAILED code=\" | json | line_format \"{{.message}}\""
+          "expr": "{app=\"bitground-backend\", level=~\"WARN|INFO\"} |~ \"SLOW|FAILED code=\" | json | line_format \"{{.message}}\""
         }
       ],
       "options": {

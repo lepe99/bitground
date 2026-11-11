@@ -5,7 +5,7 @@ plugins {
 }
 
 group = 'com.example'
-version = '0.0.1-SNAPSHOT'
+version = '2.0.0'
 
 java {
     toolchain {
@@ -74,7 +74,35 @@ dependencies {
 }
 
 tasks.named('test') {
-    useJUnitPlatform()
+    // AI 평가셋(@Tag("eval"))은 실제 Gemini를 부르므로 일반 테스트에서 뺀다 → ./gradlew aiEval
+    useJUnitPlatform {
+        excludeTags 'eval'
+    }
     // Docker Engine 29+는 API 1.40 미만을 거부하므로 Testcontainers(docker-java)가 쓸 API 버전을 명시
     systemProperty 'api.version', '1.44'
+    // 운영(docker-entrypoint.sh)과 같은 시간대. 앱은 KST LocalDateTime을 전제로 하므로,
+    // UTC인 CI 러너에서 JDBC·JPA가 같은 시각을 서로 다르게 변환해 9시간 어긋나던 문제
+    systemProperty 'user.timezone', 'Asia/Seoul'
+}
+
+// AI 평가셋 실행: ./gradlew aiEval [-PevalRuns=3] [-PevalDelayMs=4000] [-PpromptVersion=season-review-v2]
+// 고정 입력(src/test/resources/eval)을 실제 Gemini로 돌려 build/reports/ai-eval에 보고서를 남긴다 (GEMINI_API_KEY 필요, backend/.env도 읽음)
+tasks.register('aiEval', Test) {
+    description = 'AI 시즌 리뷰 평가셋을 실제 Gemini로 실행'
+    group = 'verification'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    useJUnitPlatform {
+        includeTags 'eval'
+    }
+    outputs.upToDateWhen { false }
+    systemProperty 'eval.runs', findProperty('evalRuns') ?: '2'
+    // 호출 사이 간격(ms). 요청 한도(429)에 걸리지 않게
+    systemProperty 'eval.delayMs', findProperty('evalDelayMs') ?: '4000'
+    // 비교할 프롬프트 버전 (resources/prompts/{버전}/). 없으면 운영 기본값
+    if (findProperty('promptVersion')) systemProperty 'eval.promptVersion', findProperty('promptVersion')
+    testLogging {
+        events 'passed', 'failed'
+        showStandardStreams = true
+    }
 }

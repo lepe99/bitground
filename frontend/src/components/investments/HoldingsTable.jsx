@@ -35,7 +35,7 @@ export default function HoldingsTable({rows}) {
                                     <span className="flex min-w-0 flex-col">
                                         <span className="truncate text-[15px] font-semibold md:text-sm">{r.name}</span>
                                         <span className="text-xs text-fg-3">
-                                            <span className="md:hidden">{formatAmount(r.amount)} {ticker} · 평균 {formatPrice(r.avgPrice)}원</span>
+                                            <span className="md:hidden"><span className="whitespace-nowrap">{formatAmount(r.amount)} {ticker}</span> · <span className="whitespace-nowrap">평균 {formatPrice(r.avgPrice)}원</span></span>
                                             <span className="max-md:hidden">{ticker}</span>
                                         </span>
                                     </span>

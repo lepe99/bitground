@@ -1,0 +1,38 @@
+{
+  "responseSchema": {
+    "type": "OBJECT",
+    "properties": {
+      "summary": {
+        "type": "STRING"
+      },
+      "drivers": {
+        "type": "ARRAY",
+        "items": {
+          "type": "STRING"
+        }
+      },
+      "risks": {
+        "type": "ARRAY",
+        "items": {
+          "type": "STRING"
+        }
+      },
+      "sources": {
+        "type": "ARRAY",
+        "items": {
+          "type": "STRING"
+        }
+      },
+      "background": {
+        "type": "STRING"
+      }
+    },
+    "required": [
+      "summary",
+      "drivers",
+      "risks",
+      "sources",
+      "background"
+    ]
+  }
+}

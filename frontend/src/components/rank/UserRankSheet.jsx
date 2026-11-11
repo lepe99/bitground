@@ -1,35 +1,13 @@
-import {useEffect, useState} from 'react';
 import Sheet from '../ui/Sheet.jsx';
 import Avatar from '../ui/Avatar.jsx';
 import TierBadge from '../ui/TierBadge.jsx';
-import {fetchUserRankDetail} from '../../api/rankApi.js';
+import {useRankDetail} from './useRankDetail.js';
 import {TIER_NAMES, TIER_TEXT} from '../../constants/tiers.js';
 import {formatKRW} from '../../utils/format.js';
 
-// 같은 사용자를 다시 열면 서버에 다시 묻지 않는다
-const cache = new Map();
-
-/** 순위표에서 누른 참가자: 최고 티어와 지난 시즌 티어 */
+/** 순위표에서 누른 참가자: 최고 티어와 지난 시즌 티어 (호버가 없는 터치 화면용) */
 export default function UserRankSheet({user, onClose}) {
-    const [detail, setDetail] = useState(null);
-
-    useEffect(() => {
-        if (!user) return;
-        if (cache.has(user.userId)) {
-            setDetail(cache.get(user.userId));
-            return;
-        }
-        setDetail(null);
-        fetchUserRankDetail(user.userId)
-            .then((d) => {
-                cache.set(user.userId, d);
-                setDetail(d);
-            })
-            .catch((error) => {
-                console.error('참가자 정보 조회 실패:', error);
-                setDetail({highestTier: null, pastSeasonTiers: []});
-            });
-    }, [user]);
+    const detail = useRankDetail(user?.userId);
 
     return (
         <Sheet open={user != null} onClose={onClose} title="참가자 정보">

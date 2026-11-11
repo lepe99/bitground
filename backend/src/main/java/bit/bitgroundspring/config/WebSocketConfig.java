@@ -1,6 +1,6 @@
 package bit.bitgroundspring.config;
 
-import bit.bitgroundspring.handler.OrderHistoryWebSocketHandler;
+import bit.bitgroundspring.order.OrderHistoryWebSocketHandler;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.socket.config.annotation.EnableWebSocket;

@@ -2,7 +2,9 @@ import {useEffect, useState} from "react";
 import {useAuth} from "../auth/useAuth.js";
 import {fetchCurrentRanking, fetchSeasonRanking} from "../api/rankApi.js";
 import {fetchSeasons} from "../api/seasonApi.js";
+import {useMediaQuery} from "../hooks/useMediaQuery.js";
 import SegmentedTabs from "../components/ui/SegmentedTabs.jsx";
+import SeasonSchedule from "../components/season/SeasonSchedule.jsx";
 import RankPodium from "../components/rank/RankPodium.jsx";
 import RankTable from "../components/rank/RankTable.jsx";
 import MyPosition from "../components/rank/MyPosition.jsx";
@@ -29,10 +31,13 @@ export default function Rank() {
     const {user} = useAuth();
     const [view, setView] = useState("current");
     const [current, setCurrent] = useState(null); // null: 불러오는 중
-    const [seasons, setSeasons] = useState([]);   // 지난(완료) 시즌
+    const [seasons, setSeasons] = useState(null); // 지난(완료) 시즌. null: 불러오는 중
     const [pastId, setPastId] = useState(null);
     const [past, setPast] = useState({});         // seasonId → rankings
     const [selected, setSelected] = useState(null);
+    // 마우스가 있으면 사진에 올려 티어 이력을 보고, 터치 화면은 눌러서 시트로 본다
+    const canHover = useMediaQuery("(hover: hover) and (pointer: fine)");
+    const onSelect = canHover ? undefined : setSelected;
     const [now, setNow] = useState(() => Date.now());
 
     useEffect(() => {
@@ -48,7 +53,10 @@ export default function Rank() {
                 setSeasons(done);
                 setPastId(done[0]?.id ?? null);
             })
-            .catch((error) => console.error("시즌 목록 조회 실패:", error));
+            .catch((error) => {
+                console.error("시즌 목록 조회 실패:", error);
+                setSeasons([]);
+            });
         const timer = setInterval(() => setNow(Date.now()), 30_000);
         return () => clearInterval(timer);
     }, []);
@@ -63,7 +71,7 @@ export default function Rank() {
     const rankings = view === "current" ? current : past[pastId] ?? null;
     const rows = [...(rankings ?? [])].sort((a, b) => a.ranks - b.ranks);
     const me = current?.find((r) => r.userId === user?.id);
-    const season = view === "current" ? current?.[0]?.seasonName ?? "이번 시즌" : seasons.find((s) => s.id === pastId)?.name;
+    const season = view === "current" ? current?.[0]?.seasonName ?? "이번 시즌" : seasons?.find((s) => s.id === pastId)?.name ?? "지난 시즌";
 
     return (
         <div className="mx-auto flex max-w-[1280px] flex-col gap-4 px-5 pt-4 pb-10 md:gap-6 md:px-8 md:pt-8 md:pb-14">
@@ -78,7 +86,7 @@ export default function Rank() {
                 </div>
                 <div className="flex w-full flex-wrap items-center gap-2 md:w-auto">
                     <SegmentedTabs label="시즌 선택" items={VIEWS} value={view} onChange={setView} fill className="flex-1 md:flex-none"/>
-                    {view === "past" && seasons.length > 0 && (
+                    {view === "past" && seasons?.length > 0 && (
                         <select
                             aria-label="지난 시즌"
                             value={pastId ?? ""}
@@ -91,20 +99,22 @@ export default function Rank() {
                 </div>
             </section>
 
+            {view === "current" && <SeasonSchedule/>}
+
             {/* 모바일: 내 위치를 맨 위에 */}
             {view === "current" && current && <div className="md:hidden"><MyPosition me={me} rankings={current}/></div>}
 
-            {rankings === null ? (
-                <p className="py-16 text-center text-sm text-fg-3">불러오는 중…</p>
-            ) : view === "past" && seasons.length === 0 ? (
+            {view === "past" && seasons?.length === 0 ? (
                 <p className="py-16 text-center text-sm text-fg-3">아직 끝난 시즌이 없어요.</p>
+            ) : rankings === null ? (
+                <p className="py-16 text-center text-sm text-fg-3">불러오는 중…</p>
             ) : rows.length === 0 ? (
                 <p className="py-16 text-center text-sm text-fg-3">아직 순위에 오른 참가자가 없어요.</p>
             ) : (
                 <>
-                    <RankPodium top={rows.slice(0, 3)} onSelect={setSelected}/>
+                    <RankPodium top={rows.slice(0, 3)} myUserId={user?.id} onSelect={onSelect} participants={rows.length}/>
                     <section className="grid items-start gap-4 md:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)] md:gap-5">
-                        <RankTable rows={rows.slice(3)} myUserId={view === "current" ? user?.id : null} onSelect={setSelected}/>
+                        <RankTable rows={rows.slice(3)} myUserId={user?.id} onSelect={onSelect} participants={rows.length}/>
                         <aside className="flex flex-col gap-4 md:gap-5">
                             {view === "current" && <div className="max-md:hidden"><MyPosition me={me} rankings={current}/></div>}
                             <TierGuide myTier={me?.tier}/>

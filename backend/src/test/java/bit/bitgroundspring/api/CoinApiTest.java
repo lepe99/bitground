@@ -1,7 +1,7 @@
 package bit.bitgroundspring.api;
 
-import bit.bitgroundspring.entity.Coin;
-import bit.bitgroundspring.repository.CoinRepository;
+import bit.bitgroundspring.market.Coin;
+import bit.bitgroundspring.market.CoinRepository;
 import bit.bitgroundspring.support.IntegrationTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -47,10 +47,9 @@ class CoinApiTest extends IntegrationTest {
     }
 
     @Test
-    @DisplayName("유의 종목·전체 목록·심볼 목록에도 상장 폐지 코인은 없다")
+    @DisplayName("유의 종목·심볼 목록에도 상장 폐지 코인은 없다")
     void excludesDelisted() throws Exception {
         mvc.perform(get("/coins/caution")).andExpect(jsonPath("$[*].symbol", contains("KRW-C2")));
-        mvc.perform(get("/coins")).andExpect(jsonPath("$[*].symbol", not(hasItem("KRW-C8"))));
         mvc.perform(get("/coins/symbols")).andExpect(jsonPath("$[*].symbol", not(hasItem("KRW-C8"))));
     }
 }

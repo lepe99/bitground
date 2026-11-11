@@ -1,6 +1,6 @@
 package bit.bitgroundspring.security.token;
 
-import bit.bitgroundspring.entity.User;
+import bit.bitgroundspring.user.User;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
 import jakarta.annotation.PostConstruct;

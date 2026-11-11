@@ -13,7 +13,7 @@ export default function BottomNav() {
     return (
         <nav
             aria-label="하단 메뉴"
-            className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-line bg-surface pb-[max(8px,env(safe-area-inset-bottom))] md:hidden"
+            className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-line bg-surface pb-[env(safe-area-inset-bottom)] md:hidden"
         >
             {TABS.map((tab) => (
                 <NavLink
@@ -21,7 +21,7 @@ export default function BottomNav() {
                     to={tab.to}
                     end={tab.end}
                     className={({isActive}) =>
-                        `flex h-16 flex-col items-center justify-center gap-1 text-[11px] ${isActive ? "font-bold text-fg" : "font-medium text-fg-3"}`
+                        `flex h-14 flex-col items-center justify-center gap-1 text-[11px] ${isActive ? "font-bold text-fg" : "font-medium text-fg-3"}`
                     }
                 >
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

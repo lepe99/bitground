@@ -1,0 +1,26 @@
+# Grafana (모니터링 서버, 프라이빗 서브넷). 인터넷에는 이 앱 서버의 Nginx만 노출된다
+# 기본 인증으로 한 겹 더 막아 봇·무차별 대입이 Grafana 로그인 화면까지 오지 못하게 한다
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name ${GRAFANA_DOMAIN};
+
+    ssl_certificate     /etc/letsencrypt/live/${GRAFANA_DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${GRAFANA_DOMAIN}/privkey.pem;
+
+    auth_basic           "Bitground monitoring";
+    auth_basic_user_file /etc/nginx/grafana.htpasswd;
+
+    location / {
+        proxy_pass http://${MONITORING_HOST}:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        # 기본 인증 헤더를 넘기면 Grafana가 자기 계정 정보로 해석해 401을 낸다
+        proxy_set_header Authorization "";
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto https;
+        # Grafana Live(WebSocket)
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
+    }
+}

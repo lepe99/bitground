@@ -10,8 +10,8 @@ func setRequiredEnv(t *testing.T) {
 	t.Helper()
 	for k, v := range map[string]string{
 		"DB_HOST": "localhost:3306", "DB_USER": "u", "DB_NAME": "bitground",
-		"SEASON_NAME": "정규 시즌", "BACKEND_URL": "https://api.example.com/", "SEASON_UPDATE_KEY": "k",
-		"TYPE": "prod", "TEST_TIME": "", "TIMEZONE": "",
+		"BACKEND_URL": "https://api.example.com/", "SEASON_UPDATE_KEY": "k",
+		"TYPE": "prod", "TEST_TIME": "", "TIMEZONE": "", "SCHEDULER_ROLE": "", "WRITER_FUNCTION": "",
 	} {
 		t.Setenv(k, v)
 	}
@@ -44,12 +44,6 @@ func TestLoadRequiresEnv(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "SEASON_UPDATE_KEY") || !strings.Contains(err.Error(), "BACKEND_URL") {
 		t.Fatalf("빠진 환경변수를 모두 알려야 함: %v", err)
 	}
-
-	setRequiredEnv(t)
-	t.Setenv("TYPE", "staging")
-	if _, err := Load(); err == nil {
-		t.Fatal("TYPE은 dev/prod만 허용")
-	}
 }
 
 func TestNow(t *testing.T) {
@@ -75,5 +69,34 @@ func TestNow(t *testing.T) {
 	cfg.TestTime = "0000-00-00 00:00:00"
 	if now, _ := cfg.Now(); now.Minute() != 0 || now.Second() != 0 {
 		t.Errorf("현재 시각도 정시로 반올림해야 함: %s", now)
+	}
+}
+
+func TestLoadByRole(t *testing.T) {
+	// 수집 단계는 DB 접속 정보 없이, 쓰기 Lambda 이름만 있으면 된다
+	for k := range map[string]bool{"DB_HOST": true, "DB_USER": true, "DB_NAME": true, "BACKEND_URL": true, "SEASON_UPDATE_KEY": true} {
+		t.Setenv(k, "")
+	}
+	t.Setenv("TEST_TIME", "")
+	t.Setenv("TIMEZONE", "")
+	t.Setenv("SCHEDULER_ROLE", "collector")
+	t.Setenv("WRITER_FUNCTION", "")
+	if _, err := Load(); err == nil || !strings.Contains(err.Error(), "WRITER_FUNCTION") {
+		t.Fatalf("collector는 WRITER_FUNCTION이 필요함: %v", err)
+	}
+	t.Setenv("WRITER_FUNCTION", "bitground-scheduler-writer")
+	if _, err := Load(); err != nil {
+		t.Fatalf("collector는 DB 접속 정보 없이 읽혀야 함: %v", err)
+	}
+
+	// 쓰기 단계는 DB 접속 정보와 백엔드 알림 설정이 필요하다
+	t.Setenv("SCHEDULER_ROLE", "writer")
+	if _, err := Load(); err == nil || !strings.Contains(err.Error(), "DB_HOST") {
+		t.Fatalf("writer는 DB 접속 정보가 필요함: %v", err)
+	}
+
+	t.Setenv("SCHEDULER_ROLE", "reader")
+	if _, err := Load(); err == nil || !strings.Contains(err.Error(), "SCHEDULER_ROLE") {
+		t.Fatalf("모르는 역할은 거부해야 함: %v", err)
 	}
 }

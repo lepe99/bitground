@@ -1,0 +1,36 @@
+# API 서버 (프론트는 CloudFront + S3라 여기서 서빙하지 않는다)
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name ${API_DOMAIN};
+
+    ssl_certificate     /etc/letsencrypt/live/${API_DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${API_DOMAIN}/privkey.pem;
+
+    # 백엔드 업로드 상한(요청 6MB)보다 조금 크게. 기본값 1MB면 이미지 업로드가 413으로 막힌다
+    client_max_body_size 8m;
+
+    # 외부 가동 상태 확인(UptimeRobot 등)용. 백엔드가 DB·Redis까지 받을 준비가 됐는지 본다 (상세 내용은 응답하지 않음)
+    location = /healthz {
+        proxy_pass http://backend:8091/actuator/health/readiness;
+    }
+
+    # REST API, WebSocket(/ws/**), SSE(/notifications/subscribe)
+    location / {
+        proxy_pass http://backend:8090;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        # 받은 X-Forwarded-For를 이어 붙이지 않고 실제 접속 IP로 덮어쓴다 (백엔드의 IP별 요청 제한을 헤더 위조로 피할 수 없게)
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-Port 443;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
+        # SSE는 버퍼링하면 이벤트가 쌓였다가 늦게 나간다. 오래 열려 있는 WebSocket·SSE가 60초 만에 끊기지 않게 시간도 늘린다
+        proxy_buffering off;
+        proxy_read_timeout 1h;
+        proxy_send_timeout 1h;
+    }
+}

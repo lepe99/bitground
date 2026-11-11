@@ -18,6 +18,9 @@ const Investments = lazy(() => import("../pages/Investments.jsx"));
 const PostList = lazy(() => import("../pages/community/PostList.jsx"));
 const PostWrite = lazy(() => import("../pages/community/PostWrite.jsx"));
 const PostDetail = lazy(() => import("../pages/community/PostDetail.jsx"));
+const Welcome = lazy(() => import("../pages/Welcome.jsx"));
+const Privacy = lazy(() => import("../pages/legal/Privacy.jsx"));
+const Terms = lazy(() => import("../pages/legal/Terms.jsx"));
 const TickerProvider = lazy(() =>
     import("../ticker/TickerProvider.jsx").then(m => ({default: m.TickerProvider})));
 
@@ -32,10 +35,14 @@ export const router = createBrowserRouter([
             {path: "auth/callback", element: page(<Callback/>)},
             {path: "login", element: page(<Login/>)},
             {path: "trends", element: page(<CoinTrends/>)},
+            // 약관·개인정보처리방침은 로그인 없이 볼 수 있어야 한다 (OAuth 앱 검증)
+            {path: "privacy", element: page(<Privacy/>)},
+            {path: "terms", element: page(<Terms/>)},
             {
                 element: <ProtectedRoute />,
                 children: [
                     // 여기에 보호된 라우트 추가
+                    {path: "welcome", element: page(<Welcome/>)}, // 처음 가입한 사용자만
                     {path: "rank", element: page(<Rank/>)},
                     {path: "mypage", element: page(<Mypage/>)},
                     {path: "notice", element: page(<NoticePage/>)},
@@ -56,7 +63,8 @@ export const router = createBrowserRouter([
                         children: [
                             {index: true, element: page(<PostList/>)},     // /community
                             {path: "write", element: page(<PostWrite/>)},  // /community/write
-                            {path: ":id", element: page(<PostDetail/>)}    // /community/:id
+                            {path: ":id", element: page(<PostDetail/>)},
+                            {path: ":id/edit", element: page(<PostWrite/>)} // 작성자 본인만 (서버가 확인)    // /community/:id
                         ]
                     }
                 ]
@@ -65,4 +73,3 @@ export const router = createBrowserRouter([
     }
 ]);
 
-export default router;

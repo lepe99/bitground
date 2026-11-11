@@ -1,0 +1,170 @@
+// 운영 앱 서버의 Grafana Alloy.
+// 백엔드·Nginx·certbot 컨테이너 로그 → 모니터링 서버 Loki, 백엔드·호스트 지표 → 모니터링 서버 Prometheus.
+// 모니터링 서버 주소는 환경변수 MONITORING_HOST (프라이빗 IP). 로컬 개발용 설정은 monitoring/alloy/config.alloy
+
+// ── 컨테이너 로그 ──────────────────────────────────────────────
+discovery.docker "app" {
+  host = "unix:///var/run/docker.sock"
+
+  // 같은 compose 프로젝트(기본 bitground)의 컨테이너만. backend·nginx·certbot만 남기는 것은 아래 relabel
+  filter {
+    name   = "label"
+    values = [string.format("com.docker.compose.project=%s", coalesce(sys.env("COMPOSE_PROJECT"), "bitground"))]
+  }
+}
+
+discovery.relabel "app" {
+  targets = discovery.docker.app.targets
+
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+    regex         = "backend|nginx|certbot"
+    action        = "keep"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+    replacement   = "bitground-$1"
+    target_label  = "app"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/(.*)"
+    target_label  = "container"
+  }
+}
+
+loki.source.docker "app" {
+  host       = "unix:///var/run/docker.sock"
+  targets    = discovery.relabel.app.output
+  labels     = { env = "prod" }
+  forward_to = [loki.process.app.receiver]
+}
+
+loki.process "app" {
+  // ── 백엔드 (logstash JSON) — 로컬 설정과 같은 규칙
+  stage.match {
+    selector = "{app=\"bitground-backend\"}"
+
+    stage.drop {
+      expression = "^Picked up JAVA_TOOL_OPTIONS"
+    }
+
+    stage.json {
+      expressions = {
+        level   = "level",
+        logger  = "logger_name",
+        traceId = "traceId",
+        userId  = "userId",
+      }
+    }
+
+    stage.labels {
+      values = { level = "" }
+    }
+
+    stage.structured_metadata {
+      values = {
+        traceId = "",
+        userId  = "",
+        logger  = "",
+      }
+    }
+  }
+
+  // ── Nginx 접속 로그 (JSON, nginx/base.conf의 log_format). 상태 코드만 라벨로 쓰지 않고 구조화 메타데이터로 둔다
+  // (JSON이 아닌 nginx 오류 로그·시작 메시지는 필드 추출 없이 그대로 남는다)
+  stage.match {
+    selector = "{app=\"bitground-nginx\"}"
+
+    stage.json {
+      expressions = {
+        level  = "level",
+        status = "status",
+      }
+    }
+
+    stage.labels {
+      values = { level = "" }
+    }
+
+    stage.structured_metadata {
+      values = { status = "" }
+    }
+  }
+
+  forward_to = [loki.write.monitoring.receiver]
+}
+
+loki.write "monitoring" {
+  endpoint {
+    url = string.format("http://%s:3100/loki/api/v1/push", sys.env("MONITORING_HOST"))
+  }
+}
+
+// ── 지표 ─────────────────────────────────────────────────────
+// 백엔드: 관리 포트(8091, 외부 비공개)
+prometheus.scrape "backend" {
+  targets         = [{ __address__ = "backend:8091", app = "bitground-backend" }]
+  metrics_path    = "/actuator/prometheus"
+  scrape_interval = "15s"
+  forward_to      = [prometheus.remote_write.monitoring.receiver]
+}
+
+// 호스트: 메모리·스왑·CPU(크레딧 소진 시 steal)·디스크. 2GiB 서버라 스왑 사용량을 지켜본다
+prometheus.exporter.unix "host" {
+  procfs_path = "/host/proc"
+  sysfs_path  = "/host/sys"
+  rootfs_path = "/host/root"
+
+  set_collectors = ["cpu", "diskstats", "filesystem", "loadavg", "meminfo", "netdev", "vmstat"]
+
+  filesystem {
+    mount_points_exclude = "^/(dev|proc|run|sys|var/lib/docker/.+)($|/)"
+  }
+}
+
+discovery.relabel "host" {
+  targets = prometheus.exporter.unix.host.targets
+
+  rule {
+    target_label = "instance"
+    replacement  = "app"
+  }
+}
+
+prometheus.scrape "host" {
+  targets         = discovery.relabel.host.output
+  scrape_interval = "30s"
+  forward_to      = [prometheus.remote_write.monitoring.receiver]
+}
+
+// ── Redis 지표: 메모리(사용량·상한), 키 수, 명령 처리량, 거부된 연결.
+// Alloy 내장 redis_exporter라 컨테이너를 따로 띄우지 않는다
+prometheus.exporter.redis "redis" {
+  redis_addr = "redis:6379"
+}
+
+discovery.relabel "redis" {
+  targets = prometheus.exporter.redis.redis.targets
+
+  rule {
+    target_label = "instance"
+    replacement  = "redis"
+  }
+}
+
+prometheus.scrape "redis" {
+  targets         = discovery.relabel.redis.output
+  scrape_interval = "30s"
+  forward_to      = [prometheus.remote_write.monitoring.receiver]
+}
+
+prometheus.remote_write "monitoring" {
+  endpoint {
+    url = string.format("http://%s:9090/api/v1/write", sys.env("MONITORING_HOST"))
+  }
+
+  external_labels = { env = "prod" }
+}

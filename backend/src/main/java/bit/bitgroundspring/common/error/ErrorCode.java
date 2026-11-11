@@ -39,12 +39,15 @@ public enum ErrorCode {
 
     // 사용자
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."),
+    USER_SUSPENDED(HttpStatus.FORBIDDEN, "이용이 정지된 계정입니다. 문의는 화면 아래 문의 메일로 부탁드립니다."),
+    CANNOT_SUSPEND_ADMIN(HttpStatus.BAD_REQUEST, "관리자 계정은 정지할 수 없습니다."),
 
     // 커뮤니티·공지
     POST_NOT_FOUND(HttpStatus.NOT_FOUND, "게시글을 찾을 수 없습니다."),
     COMMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "댓글을 찾을 수 없습니다."),
     NOTICE_NOT_FOUND(HttpStatus.NOT_FOUND, "공지사항을 찾을 수 없습니다."),
     NOT_AUTHOR(HttpStatus.FORBIDDEN, "작성자만 처리할 수 있습니다."),
+    INQUIRY_ANSWERED(HttpStatus.CONFLICT, "답변이 달린 문의는 수정할 수 없습니다."),
 
     // 시장·시즌
     COIN_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 코인입니다."),
@@ -52,6 +55,7 @@ public enum ErrorCode {
     SEASON_NOT_FOUND(HttpStatus.NOT_FOUND, "시즌을 찾을 수 없습니다."),
     NO_ACTIVE_SEASON(HttpStatus.CONFLICT, "진행 중인 시즌이 없습니다."),
     SEASON_NOT_COMPLETED(HttpStatus.CONFLICT, "종료된 시즌에서만 요청할 수 있습니다."),
+    INVALID_SEASON_SCHEDULE(HttpStatus.BAD_REQUEST, "시즌 일정이 올바르지 않습니다."),
     AI_INSIGHT_NOT_FOUND(HttpStatus.NOT_FOUND, "오늘의 AI 인사이트가 없습니다."),
     AI_ADVICE_UNAVAILABLE(HttpStatus.UNPROCESSABLE_ENTITY, "AI 조언을 생성할 수 없습니다."),
 
@@ -63,9 +67,9 @@ public enum ErrorCode {
     INVALID_ORDER(HttpStatus.BAD_REQUEST, "주문 정보가 올바르지 않습니다."),
     ORDER_NOT_FOUND(HttpStatus.NOT_FOUND, "주문을 찾을 수 없습니다."),
     ORDER_NOT_PENDING(HttpStatus.CONFLICT, "이미 체결되었거나 취소된 주문입니다."),
+    SEASON_SETTLING(HttpStatus.CONFLICT, "시즌 정산 중이에요. 새 시즌이 시작되면 다시 거래할 수 있어요."),
     INSUFFICIENT_CASH(HttpStatus.UNPROCESSABLE_ENTITY, "주문 가능 금액이 부족합니다."),
     INSUFFICIENT_ASSET(HttpStatus.UNPROCESSABLE_ENTITY, "주문 가능 수량이 부족합니다."),
-    PRICE_OUT_OF_RANGE(HttpStatus.UNPROCESSABLE_ENTITY, "지정가가 시장가에서 너무 벗어났습니다."),
 
     // 파일 업로드
     FILE_EMPTY(HttpStatus.BAD_REQUEST, "파일이 비어 있습니다."),

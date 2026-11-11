@@ -5,7 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 )
 
@@ -35,50 +35,42 @@ const userTotalsCTE = `
 	)`
 
 // UpdateRank 현재 시즌 랭킹을 다시 계산합니다. dailySnapshot이면 일일 자산 스냅샷도 남깁니다.
-// 코인 현재가(시즌 정산의 청산 가격)와 시세(가격 이력 저장용)를 함께 반환합니다.
+// coinPrices 코인 ID → 현재가 (CoinPrices로 만든다. 시즌 정산의 청산 가격과 같은 값)
 //
 // 총자산 계산과 순위·티어 산정을 SQL 집합 연산 한 번(윈도 함수)으로 처리한다.
-// 실행 간 공유하는 임시 테이블·전역 상태가 없어 두 실행이 겹쳐도 서로의 결과를 지우지 않고,
-// 랭킹과 스냅샷이 한 트랜잭션에서 같은 시점의 자산으로 계산된다.
-func UpdateRank(ctx context.Context, db *sql.DB, symbolMap map[string]int, seasonID int, dailySnapshot bool, now time.Time) (map[int]float64, map[int]model.UpbitCoinPrice, error) {
-	coinPrices, coinPriceHistory, err := getAllCoinsCurrentPrice(ctx, symbolMap)
-	if err != nil {
-		return nil, nil, fmt.Errorf("코인 현재가 조회 실패: %w", err)
-	}
+// 실행 간 공유하는 임시 테이블·전역 상태가 없어 두 실행이 겹쳐도 서로의 결과를 지우지 않는다.
+// 거래 중에도 매시 돌므로 원본(주문·자산·사용자)을 잠그지 않도록 READ COMMITTED로 실행한다 (readCommitted, db.go).
+func UpdateRank(ctx context.Context, db *sql.DB, coinPrices map[int]float64, seasonID int, dailySnapshot bool, now time.Time) error {
 	prices, err := pricesJSON(coinPrices)
 	if err != nil {
-		return nil, nil, err
+		return err
 	}
 
 	txCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 
-	err = withTx(txCtx, db, func(tx *sql.Tx) error {
+	err = withTxOptions(txCtx, db, readCommitted, func(tx *sql.Tx) error {
 		n, err := upsertRankings(txCtx, tx, seasonID, prices)
 		if err != nil {
 			return err
 		}
-		log.Printf("랭킹 - 시즌 %d 랭킹 갱신 (영향 행 %d)\n", seasonID, n)
+		slog.InfoContext(ctx, "랭킹 갱신", "season_id", seasonID, "rows", n)
 
 		if dailySnapshot {
 			n, err := upsertDailyBalances(txCtx, tx, seasonID, prices, now)
 			if err != nil {
 				return err
 			}
-			log.Printf("랭킹 - 일일 자산 스냅샷 저장 (영향 행 %d)\n", n)
+			slog.InfoContext(ctx, "일일 자산 스냅샷 저장", "rows", n)
 		}
 		return nil
 	})
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return coinPrices, coinPriceHistory, nil
+	return err
 }
 
 // upsertRankings 총자산 내림차순으로 순위를 매기고 순위 구간에 따라 티어를 정합니다.
 //   - 1위: 7, 2~3위: 6
-//   - 나머지는 4위 이하 인원 중 상위 비율로 10%: 5, 25%: 4, 45%: 3, 70%: 2, 그 외: 1
+//   - 나머지는 4위 이하 인원 중 상위 비율로 정한다 (tierCutoffs, rules.go)
 func upsertRankings(ctx context.Context, tx *sql.Tx, seasonID int, prices string) (int64, error) {
 	// 시즌 중 탈퇴한 사용자는 랭킹에서 지운다
 	_, err := tx.ExecContext(ctx, `
@@ -92,15 +84,7 @@ func upsertRankings(ctx context.Context, tx *sql.Tx, seasonID int, prices string
 	query := `
 		INSERT INTO user_rankings (season_id, user_id, total_value, ranks, tier)` + userTotalsCTE + `
 		SELECT ?, user_id, total_value, ranks,
-		       CASE
-		           WHEN ranks = 1 THEN 7
-		           WHEN ranks <= 3 THEN 6
-		           WHEN (ranks - 3) / GREATEST(participants - 3, 1.0) <= 0.10 THEN 5
-		           WHEN (ranks - 3) / GREATEST(participants - 3, 1.0) <= 0.25 THEN 4
-		           WHEN (ranks - 3) / GREATEST(participants - 3, 1.0) <= 0.45 THEN 3
-		           WHEN (ranks - 3) / GREATEST(participants - 3, 1.0) <= 0.70 THEN 2
-		           ELSE 1
-		       END
+		       ` + tierCaseSQL() + `
 		FROM (
 		    SELECT user_id,
 		           total_value,
@@ -147,49 +131,17 @@ func rowsAffected(res sql.Result) int64 {
 	return n
 }
 
-func getAllCoinsCurrentPrice(ctx context.Context, symbolMap map[string]int) (map[int]float64, map[int]model.UpbitCoinPrice, error) {
-	apiURL := "https://api.upbit.com/v1/ticker/all?quote_currencies=KRW"
-
-	var upbitPrices []model.UpbitCoinPrice
-	if err := getJSON(ctx, apiURL, 10*time.Second, &upbitPrices); err != nil {
-		return nil, nil, err
-	}
-
-	coinPrices := make(map[int]float64)
-	coinPriceHistory := make(map[int]model.UpbitCoinPrice)
-
-	for _, upbitCoin := range upbitPrices {
-		symbol := upbitCoin.Market
-		if symbolId, exists := symbolMap[symbol]; exists {
-			coinPrices[symbolId] = upbitCoin.TradePrice
-			coinPriceHistory[symbolId] = upbitCoin
+// CoinPrices 업비트 시세(심볼 기준)를 DB 코인 ID 기준 현재가와 가격 기록용 시세로 바꾼다 (DB에 있는 코인만)
+func CoinPrices(symbolMap map[string]int, tickers map[string]model.UpbitCoinPrice) (map[int]float64, map[int]model.UpbitCoinPrice) {
+	prices := make(map[int]float64, len(symbolMap))
+	history := make(map[int]model.UpbitCoinPrice, len(symbolMap))
+	for symbol, ticker := range tickers {
+		if id, ok := symbolMap[symbol]; ok {
+			prices[id] = ticker.TradePrice
+			history[id] = ticker
 		}
 	}
-
-	return coinPrices, coinPriceHistory, nil
-}
-
-// GetCurrentSeasonID 진행중인 시즌 ID 가져오기
-func GetCurrentSeasonID(ctx context.Context, db *sql.DB) (int, error) {
-	// 쿼리 타임아웃 설정 (10초)
-	queryCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-
-	query := `
-		SELECT id
-		FROM seasons
-		WHERE status = 'PENDING'
-		LIMIT 1
-	`
-
-	// 쿼리 실행
-	var seasonID int
-	err := db.QueryRowContext(queryCtx, query).Scan(&seasonID)
-	if err != nil {
-		return 0, fmt.Errorf("쿼리 실행 에러: %w", err)
-	}
-
-	return seasonID, nil
+	return prices, history
 }
 
 // GetActiveCoinsSymbols 데이터베이스에서 활성화된 코인 심볼들을 가져오는 함수
@@ -211,7 +163,7 @@ func GetActiveCoinsSymbols(ctx context.Context, db *sql.DB) (map[string]int, err
 	}
 	defer func(rows *sql.Rows) {
 		if err := rows.Close(); err != nil {
-			log.Printf("행 닫기 에러: %v\n", err)
+			slog.WarnContext(ctx, "행 닫기 실패", "error", err)
 		}
 	}(rows)
 

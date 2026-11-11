@@ -56,14 +56,14 @@ export default function MySummary() {
     const buyTotal = rows.reduce((s, r) => s + r.buy, 0);
     const pnl = evalTotal - buyTotal;
     const total = cash + evalTotal;
-    const tier = rank?.tier ?? user?.tier ?? 0;
+    const tier = rank?.tier ?? user?.currentTier ?? user?.tier ?? 0;
     const percentile = rank?.rank && rank.total ? Math.max(1, Math.round((rank.rank / rank.total) * 100)) : null;
 
     return (
         <div className="flex flex-col gap-3 md:gap-5">
             <section className="flex flex-col gap-1 py-2 md:py-0">
                 <span className="text-[15px] text-fg-2">{user?.name ? `${user.name}님의 자산` : '내 자산'}</span>
-                <span className="num text-[32px] font-extrabold tracking-[-0.02em] md:text-[40px]">
+                <span className="num text-[clamp(24px,8vw,32px)] font-extrabold tracking-[-0.02em] [overflow-wrap:anywhere] md:text-[40px]">
                     {assets ? `${formatKRW(total)}원` : '—'}
                 </span>
                 {assets && rows.length > 0 && (
@@ -101,12 +101,12 @@ export default function MySummary() {
                         <li key={r.symbol}>
                             <Link to={`/trade?market=${r.symbol}`} className="flex items-center gap-3.5 py-3">
                                 <CoinIcon symbol={r.symbol} size={40}/>
-                                <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                                    <span className="text-base font-semibold">{names[r.symbol] ?? r.symbol}</span>
-                                    <span className="num text-[13px] text-fg-3">{r.amount} {r.symbol.split('-').pop()}</span>
+                                <span className="flex min-w-[5rem] flex-1 flex-col gap-0.5">
+                                    <span className="truncate text-base font-semibold">{names[r.symbol] ?? r.symbol}</span>
+                                    <span className="num truncate text-[13px] text-fg-3">{r.amount} {r.symbol.split('-').pop()}</span>
                                 </span>
-                                <span className="flex flex-col items-end gap-0.5">
-                                    <span className="num text-base font-semibold">{formatKRW(r.value)}원</span>
+                                <span className="flex min-w-0 flex-col items-end gap-0.5 text-right">
+                                    <span className="num text-base font-semibold [overflow-wrap:anywhere]">{formatKRW(r.value)}원</span>
                                     <span className={`num text-[13px] font-semibold ${changeColor(r.rate)}`}>{formatPercent(r.rate)}</span>
                                 </span>
                             </Link>

@@ -1,12 +1,24 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {NotificationContext} from './NotificationContext.js';
-import {formatNotification} from './formatNotification.js';
 import {useAuth} from '../auth/useAuth.js';
 import {useToast} from '../components/toastContext.js';
-import {fetchUnreadNotificationCount} from '../api/notificationApi.js';
+import {
+    fetchNotificationSettings,
+    fetchUnreadNotificationCount,
+    markNotificationsRead,
+    updateNotificationSettings,
+} from '../api/notificationApi.js';
+import {groupKey} from './groupNotifications.js';
+import {targetOf} from './notificationKinds.js';
+import {router} from '../routes/router.jsx';
 
 const SSE_URL = `${import.meta.env.VITE_API_URL}/notifications/subscribe`;
 const RECONNECT_BASE_MS = 3000;
+
+// 설정을 못 불러왔을 때(설정한 적 없을 때와 같이) 모두 켬
+const DEFAULT_SETTINGS = {orderExecution: true, comment: true, notice: true, seasonUpdate: true, toast: true};
+// 알림 종류 → 설정 항목 (문의 알림은 끌 수 없음)
+const SETTING_OF = {ORDER_EXECUTION: 'orderExecution', COMMENT: 'comment', NOTICE: 'notice', SEASON_UPDATE: 'seasonUpdate'};
 // 연속 실패 시 재연결을 멈추는 횟수 (지수 백오프, 최대 30초 간격)
 const MAX_RECONNECT_ATTEMPTS = 8;
 const MAX_RECONNECT_DELAY_MS = 30000;
@@ -18,9 +30,12 @@ const MAX_RECONNECT_DELAY_MS = 30000;
  */
 export const NotificationProvider = ({children}) => {
     const {isLoggedIn} = useAuth();
-    const {addToast} = useToast();
+    const {addToast, showNotification} = useToast();
     const [userCash, setUserCash] = useState(0);
     const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
+    const [settings, setSettings] = useState(DEFAULT_SETTINGS);
+    const settingsRef = useRef(DEFAULT_SETTINGS); // SSE 처리기에서 최신 설정을 읽는다
+    settingsRef.current = settings;
 
     const eventSourceRef = useRef(null);
     const reconnectTimeoutRef = useRef(null);
@@ -36,20 +51,46 @@ export const NotificationProvider = ({children}) => {
         }
     }, []);
 
+    // 토스트를 누르면 합쳐진 알림을 모두 읽음으로 하고 해당 화면으로 이동
+    const openFromToast = useCallback((items) => {
+        const ids = items.map((i) => i.id).filter((id) => id > 0);
+        if (ids.length > 0) {
+            markNotificationsRead(ids)
+                .then(refreshUnreadCount)
+                .catch((error) => console.error('알림 읽음 처리 실패:', error));
+        }
+        const to = targetOf(items[0]);
+        if (to) void router.navigate(to);
+    }, [refreshUnreadCount]);
+
     const handleMessage = useCallback((event) => {
         try {
             const notification = JSON.parse(event.data);
             if (!notification.message) return;
 
-            if (notification.message === 'ORDER_EXECUTION') {
+            if (notification.message === 'ORDER_EXECUTION' && notification.data?.cash != null) {
                 setUserCash(notification.data.cash);
             }
-            addToast(formatNotification(notification), notification.messageType === 'ERROR' ? 'error' : 'default');
+            const text = notification.data?.text ?? ''; // 서버가 저장한 문구 그대로 (알림 목록과 같은 문장)
+            // 공지·시즌은 모든 접속자에게 오므로 끈 종류는 여기서 거른다. 토스트를 끄면 배지만 바뀐다
+            const muted = settingsRef.current[SETTING_OF[notification.message]] === false;
+            if (muted) return;
+            if (notification.messageType === 'ERROR') {
+                addToast(text, 'error');
+            } else if (text && settingsRef.current.toast) {
+                const item = {
+                    id: notification.data?.id, // 저장된 알림 번호 (공지·시즌은 없음)
+                    messageType: notification.message,
+                    message: text.trim(),
+                    postId: notification.data?.postId,
+                };
+                showNotification({key: groupKey(item), item, onOpen: openFromToast});
+            }
             refreshUnreadCount();
         } catch (e) {
             console.error('SSE 메시지 파싱 오류:', e);
         }
-    }, [addToast, refreshUnreadCount]);
+    }, [addToast, showNotification, openFromToast, refreshUnreadCount]);
 
     const connect = useCallback(() => {
         if (eventSourceRef.current) return;
@@ -99,12 +140,16 @@ export const NotificationProvider = ({children}) => {
     useEffect(() => {
         if (!isLoggedIn) {
             setUnreadNotificationsCount(0);
+            setSettings(DEFAULT_SETTINGS);
             return;
         }
 
         enabledRef.current = true;
         connect();
         refreshUnreadCount();
+        fetchNotificationSettings()
+            .then((loaded) => setSettings({...DEFAULT_SETTINGS, ...loaded}))
+            .catch((error) => console.error('알림 설정 가져오기 실패:', error));
 
         return () => {
             enabledRef.current = false;
@@ -112,9 +157,21 @@ export const NotificationProvider = ({children}) => {
         };
     }, [isLoggedIn, connect, disconnect, refreshUnreadCount]);
 
+    // 설정 바꾸기: 화면에 먼저 반영하고, 실패하면 되돌린다
+    const updateSettings = useCallback(async (patch) => {
+        const previous = settingsRef.current;
+        setSettings({...previous, ...patch});
+        try {
+            setSettings({...DEFAULT_SETTINGS, ...(await updateNotificationSettings(patch))});
+        } catch (error) {
+            setSettings(previous);
+            throw error;
+        }
+    }, []);
+
     const value = useMemo(
-        () => ({userCash, unreadNotificationsCount, setUnreadNotificationsCount}),
-        [userCash, unreadNotificationsCount]
+        () => ({userCash, unreadNotificationsCount, setUnreadNotificationsCount, refreshUnreadCount, settings, updateSettings}),
+        [userCash, unreadNotificationsCount, refreshUnreadCount, settings, updateSettings]
     );
 
     return (

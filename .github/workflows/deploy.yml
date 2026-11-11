@@ -1,0 +1,122 @@
+# 운영 배포: main의 CI가 성공하면 그 커밋을 AWS에 올린다
+#   1) 앱 서버(SSM Run Command): 저장소를 그 커밋으로 맞추고 deploy/app/deploy.sh 실행 (백엔드 이미지 = 커밋 해시 태그, DB 마이그레이션은 백엔드 기동 때)
+#   2) 스케줄러 Lambda 두 개: CI가 만든 zip으로 코드 교체
+#   3) 프론트: CI가 만든 dist를 S3에 동기화하고 CloudFront 캐시 무효화
+# AWS 권한은 OIDC로 받는다 (역할 bitground-prod-github-deploy는 main 브랜치에서만 맡을 수 있다)
+# 필요한 저장소 변수: AWS_ROLE_ARN, APP_INSTANCE_ID, FRONTEND_BUCKET, CLOUDFRONT_DISTRIBUTION_ID
+name: Deploy
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+# 배포는 겹치지 않게 하나씩, 진행 중인 배포는 취소하지 않는다 (중간에 끊기면 서버·Lambda·프론트 버전이 어긋난다)
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  actions: read   # CI 실행의 산출물(Lambda zip, 프론트 dist) 내려받기
+  id-token: write # AWS OIDC
+
+env:
+  AWS_REGION: ap-northeast-2
+  SHA: ${{ github.event.workflow_run.head_sha }}
+  COLLECTOR_FUNCTION: bitground-prod-scheduler-collector
+  WRITER_FUNCTION: bitground-prod-scheduler-writer
+
+jobs:
+  deploy:
+    name: 운영 배포
+    # main에 푸시되어 CI가 성공한 경우만 (PR·수동 실행·실패한 CI는 배포하지 않음)
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    # environment를 지정하면 OIDC sub가 environment:production이 되어 배포 역할(ref:refs/heads/main만 신뢰)을 맡을 수 없다
+    steps:
+      - name: 배포할 커밋
+        run: |
+          echo "커밋: $SHA"
+          echo "CI 실행: ${{ github.event.workflow_run.html_url }}"
+
+      - uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - uses: actions/download-artifact@v5
+        with:
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+          name: scheduler-lambda
+          path: artifacts/scheduler
+
+      - uses: actions/download-artifact@v5
+        with:
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+          name: frontend-dist
+          path: artifacts/frontend
+
+      # 1) 백엔드 먼저: 새 프론트·스케줄러가 새 API·스키마를 기대할 수 있으므로
+      - name: 앱 서버 배포 (SSM Run Command)
+        env:
+          INSTANCE_ID: ${{ vars.APP_INSTANCE_ID }}
+        run: |
+          params=$(jq -n --arg sha "$SHA" '{commands: [
+            "set -euo pipefail",
+            "cd /opt/bitground",
+            "git fetch -q origin \($sha)",
+            "git checkout -q --detach \($sha)",
+            "bash deploy/app/deploy.sh \($sha)"
+          ], executionTimeout: ["900"]}')
+          cmd=$(aws ssm send-command --instance-ids "$INSTANCE_ID" --document-name AWS-RunShellScript \
+                --comment "deploy $SHA" --parameters "$params" --query Command.CommandId --output text)
+          echo "명령 ID: $cmd"
+          # 이미지 받기·백엔드 기동까지 몇 분 걸릴 수 있어 직접 기다린다 (aws ssm wait는 100초에서 끝남)
+          for _ in $(seq 1 120); do
+            sleep 5
+            status=$(aws ssm get-command-invocation --command-id "$cmd" --instance-id "$INSTANCE_ID" \
+                     --query Status --output text 2>/dev/null || echo Pending)
+            case "$status" in Pending|InProgress|Delayed) continue ;; *) break ;; esac
+          done
+          aws ssm get-command-invocation --command-id "$cmd" --instance-id "$INSTANCE_ID" \
+              --query '[StandardOutputContent,StandardErrorContent]' --output text
+          echo "결과: $status"
+          [ "$status" = Success ]
+
+      # 2) 수집(A)·쓰기(B)는 같은 바이너리 (실행 모드는 함수 환경 변수로 나뉜다)
+      - name: 스케줄러 Lambda 교체
+        run: |
+          zip=artifacts/scheduler/scheduler-lambda.zip
+          for fn in "$COLLECTOR_FUNCTION" "$WRITER_FUNCTION"; do
+            aws lambda update-function-code --function-name "$fn" --zip-file "fileb://$zip" \
+                --query '[FunctionName,CodeSha256]' --output text
+            aws lambda wait function-updated-v2 --function-name "$fn"
+          done
+
+      # 3) 해시가 붙은 assets는 오래 캐시하고, index.html은 매번 새로 받게 한다 (예전 index가 지운 파일을 가리키지 않게 index를 마지막에)
+      - name: 프론트 배포 (S3 + CloudFront)
+        env:
+          BUCKET: ${{ vars.FRONTEND_BUCKET }}
+          DISTRIBUTION_ID: ${{ vars.CLOUDFRONT_DISTRIBUTION_ID }}
+        run: |
+          dist=artifacts/frontend
+          aws s3 sync "$dist/assets" "s3://$BUCKET/assets" --cache-control "public,max-age=31536000,immutable" --only-show-errors
+          aws s3 sync "$dist" "s3://$BUCKET" --exclude "assets/*" --exclude index.html --only-show-errors
+          aws s3 cp "$dist/index.html" "s3://$BUCKET/index.html" --cache-control no-cache --only-show-errors
+          # 이번 빌드에 없는 예전 파일 정리 (index.html을 올린 뒤에)
+          aws s3 sync "$dist" "s3://$BUCKET" --delete --only-show-errors
+          id=$(aws cloudfront create-invalidation --distribution-id "$DISTRIBUTION_ID" --paths '/*' \
+               --query Invalidation.Id --output text)
+          echo "캐시 무효화: $id"
+          aws cloudfront wait invalidation-completed --distribution-id "$DISTRIBUTION_ID" --id "$id"
+
+      - name: 배포 확인
+        run: |
+          curl -fsS --retry 5 --retry-delay 5 https://api.bitground.kr/healthz
+          echo
+          curl -fsS -o /dev/null -w 'www %{http_code}\n' https://www.bitground.kr/

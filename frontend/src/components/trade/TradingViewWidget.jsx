@@ -33,7 +33,7 @@ export default function TradingViewWidget({market, height = 400, compact = false
             hide_legend: true,
             hide_top_toolbar: compact,
             hide_side_toolbar: true,
-            range: compact ? '1D' : '7D',
+            // range를 주면 TradingView가 그 기간에 맞는 봉을 골라 interval(1시간)을 무시한다 (모바일 '1D'가 짧은 봉으로 바뀌던 원인)
             allow_symbol_change: false,
             studies: compact ? [] : ['STD;SMA'],
             support_host: 'https://www.tradingview.com',

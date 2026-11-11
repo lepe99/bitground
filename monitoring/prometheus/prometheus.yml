@@ -1,0 +1,4 @@
+# Prometheus는 지표를 직접 수집하지 않고 Alloy가 보내는 값(remote write)만 저장한다.
+# 수집 대상·주기는 monitoring/alloy/config.alloy 에 있다.
+global:
+  scrape_interval: 15s
