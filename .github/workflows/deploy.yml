@@ -42,19 +42,19 @@ jobs:
           echo "커밋: $SHA"
           echo "CI 실행: ${{ github.event.workflow_run.html_url }}"
 
-      - uses: aws-actions/configure-aws-credentials@v5
+      - uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v8
         with:
           run-id: ${{ github.event.workflow_run.id }}
           github-token: ${{ github.token }}
           name: scheduler-lambda
           path: artifacts/scheduler
 
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v8
         with:
           run-id: ${{ github.event.workflow_run.id }}
           github-token: ${{ github.token }}
