@@ -7,15 +7,17 @@ import java.math.BigDecimal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** 알림 문구. 프론트의 알림 묶기(groupNotifications.js)가 첫 단어와 '수량 : 0.1 BTC' 형식을 본다 */
+/** 알림 문구. 프론트의 알림 묶기(groupNotifications.js)가 첫 단어와 체결 알림 둘째 줄의 '0.1 BTC · 개당' 형식을 본다 */
 class NotificationMessagesTest {
 
     @Test
     void 지정가_체결은_수수료까지_알린다() {
-        assertThat(NotificationMessages.orderExecuted(OrderType.BUY, "KRW-BTC", new BigDecimal("0.01"), new BigDecimal("101234000"), 507L))
-                .isEqualTo("지정가 매수 주문이 체결되었습니다.\n수량 : 0.0100000 BTC\n체결 : 개당 101,234,000원\n수수료 : 507원");
-        assertThat(NotificationMessages.orderExecuted(OrderType.SELL, "KRW-DOGE", new BigDecimal("1234.5"), new BigDecimal("512.30"), 1_234L))
-                .isEqualTo("지정가 매도 주문이 체결되었습니다.\n수량 : 1234.5000000 DOGE\n체결 : 개당 512.3원\n수수료 : 1,234원");
+        // 매수: 대금 1,012,340원 + 수수료 507원을 씀
+        assertThat(NotificationMessages.orderExecuted(OrderType.BUY, "KRW-BTC", new BigDecimal("0.01000000"), new BigDecimal("101234000"), 507L))
+                .isEqualTo("지정가 매수 주문이 체결되었습니다.\n0.01 BTC · 개당 101,234,000원\n수수료 507원 · 1,012,847원 사용");
+        // 매도: 대금 632,469원(632,469.13 내림) − 수수료 317원을 받음. 수량은 반올림하지 않고 저장된 값 그대로
+        assertThat(NotificationMessages.orderExecuted(OrderType.SELL, "KRW-DOGE", new BigDecimal("1234.5678912"), new BigDecimal("512.30"), 317L))
+                .isEqualTo("지정가 매도 주문이 체결되었습니다.\n1234.5678912 DOGE · 개당 512.3원\n수수료 317원 · 632,152원 받음");
         // 수수료 도입 전에 쌓인 이벤트(fee 없음)는 수수료 줄 없이
         assertThat(NotificationMessages.orderExecuted(OrderType.BUY, "KRW-BTC", new BigDecimal("0.01"), new BigDecimal("1000"), null))
                 .doesNotContain("수수료");

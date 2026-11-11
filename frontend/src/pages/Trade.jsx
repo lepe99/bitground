@@ -133,7 +133,10 @@ export default function Trade() {
                         onOrderPlaced={reloadAssets}
                         className="min-w-0 flex-[1_1_340px]"
                     />
-                    <RecentTrades symbol={selectedMarket} className="h-[468px] min-w-0 flex-[1_1_340px]"/>
+                    {/* 나란히 있으면 주문 칸 높이에 맞추고, 아래로 내려가면 468px. 안쪽을 absolute로 두어 체결 목록 길이가 높이에 영향을 주지 않게 */}
+                    <div className="relative min-h-[468px] min-w-0 flex-[1_1_340px]">
+                        <RecentTrades symbol={selectedMarket} className="absolute inset-0"/>
+                    </div>
                 </div>
             </div>
             {list("sticky top-[64px] h-[calc(100dvh-72px)] min-w-0 flex-[1_1_420px] overflow-hidden rounded-xl border border-line")}

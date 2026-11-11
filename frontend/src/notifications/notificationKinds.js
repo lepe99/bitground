@@ -7,6 +7,12 @@ const TARGETS = {
     SEASON_UPDATE: '/rank',
 };
 
+/**
+ * 본문을 2줄 미리보기로 줄여도 되는 알림 (댓글·문의: 눌러서 글에서 전체를 본다).
+ * 체결·취소·공지·시즌 알림은 수수료·금액 같은 정보라 줄이지 않고 전부 보여 준다
+ */
+export const isPreview = (messageType) => messageType === 'COMMENT' || messageType === 'INQUIRY';
+
 export const targetOf = ({messageType, postId}) => ((messageType === 'COMMENT' || messageType === 'INQUIRY') && postId
     ? `/community/${postId}` : TARGETS[messageType]);
 

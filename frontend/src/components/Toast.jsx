@@ -1,6 +1,6 @@
 import {useState, useCallback, useEffect, useMemo} from 'react';
 import {ToastContext} from './toastContext.js';
-import {kindOf} from '../notifications/notificationKinds.js';
+import {isPreview, kindOf} from '../notifications/notificationKinds.js';
 import KindIcon from '../notifications/KindIcon.jsx';
 import {summarize} from '../notifications/groupNotifications.js';
 
@@ -162,7 +162,7 @@ const NotificationToast = ({toast, onDismiss, onRemove}) => {
                 </span>
                 <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                     <span className="text-sm leading-snug font-bold">{title}</span>
-                    {body && <span className="line-clamp-2 whitespace-pre-line text-[13px] leading-relaxed text-fg-3">{body}</span>}
+                    {body && <span className={`${isPreview(latest.messageType) ? 'line-clamp-2' : ''} whitespace-pre-line text-[13px] leading-relaxed text-fg-3`}>{body}</span>}
                 </span>
             </button>
             <button

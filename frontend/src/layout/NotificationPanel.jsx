@@ -8,7 +8,7 @@ import {
     markAllNotificationsRead,
     markNotificationsRead,
 } from '../api/notificationApi.js';
-import {kindOf, targetOf} from '../notifications/notificationKinds.js';
+import {isPreview, kindOf, targetOf} from '../notifications/notificationKinds.js';
 import KindIcon from '../notifications/KindIcon.jsx';
 import {groupNotifications, splitMessage, summarize} from '../notifications/groupNotifications.js';
 
@@ -81,7 +81,7 @@ function NotificationItem({group, now, onOpen, onDelete}) {
                             <span className={`min-w-0 flex-1 text-sm leading-snug ${unread ? 'font-bold' : 'font-semibold text-fg-2'}`}>{title}</span>
                             <span className="num shrink-0 pt-px text-[11px] text-fg-3">{relativeTime(latest.createdAt, now)}</span>
                         </span>
-                        {body && <span className="line-clamp-2 whitespace-pre-line text-[13px] leading-relaxed text-fg-3">{body}</span>}
+                        {body && <span className={`${isPreview(latest.messageType) ? 'line-clamp-2' : ''} whitespace-pre-line text-[13px] leading-relaxed text-fg-3`}>{body}</span>}
                     </span>
                     <span className={`mt-2 size-2 shrink-0 rounded-full ${unread ? 'bg-up' : 'bg-transparent'}`} aria-label={unread ? '읽지 않음' : undefined}/>
                 </button>
@@ -118,7 +118,7 @@ function NotificationItem({group, now, onOpen, onDelete}) {
                                 <button type="button" onClick={() => onOpen([item])} className="flex w-full items-start gap-2 py-2 pr-4 pl-3 text-left hover:bg-surface-2">
                                     <span className="min-w-0 flex-1">
                                         <span className={`block text-[13px] leading-snug ${item.isRead ? 'text-fg-2' : 'font-semibold'}`}>{one.title}</span>
-                                        {one.body && <span className="line-clamp-1 whitespace-pre-line text-xs text-fg-3">{one.body}</span>}
+                                        {one.body && <span className={`${isPreview(item.messageType) ? 'line-clamp-1' : ''} whitespace-pre-line text-xs text-fg-3`}>{one.body}</span>}
                                     </span>
                                     <span className="num shrink-0 text-[11px] text-fg-3">{relativeTime(item.createdAt, now)}</span>
                                 </button>
