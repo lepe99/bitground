@@ -6,6 +6,16 @@
 릴리즈 방법: `dev`에서 `frontend/package.json`·`backend/build.gradle` 버전을 올리고 이 파일 맨 위에 새 항목을 쓴 뒤 `main`으로 PR을 병합한다.
 PR에서 세 곳의 버전이 같은지와 새 버전인지 검사하고, 병합 후 운영 배포가 성공하면 `vX.Y.Z` 태그와 GitHub Release(본문은 아래 항목)가 자동으로 만들어진다.
 
+## [2.1.3] - 2026-11-12
+
+### 수정
+- 앱 서버 Nginx 연결 수 상한 1,024 → 4,096(워커당): 부하 테스트에서 동시 사용자 750명부터 "worker_connections are not enough"로 연결을 받지 못하던 문제
+- Nginx → 백엔드 연결 재사용(upstream keepalive): 요청마다 새 연결을 열지 않게
+- TLS 세션 캐시 10MB → 4MB (Nginx 메모리 상한 안에서 고정으로 차지하던 몫 축소)
+
+### 추가
+- 운영 서버 부하 테스트 스크립트(`loadtest/`, k6)와 결과 보고서(`docs/LOAD_TEST.md`)
+
 ## [2.1.2] - 2026-11-11
 
 ### 수정

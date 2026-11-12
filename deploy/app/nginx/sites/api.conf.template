@@ -17,7 +17,7 @@ server {
 
     # REST API, WebSocket(/ws/**), SSE(/notifications/subscribe)
     location / {
-        proxy_pass http://backend:8090;
+        proxy_pass http://backend_api;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         # 받은 X-Forwarded-For를 이어 붙이지 않고 실제 접속 IP로 덮어쓴다 (백엔드의 IP별 요청 제한을 헤더 위조로 피할 수 없게)
