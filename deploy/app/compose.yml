@@ -2,7 +2,7 @@
 #   cd /opt/bitground/deploy/app && docker compose up -d
 #
 # 메모리 상한 (부하 테스트로 정한 값, 합계 약 1.7GiB):
-#   backend 1000M · mysql 400M · redis 64M · alloy 160M · nginx 32M · certbot 128M · tinyproxy 32M
+#   backend 1000M · mysql 400M · redis 64M · alloy 160M · nginx 128M · certbot 128M · tinyproxy 32M
 #
 # 외부에 여는 포트 (보안 그룹으로 출발지를 제한):
 #   80, 443  nginx      인터넷 전체 (HTTPS, Let's Encrypt 인증서 발급)
@@ -28,7 +28,8 @@ services:
     logging: *default-logging
     image: nginx:1.30.5-alpine
     restart: unless-stopped
-    mem_limit: 32m
+    # 32MB였을 때 부하 테스트(초당 약 24건)에서 워커가 OOM으로 죽어 연결이 30~60초씩 멈췄다
+    mem_limit: 128m
     environment:
       API_DOMAIN: ${API_DOMAIN:?API_DOMAIN 필요}
       # Grafana 중계 (모니터링 서버 3000). 해시는 base64(bcrypt) (bcrypt의 '$'가 .env에서 변수로 해석되지 않게)
