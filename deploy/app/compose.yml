@@ -44,6 +44,7 @@ services:
       - "80:80"
       - "443:443"
     volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/base.conf:/etc/bitground/base.conf:ro
       - ./nginx/sites:/etc/bitground/sites:ro
       - ./nginx/entrypoint.sh:/docker-entrypoint.d/40-bitground.sh:ro
