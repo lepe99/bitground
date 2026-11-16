@@ -51,8 +51,8 @@ echo "s3://$BUCKET/mysql/loadtest/tokens.json"
 
 echo "== 5. 요청 횟수 제한 끄기 (backend.env에 임시로 추가, cleanup.sh가 되돌린다)"
 grep -q '^RATELIMIT_ENABLED=' backend.env || echo 'RATELIMIT_ENABLED=false' >> backend.env
-docker compose up -d backend
+./rollout.sh   # 무중단 교체로 env 반영
 for _ in $(seq 1 36); do
-  [ "$(docker inspect -f '{{.State.Health.Status}}' bitground-backend-1)" = healthy ] && break; sleep 5
+  [ "$(docker inspect -f '{{.State.Health.Status}}' $(docker compose ps -q backend | head -1))" = healthy ] && break; sleep 5
 done
-docker inspect -f 'backend {{.State.Health.Status}}' bitground-backend-1
+docker inspect -f 'backend {{.State.Health.Status}}' $(docker compose ps -q backend | head -1)

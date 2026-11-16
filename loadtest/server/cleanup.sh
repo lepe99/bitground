@@ -45,11 +45,11 @@ docker compose exec -T redis sh -c 'redis-cli --no-auth-warning ${REDIS_PASSWORD
 
 echo "== 4. 요청 횟수 제한 되돌리기 + 백엔드 재생성"
 sed -i '/^RATELIMIT_ENABLED=/d' backend.env
-docker compose up -d backend
+./rollout.sh   # 무중단 교체로 env 반영
 for _ in $(seq 1 36); do
-  [ "$(docker inspect -f '{{.State.Health.Status}}' bitground-backend-1)" = healthy ] && break; sleep 5
+  [ "$(docker inspect -f '{{.State.Health.Status}}' $(docker compose ps -q backend | head -1))" = healthy ] && break; sleep 5
 done
-docker inspect -f 'backend {{.State.Health.Status}}' bitground-backend-1
+docker inspect -f 'backend {{.State.Health.Status}}' $(docker compose ps -q backend | head -1)
 grep -c '^RATELIMIT_ENABLED=' backend.env || echo "RATELIMIT_ENABLED 없음 (기본값 true)"
 
 echo "== 5. 토큰 파일 삭제"

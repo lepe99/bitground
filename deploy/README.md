@@ -8,7 +8,7 @@
                alloy ──────────────────────────────────────▶ prometheus ◀── 앱 서버 alloy (지표)
                tinyproxy ◀── 모니터링 서버의 외부 통신        alloy:3500 ◀── lambda-promtail (Lambda 로그)
                                                             grafana ◀── SSM 포트 포워딩
-EventBridge ─▶ Lambda A (수집, VPC 밖) ─▶ Lambda B (쓰기, VPC 안) ─▶ mysql:3306, backend:8090
+EventBridge ─▶ Lambda A (수집, VPC 밖) ─▶ Lambda B (쓰기, VPC 안) ─▶ mysql:3306, nginx:8090 → backend
 CloudFront ─▶ S3 (프론트)
 ```
 
@@ -18,6 +18,7 @@ CloudFront ─▶ S3 (프론트)
 | `app/nginx/` | HTTPS 종료·프록시(`/healthz`, API·WebSocket·SSE, Grafana 기본 인증), certbot 발급·갱신 스크립트 |
 | `app/alloy/config.alloy` | 컨테이너 로그·백엔드 지표·호스트 지표 → 모니터링 서버 |
 | `app/tinyproxy/` | 모니터링 서버용 외부 통신 프록시 |
+| `app/rollout.sh` | 백엔드 무중단 교체 (새 컨테이너 healthy → 이전 컨테이너 정상 종료, 실패 시 이전 유지). `deploy.sh`가 부른다 |
 | `app/backup.sh` | MySQL → S3 백업 (호스트 cron) |
 | `monitoring/compose.yml` | 모니터링 서버: loki, prometheus, grafana, alloy(Lambda 로그 수신) |
 

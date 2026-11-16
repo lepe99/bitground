@@ -31,7 +31,10 @@ echo "BACKEND_TAG=$SHA" >> .env
 render_env /bitground/prod/backend backend.env
 
 docker compose pull -q backend
-docker compose up -d --remove-orphans
+# 백엔드는 무중단 교체 (새 컨테이너 healthy 확인 후 이전 것 종료). 나머지 서비스는 바뀐 것만 다시 만든다
+# 순서: 백엔드 먼저 — nginx가 8090을 새로 열게 되는 경우 이전 백엔드가 그 포트를 놓아야 하므로
+./rollout.sh
+docker compose up -d --no-deps --remove-orphans $(docker compose config --services | grep -v -x backend)
 
 # 바인드 마운트한 설정 파일은 바뀌어도 compose가 컨테이너를 다시 만들지 않으므로, 바뀐 서비스만 직접 재시작한다
 if [ -n "$PREV" ]; then
@@ -44,8 +47,9 @@ if [ -n "$PREV" ]; then
     done
 fi
 
+BACKEND=$(docker compose ps -q backend | head -1)   # 무중단 교체로 컨테이너 이름(번호)이 바뀐다
 for _ in $(seq 1 36); do
-    status=$(docker inspect -f '{{.State.Health.Status}}' bitground-backend-1 2>/dev/null || echo missing)
+    status=$(docker inspect -f '{{.State.Health.Status}}' "$BACKEND" 2>/dev/null || echo missing)
     [ "$status" = healthy ] && break
     sleep 5
 done
@@ -56,5 +60,5 @@ if [ "$status" != healthy ]; then
 fi
 
 echo "$SHA" > .deployed-sha
-echo "backend: $(docker inspect -f '{{index .Config.Labels "org.opencontainers.image.revision"}}' bitground-backend-1) healthy"
+echo "backend: $(docker inspect -f '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$BACKEND") healthy"
 docker compose ps --format '{{.Name}} {{.Status}}'
