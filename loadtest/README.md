@@ -7,7 +7,7 @@
 |---|---|
 | `smoke.js` | 로그인 없는 API 확인 (10명, 1분) |
 | `capacity.js` | S1 용량 측정. 가상 사용자 1명 = 알림 SSE 1개 + 30%는 체결 WebSocket + 5~15초마다 화면 이동 |
-| `seed.js` | 커뮤니티 화면용 게시글 40개·댓글 200개 |
+| `seed.js` | 커뮤니티 화면용 게시글 40개·댓글 200개. `cleanup.sh`가 지우므로 **준비할 때마다 다시 실행**해야 `results/posts.txt`가 맞는다 |
 | `lib/common.js` | 대상 주소, VU별 토큰, 화면 단위 요청(`openPage`), 실패율·화면 시간 지표 |
 | `run.sh` / `series.sh` | S1 한 단계 / 여러 단계 실행 (서버 기록 → k6 → 서버 지표 수집) |
 | `ssm-run.sh` | 로컬 스크립트를 운영 서버에서 SSM Run Command로 실행 |

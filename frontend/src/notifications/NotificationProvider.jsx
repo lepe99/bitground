@@ -116,9 +116,9 @@ export const NotificationProvider = ({children}) => {
             reconnectTimeoutRef.current = setTimeout(async () => {
                 // EventSource는 응답 상태 코드를 알려주지 않으므로 axios 요청으로 인증을 먼저 확인한다.
                 // 액세스 토큰이 만료됐으면 인터셉터가 재발급하고, 재발급도 실패하면 로그아웃(forceLogout)되어
-                // isLoggedIn이 false가 되면서 연결이 정리된다.
+                // isLoggedIn이 false가 되면서 연결이 정리된다. 끊긴 사이 쌓인 알림이 배지에 보이도록 받은 개수도 반영한다.
                 try {
-                    await fetchUnreadNotificationCount();
+                    setUnreadNotificationsCount(await fetchUnreadNotificationCount());
                     if (enabledRef.current) connectRef.current();
                 } catch {
                     // 인증 실패: 로그아웃 처리에 맡기고 재연결하지 않음
