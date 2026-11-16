@@ -33,7 +33,7 @@
 - **앱 서버**(퍼블릭 서브넷): Nginx(TLS) → Spring Boot → MySQL·Redis를 Docker Compose로. 배포 때는 새 백엔드 컨테이너를 먼저 띄워 healthy가 되면 이전 것을 정상 종료한다.
 - **모니터링 서버**(프라이빗 서브넷): Prometheus·Loki·Grafana. NAT 대신 앱 서버의 tinyproxy로 외부와 통신한다.
 - **스케줄러**: 외부 API를 부르는 수집 Lambda는 VPC 밖, DB에 쓰는 Lambda는 VPC 안에 두어 NAT 없이 DB를 비공개로 유지한다.
-- **배포**: GitHub Actions가 테스트 → arm64 이미지(GHCR) → OIDC로 AWS 권한을 받아 SSM Run Command로 배포 → 성공하면 태그·Release를 만든다.
+- **배포**: GitHub Actions가 테스트 → arm64 이미지(GHCR) → OIDC로 AWS 권한을 받아 SSM Run Command로 배포 → 성공하면 태그·Release를 만든다. 마지막 릴리즈 이후 바뀐 영역(백엔드·서버 설정·스케줄러·프론트)만 검사·배포한다.
 
 ### 예약(지정가) 주문 체결
 

@@ -3,6 +3,8 @@
 #   2) 스케줄러 Lambda 두 개: CI가 만든 zip으로 코드 교체
 #   3) 프론트: CI가 만든 dist를 S3에 동기화하고 CloudFront 캐시 무효화
 #   4) 배포가 끝나면 그 커밋에 vX.Y.Z 태그와 GitHub Release (본문은 CHANGELOG.md의 그 버전 항목)
+# 1)~3)은 바뀐 영역만 한다: CI가 마지막 릴리즈 태그(= 지금 운영 중인 커밋)와 비교해 남긴 changes.env를 읽는다.
+#   어느 단계라도 실패하면 태그가 생기지 않으므로, 다음 배포가 다시 그 태그부터 비교해 빠진 부분까지 올린다
 # AWS 권한은 OIDC로 받는다 (역할 bitground-prod-github-deploy는 main 브랜치에서만 맡을 수 있다)
 # 필요한 저장소 변수: AWS_ROLE_ARN, APP_INSTANCE_ID, FRONTEND_BUCKET, CLOUDFRONT_DISTRIBUTION_ID
 name: Deploy
@@ -48,7 +50,34 @@ jobs:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
+      # CI가 판정한 변경 영역. 없으면(예전 CI 실행 등) 전부 배포한다
       - uses: actions/download-artifact@v8
+        continue-on-error: true
+        with:
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+          name: changes
+          path: artifacts/changes
+
+      - id: changes
+        name: 바뀐 영역
+        run: |
+          mkdir -p artifacts/changes && f=artifacts/changes/changes.env
+          if [ ! -s "$f" ]; then
+            echo "변경 영역 정보가 없어 전부 배포합니다"
+            printf 'backend=true\nserver=true\nscheduler=true\nfrontend=true\n' > "$f.all"
+            f=$f.all
+          fi
+          cat "$f" | tee -a "$GITHUB_OUTPUT"
+          {
+            echo '### 배포 단계'
+            echo '| 영역 | 배포 |'
+            echo '|---|---|'
+            sed 's/^\(.*\)=\(.*\)$/| \1 | \2 |/' "$f"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/download-artifact@v8
+        if: steps.changes.outputs.scheduler == 'true'
         with:
           run-id: ${{ github.event.workflow_run.id }}
           github-token: ${{ github.token }}
@@ -56,6 +85,7 @@ jobs:
           path: artifacts/scheduler
 
       - uses: actions/download-artifact@v8
+        if: steps.changes.outputs.frontend == 'true'
         with:
           run-id: ${{ github.event.workflow_run.id }}
           github-token: ${{ github.token }}
@@ -63,7 +93,10 @@ jobs:
           path: artifacts/frontend
 
       # 1) 백엔드 먼저: 새 프론트·스케줄러가 새 API·스키마를 기대할 수 있으므로
+      #    백엔드 코드나 서버 설정(deploy/app)이 바뀌었을 때만. 그대로면 서버는 지금 커밋 그대로 둔다
+      #    (다음 배포 때 deploy.sh가 서버에 남은 .deployed-sha부터 비교하므로 nginx 등 설정 반영은 빠지지 않는다)
       - name: 앱 서버 배포 (SSM Run Command)
+        if: steps.changes.outputs.backend == 'true' || steps.changes.outputs.server == 'true'
         env:
           INSTANCE_ID: ${{ vars.APP_INSTANCE_ID }}
         run: |
@@ -91,6 +124,7 @@ jobs:
 
       # 2) 수집(A)·쓰기(B)는 같은 바이너리 (실행 모드는 함수 환경 변수로 나뉜다)
       - name: 스케줄러 Lambda 교체
+        if: steps.changes.outputs.scheduler == 'true'
         run: |
           zip=artifacts/scheduler/scheduler-lambda.zip
           for fn in "$COLLECTOR_FUNCTION" "$WRITER_FUNCTION"; do
@@ -101,6 +135,7 @@ jobs:
 
       # 3) 해시가 붙은 assets는 오래 캐시하고, index.html은 매번 새로 받게 한다 (예전 index가 지운 파일을 가리키지 않게 index를 마지막에)
       - name: 프론트 배포 (S3 + CloudFront)
+        if: steps.changes.outputs.frontend == 'true'
         env:
           BUCKET: ${{ vars.FRONTEND_BUCKET }}
           DISTRIBUTION_ID: ${{ vars.CLOUDFRONT_DISTRIBUTION_ID }}

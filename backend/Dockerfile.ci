@@ -1,0 +1,27 @@
+# CI 전용 실행 이미지: CI의 backend 테스트 job이 만든 jar(ci-jar/app.jar)를 담기만 한다.
+#   Docker 안에서 Gradle을 다시 돌리지 않으므로 빌드가 몇십 초면 끝난다. jar는 CPU와 무관해 arm64 서버에서 그대로 돈다.
+#   (build/는 .dockerignore로 빠지므로 CI가 jar를 ci-jar/에 내려받는다)
+# 로컬(docker compose --profile app)은 소스부터 빌드하는 Dockerfile을 쓴다.
+# ⚠ 아래 실행 설정은 Dockerfile의 2) Run 단계와 같게 유지한다 (한쪽만 바꾸면 로컬과 운영이 달라진다)
+FROM eclipse-temurin:21-jre-alpine
+WORKDIR /app
+
+# root가 아닌 전용 사용자로 실행
+RUN addgroup -S app && adduser -S -G app app
+
+COPY ci-jar/app.jar app.jar
+
+# 시간대 등 JVM 옵션을 붙여 실행
+COPY --chmod=755 docker-entrypoint.sh /app/docker-entrypoint.sh
+
+USER app
+
+# 컨테이너 메모리 한도 기준으로 힙을 잡는다 (1GB 인스턴스에서 메타스페이스·OS·Redis 몫을 남기도록 60%)
+# OOM이 나면 비정상 상태로 버티지 않고 종료해 재시작되게 한다
+ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=60.0 -XX:+ExitOnOutOfMemoryError"
+
+EXPOSE 8090 8091
+# 관리 포트의 liveness 프로브로 상태 확인 (busybox wget 사용)
+HEALTHCHECK --interval=30s --timeout=3s --start-period=60s --retries=3   CMD wget -qO- http://127.0.0.1:8091/actuator/health/liveness > /dev/null || exit 1
+
+ENTRYPOINT ["/app/docker-entrypoint.sh"]

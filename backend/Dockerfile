@@ -18,6 +18,7 @@ RUN chmod +x gradlew \
  && ./gradlew clean bootJar -x test --no-daemon
 
 # 2) Run 단계: JRE만 포함해 경량화
+# ⚠ 운영 이미지는 CI가 Dockerfile.ci로 만든다. 이 단계의 실행 설정을 바꾸면 Dockerfile.ci도 같이 바꾼다
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
 

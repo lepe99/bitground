@@ -1,6 +1,9 @@
-# CI: PR·푸시마다 백엔드·스케줄러·프론트를 검사하고, dev·main에 올라가면 배포 산출물을 만든다.
+# CI: PR·푸시마다 바뀐 영역만 검사하고, main에 올라가면 배포 산출물을 만든다.
+#   변경 영역  .github/scripts/changed-areas.sh가 기준 커밋 이후 바뀐 영역(backend·server·scheduler·frontend)을 판정 → 안 바뀐 영역은 건너뜀
+#             기준: main 푸시 = 마지막 릴리즈 태그(운영에 나가 있는 커밋) · PR = 대상 브랜치 · dev 푸시 = 직전 푸시
+#             수동 실행·주간 정기 실행은 전체
 #   검사   backend(Gradle 테스트, Testcontainers MySQL·Redis) · scheduler(vet·테스트, Testcontainers MySQL) · frontend(lint·build)
-#   산출물 백엔드 arm64 이미지 → GHCR, 스케줄러 Lambda zip · 프론트 dist → Actions 산출물
+#   산출물 (main 푸시·수동 실행만) 백엔드 arm64 이미지 → GHCR, 스케줄러 Lambda zip · 프론트 dist · 변경 영역 → Actions 산출물
 # AWS에 올리는 일은 배포 워크플로가 맡는다 (이 워크플로에는 AWS 권한이 없다)
 name: CI
 
@@ -13,10 +16,14 @@ on:
     branches: [dev, main]
     paths-ignore: ['**/*.md', 'docs/**']
   workflow_dispatch:
+  # 매주 월요일 03:00(KST) 전체 테스트 (배포 없음): 한동안 안 바뀐 영역의 테스트가
+  # 환경 변화(Testcontainers 이미지, 러너 등)로 깨진 것을 그 영역을 고치기 전에 찾는다
+  schedule:
+    - cron: "0 18 * * 0"
 
-# 같은 브랜치·PR에 새 커밋이 오면 이전 실행은 취소한다
+# 같은 브랜치·PR에 새 커밋이 오면 이전 실행은 취소한다 (정기 실행은 따로 묶어 main 푸시를 취소하지 않게)
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.event_name == 'schedule' && 'weekly' || github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -26,6 +33,70 @@ env:
   IMAGE: ghcr.io/${{ github.repository_owner }}/bitground-backend
 
 jobs:
+  # 기준 커밋 이후 바뀐 영역을 판정한다. 애매하면 더 많이 실행하는 쪽으로 (판정 규칙은 스크립트 머리말)
+  changes:
+    name: 변경 영역
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      backend: ${{ steps.areas.outputs.backend }}
+      server: ${{ steps.areas.outputs.server }}
+      scheduler: ${{ steps.areas.outputs.scheduler }}
+      frontend: ${{ steps.areas.outputs.frontend }}
+      # 배포 산출물(이미지·zip·dist)을 만들지: main 푸시·수동 실행
+      publish: ${{ steps.areas.outputs.publish }}
+      # 기준 커밋. main 푸시에서는 운영 중인 이미지의 태그이기도 하다 (백엔드가 그대로면 이 이미지를 다시 쓴다)
+      base_sha: ${{ steps.areas.outputs.base_sha }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0 # 기준 커밋(릴리즈 태그·이전 푸시)과 비교하려면 이력·태그가 필요
+          fetch-tags: true
+      - id: areas
+        name: 기준 커밋 이후 바뀐 영역
+        env:
+          EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          base=""
+          case "$EVENT" in
+            pull_request) base=$PR_BASE ;;
+            push)
+              if [ "$GITHUB_REF" = refs/heads/main ]; then
+                # 직전 커밋이 아니라 마지막 릴리즈 태그와 비교한다. Deploy는 모두 성공해야 태그를 만들므로 이 태그가 운영에 나가 있는 커밋이다.
+                # 직전 커밋과 비교하면, 앞 배포가 실패·취소됐을 때 그 변경이 다음 릴리즈에서도 빠진 채 배포된다
+                base=$(git describe --tags --abbrev=0 --match 'v*' HEAD 2>/dev/null || true)
+              else
+                base=$BEFORE # 새 브랜치(000…)·강제 푸시로 없는 커밋이면 스크립트가 전체로 판정
+              fi ;;
+            # workflow_dispatch·schedule: 기준 없음 → 전체
+          esac
+
+          mkdir -p "$RUNNER_TEMP/changes"
+          bash .github/scripts/changed-areas.sh "$base" > "$RUNNER_TEMP/changes/changes.env"
+          cat "$RUNNER_TEMP/changes/changes.env" >> "$GITHUB_OUTPUT"
+
+          publish=false
+          if [ "$EVENT" = workflow_dispatch ] || { [ "$EVENT" = push ] && [ "$GITHUB_REF" = refs/heads/main ]; }; then publish=true; fi
+          base_sha=$( [ -n "$base" ] && git rev-parse -q --verify "$base^{commit}" || true)
+          echo "publish=$publish" >> "$GITHUB_OUTPUT"
+          echo "base_sha=$base_sha" >> "$GITHUB_OUTPUT"
+
+          {
+            echo "### 변경 영역 (기준: ${base:-없음 → 전체})"
+            echo '| 영역 | 실행 |'
+            echo '|---|---|'
+            sed 's/^\(.*\)=\(.*\)$/| \1 | \2 |/' "$RUNNER_TEMP/changes/changes.env"
+          } >> "$GITHUB_STEP_SUMMARY"
+      # Deploy가 이 결과로 단계를 건너뛴다
+      - uses: actions/upload-artifact@v7
+        if: steps.areas.outputs.publish == 'true'
+        with:
+          name: changes
+          path: ${{ runner.temp }}/changes/changes.env
+          retention-days: 30
+
   # main으로 가는 PR: 릴리즈 버전을 올렸는지 확인 (병합되면 Deploy가 이 버전으로 태그·릴리즈를 만든다)
   release-version:
     name: 릴리즈 버전 확인
@@ -46,6 +117,8 @@ jobs:
 
   backend:
     name: backend 테스트
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     defaults:
@@ -59,7 +132,9 @@ jobs:
           java-version: "21"
       - uses: gradle/actions/setup-gradle@v5
       # @Tag("eval")(실제 Gemini 호출)은 build.gradle에서 빠진다
-      - run: ./gradlew test --no-daemon
+      # 이미지에 담을 jar도 여기서 만든다: 이미지 job이 Docker 안에서 Gradle을 처음부터 다시 돌리지 않게 (테스트가 실패하면 만들지 않음)
+      # build가 아니라 bootJar만: build는 -plain.jar까지 만들어 jar가 두 개가 된다
+      - run: ./gradlew test bootJar --no-daemon
       # 실패한 테스트를 PR·커밋 화면에 주석으로 남긴다 (로그를 열지 않아도 원인이 보이게)
       - name: 테스트 결과 주석
         if: ${{ !cancelled() }}
@@ -75,9 +150,24 @@ jobs:
           name: backend-test-report
           path: backend/build/reports/tests/test
           retention-days: 7
+      # build/는 .dockerignore로 빌드 컨텍스트에서 빠지므로 ci-jar/로 옮겨 넘긴다 (Dockerfile.ci가 읽는 자리)
+      - name: 이미지용 jar
+        if: needs.changes.outputs.publish == 'true'
+        run: |
+          jars=(build/libs/*.jar)
+          if [ "${#jars[@]}" -ne 1 ]; then echo "::error::jar가 하나가 아닙니다: ${jars[*]}"; exit 1; fi
+          mkdir -p ci-jar && cp "${jars[0]}" ci-jar/app.jar
+      - uses: actions/upload-artifact@v7
+        if: needs.changes.outputs.publish == 'true'
+        with:
+          name: backend-jar
+          path: backend/ci-jar/app.jar
+          retention-days: 1
 
   scheduler:
     name: scheduler 테스트
+    needs: changes
+    if: needs.changes.outputs.scheduler == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     defaults:
@@ -99,7 +189,7 @@ jobs:
       - name: Lambda zip (arm64, provided.al2023)
         run: ./build-lambda.sh
       - uses: actions/upload-artifact@v7
-        if: github.event_name != 'pull_request'
+        if: needs.changes.outputs.publish == 'true'
         with:
           name: scheduler-lambda
           path: scheduler/dist/scheduler-lambda.zip
@@ -107,6 +197,8 @@ jobs:
 
   frontend:
     name: frontend lint·build
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     defaults:
@@ -127,17 +219,19 @@ jobs:
           VITE_API_URL: ${{ vars.VITE_API_URL }}
           VITE_GRAFANA_URL: ${{ vars.VITE_GRAFANA_URL }}
       - uses: actions/upload-artifact@v7
-        if: github.event_name != 'pull_request'
+        if: needs.changes.outputs.publish == 'true'
         with:
           name: frontend-dist
           path: frontend/dist
           retention-days: 30
 
-  # 검사를 모두 통과하고 dev·main에 푸시됐거나 수동 실행했을 때만 이미지를 올린다 (PR에서는 올리지 않음)
+  # 검사를 모두 통과하고 main에 푸시됐거나 수동 실행했을 때만 이미지를 올린다 (dev는 배포하지 않으므로 만들지 않음)
   backend-image:
     name: backend 이미지 (arm64 → GHCR)
-    needs: [backend, scheduler, frontend]
-    if: github.event_name != 'pull_request'
+    needs: [changes, backend, scheduler, frontend]
+    # 안 바뀌어 건너뛴 job이 섞여도 실행한다. 기본값은 needs 중 하나라도 skipped면 이 job도 건너뛰어,
+    # 백엔드가 그대로인 릴리즈에서 커밋 태그 이미지가 없어 배포가 실패한다. 실패·취소가 있으면 그대로 멈춘다
+    if: ${{ !cancelled() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') && needs.changes.outputs.publish == 'true' }}
     # 운영 서버(t4g, Graviton)와 같은 arm64 러너에서 에뮬레이션 없이 빌드 (공개 저장소 무료)
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 30
@@ -152,8 +246,42 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      # 이미지 만드는 방법 (배포는 언제나 '이 커밋 해시 태그' 이미지를 받으므로 셋 다 그 태그를 남긴다)
+      #   jar    백엔드가 바뀜 → 테스트 job이 만든 jar를 Dockerfile.ci로 포장 (Gradle을 다시 돌리지 않음)
+      #   retag  백엔드가 그대로 → 운영 중인 이미지(마지막 릴리즈 커밋)에 이 커밋 태그만 더 붙임 (몇 초, 내려받지 않음)
+      #   full   그대로인데 원본 이미지가 없음(첫 실행·정리됨) → Dockerfile로 소스부터 빌드 (느리지만 실패하지 않게)
+      - id: mode
+        name: 이미지 만드는 방법
+        env:
+          BACKEND_RESULT: ${{ needs.backend.result }}
+          BASE_SHA: ${{ needs.changes.outputs.base_sha }}
+        run: |
+          if [ "$BACKEND_RESULT" = success ]; then
+            mode=jar
+          elif [ -n "$BASE_SHA" ] && docker buildx imagetools inspect "$IMAGE:$BASE_SHA" > /dev/null 2>&1; then
+            mode=retag
+          else
+            mode=full
+          fi
+          echo "mode=$mode" >> "$GITHUB_OUTPUT"
+          echo "백엔드 이미지: $mode" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: 운영 중인 이미지에 이 커밋 태그 붙이기
+        if: steps.mode.outputs.mode == 'retag'
+        env:
+          BASE_SHA: ${{ needs.changes.outputs.base_sha }}
+        run: |
+          docker buildx imagetools create -t "$IMAGE:$GITHUB_SHA" -t "$IMAGE:$GITHUB_REF_NAME" "$IMAGE:$BASE_SHA"
+          echo "$IMAGE:$BASE_SHA → $GITHUB_SHA, $GITHUB_REF_NAME" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/download-artifact@v8
+        if: steps.mode.outputs.mode == 'jar'
+        with:
+          name: backend-jar
+          path: backend/ci-jar
       # 태그: 커밋 해시(배포가 정확히 이 버전을 가리킴) + 브랜치 이름(dev/main 최신)
       - id: meta
+        if: steps.mode.outputs.mode != 'retag'
         uses: docker/metadata-action@v6
         with:
           images: ${{ env.IMAGE }}
@@ -163,11 +291,13 @@ jobs:
           labels: |
             org.opencontainers.image.title=bitground-backend
       - uses: docker/build-push-action@v7
+        if: steps.mode.outputs.mode != 'retag'
         with:
           context: backend
+          file: backend/${{ steps.mode.outputs.mode == 'jar' && 'Dockerfile.ci' || 'Dockerfile' }}
           platforms: linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=backend-arm64
-          cache-to: type=gha,mode=max,scope=backend-arm64
+          cache-from: type=gha,scope=backend-arm64-${{ steps.mode.outputs.mode }}
+          cache-to: type=gha,mode=max,scope=backend-arm64-${{ steps.mode.outputs.mode }}
