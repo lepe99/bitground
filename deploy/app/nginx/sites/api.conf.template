@@ -12,12 +12,19 @@ server {
 
     # 외부 가동 상태 확인(UptimeRobot 등)용. 백엔드가 DB·Redis까지 받을 준비가 됐는지 본다 (상세 내용은 응답하지 않음)
     location = /healthz {
-        proxy_pass http://backend:8091/actuator/health/readiness;
+        proxy_pass http://backend_mgmt/actuator/health/readiness;
     }
 
     # REST API, WebSocket(/ws/**), SSE(/notifications/subscribe)
     location / {
         proxy_pass http://backend_api;
+        # 배포 중 내려가는 컨테이너에 연결이 안 되면 바로 다른 컨테이너로 다시 보낸다
+        # (연결 단계 실패만 재시도하므로 주문 같은 POST가 두 번 처리되지 않는다)
+        proxy_connect_timeout 2s;
+        proxy_next_upstream error timeout;
+        # 교체 중에는 주소가 잠깐 3개(새 것, 이전 것, 방금 지운 것)일 수 있어 3번까지
+        proxy_next_upstream_tries 3;
+        proxy_next_upstream_timeout 10s;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         # 받은 X-Forwarded-For를 이어 붙이지 않고 실제 접속 IP로 덮어쓴다 (백엔드의 IP별 요청 제한을 헤더 위조로 피할 수 없게)

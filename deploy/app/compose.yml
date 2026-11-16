@@ -7,7 +7,7 @@
 # 외부에 여는 포트 (보안 그룹으로 출발지를 제한):
 #   80, 443  nginx      인터넷 전체 (HTTPS, Let's Encrypt 인증서 발급)
 #   3306     mysql      쓰기 Lambda(B) 보안 그룹만
-#   8090     backend    쓰기 Lambda(B) 보안 그룹만 (시즌·스플릿 완료 알림)
+#   8090     nginx      쓰기 Lambda(B) 보안 그룹만 (시즌·스플릿 완료 알림, 백엔드로 넘김)
 #   8888     tinyproxy  모니터링 서버 보안 그룹만 (모니터링 서버의 외부 통신 출구)
 # 관리 포트 8091(actuator)은 열지 않는다. 같은 네트워크의 alloy·nginx만 접근한다.
 #
@@ -43,6 +43,7 @@ services:
     ports:
       - "80:80"
       - "443:443"
+      - "8090:8090" # 쓰기 Lambda(B) → 백엔드 완료 알림 (보안 그룹으로 Lambda B만)
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/base.conf:/etc/bitground/base.conf:ro
@@ -83,8 +84,9 @@ services:
       REDIS_HOST: redis
       SERVER_TOMCAT_THREADS_MAX: "80" # 2 vCPU에서 200보다 지연이 짧았다 (부하 테스트 500명 p95 402ms vs 650ms)
       LOGGING_STRUCTURED_FORMAT_CONSOLE: logstash # JSON 로그 → Alloy → Loki
-    ports:
-      - "8090:8090" # 쓰기 Lambda(B)의 완료 알림용. 인터넷에는 보안 그룹으로 막는다 (사용자 요청은 nginx 443)
+    # 호스트 포트를 열지 않는다: 무중단 배포 때 컨테이너가 잠시 2개가 되기 때문 (Lambda B의 8090은 nginx가 받아 넘긴다)
+    # SIGTERM 후 처리 중인 요청을 끝낼 시간 (스프링 graceful shutdown 20초 + 여유)
+    stop_grace_period: 30s
     depends_on:
       mysql:
         condition: service_healthy

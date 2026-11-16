@@ -1,6 +1,9 @@
 # 비밀값과 환경별 값은 환경변수로 주입한다.
 # 로컬에서는 backend/.env 파일을 읽는다 (.env.example 참고, 커밋 금지).
 spring:
+  # 종료 신호(SIGTERM)를 받으면 새 요청은 받지 않고 처리 중인 요청을 끝낸 뒤 내려간다 (무중단 배포 때 이전 컨테이너)
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
   # BigDecimal 금액·수량을 1E-8 같은 지수 표기 없이 숫자 그대로 응답
   jackson:
     generator:
@@ -137,6 +140,7 @@ spring:
 # 서버 포트, 프록시(로드밸런서/CloudFront) 뒤에서 X-Forwarded-* 헤더 신뢰
 server:
   port: 8090
+  shutdown: graceful
   forward-headers-strategy: framework
 
 # swagger doc

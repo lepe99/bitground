@@ -36,8 +36,8 @@ for k in sorted(cpu):
 EOF
   echo "backend log lines with ERROR or Deadlock:"
   since=$(( $(date +%s) - $(cat "$WORK/$TAG.start") + 5 ))
-  docker logs bitground-backend-1 --since "${since}s" 2>&1 | grep -c -E '"level":"ERROR"|Deadlock' || true
+  docker logs $(docker compose ps -q backend | head -1) --since "${since}s" 2>&1 | grep -c -E '"level":"ERROR"|Deadlock' || true
   echo "nginx error log (worker_connections / alert / emerg):"
-  docker logs bitground-nginx-1 --since "${since}s" 2>&1 | grep -E 'worker_connections|\[alert\]|\[emerg\]|\[crit\]' | sed -E 's/^.*[0-9]+#[0-9]+: //' | cut -c1-160 | sort | uniq -c | sort -rn | head -5
+  docker logs bitground-nginx-1 --since "${since}s" 2>&1 | grep -E 'worker_connections|\[alert\]|\[emerg\]|\[crit\]' | sed -E 's/^.*[0-9]+#[0-9]+: //' | cut -c1-160 | sort | uniq -c | sort -rn | head -5 || true
   echo "oom-kill (kernel, this window): $(journalctl -k --since "@$(cat "$WORK/$TAG.start")" --no-pager 2>/dev/null | grep -c 'Killed process' || true)"
 fi

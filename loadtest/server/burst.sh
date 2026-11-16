@@ -53,6 +53,6 @@ SELECT 'deadlocks_delta', COUNT - $DL0 FROM information_schema.INNODB_METRICS WH
 EOF
 python3 -c "import time; print('trigger_to_now_s', round(time.time() - $T0, 1))"
 echo "== 백엔드 로그: 재구성·오류"
-docker logs bitground-backend-1 --since 4m 2>&1 | grep -E 'rebuilt from DB|Deadlock|"level":"ERROR"' | cut -c1-300 | tail -5
+docker logs $(docker compose ps -q backend | head -1) --since 4m 2>&1 | grep -E 'rebuilt from DB|Deadlock|"level":"ERROR"' | cut -c1-300 | tail -5
 echo "== 체결 스트림"
 for k in $(r --scan --pattern '*exec*'); do echo "$k xlen=$(r XLEN "$k") pending=$(r XPENDING "$k" order-executors 2>/dev/null | head -1)"; done
