@@ -76,7 +76,7 @@
 1. 검색어 = 대상 이름 + 오늘 기사 제목 → `gemini-embedding-2` (`task: search result | query: {검색어}` 형식)
 2. Pinecone 검색: 코인은 `symbols`에 그 코인이 있는 기사만, 발행 시각은 **30일 전 ~ 24시간 전** (오늘 기사는 `<news>`로 따로 들어가므로 배경은 그 이전 흐름만)
 3. 유사도 0.65 이상, 오늘 기사와 링크·제목이 겹치지 않는 기사 최대 4건 → 프롬프트 `<context>` 블록
-4. 모델은 `background`에 지난 흐름 1~2문장을 날짜와 함께 씁니다. 오늘 움직임과 인과로 잇지 않습니다 (코드가 인과 표현·인용 누락을 검증)
+4. 모델은 `background`에 지난 흐름 1~2문장을 날짜와 함께 씁니다. 오늘 움직임과 인과로 잇지 않습니다 (코드가 인과 표현·인용 누락을 검증).
 5. 화면(최신동향 AI 분석)에 '지난 흐름' 칸과 참고 기사의 '지난 흐름' 표시
 
 Pinecone 키가 없거나 검색이 실패하면 배경 없이 만듭니다. 아카이브를 막 시작하면 24시간보다 오래된 기사가 없어 배경이 비어 있고, 매시간 수집이 하루 넘게 쌓이면 채워집니다.
@@ -92,7 +92,7 @@ docker compose --profile app --profile scheduler run --rm -e RUN_HOURLY= -e NEWS
 docker compose --profile app --profile scheduler run --rm -e RUN_HOURLY= -e NEWS_REEMBED=all -e NEWS_EMBED_RPM=60 scheduler
 ```
 
-- 2026-11-06: gemini-embedding-2가 taskType을 받지 않아 입력 형식을 `title: … | text: …` / `task: search result | query: …`로 바꾸고 전체(약 1,500건)를 다시 임베딩했습니다
+- 2026-11-06: gemini-embedding-2가 taskType을 받지 않아 입력 형식을 `title: … | text: …` / `task: search result | query: …`로 바꾸고 전체(약 1,500건)를 다시 임베딩했습니다.
 
 ## 확인할 것
 
