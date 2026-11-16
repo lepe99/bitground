@@ -6,6 +6,11 @@
 릴리즈 방법: `dev`에서 `frontend/package.json`·`backend/build.gradle` 버전을 올리고 이 파일 맨 위에 새 항목을 쓴 뒤 `main`으로 PR을 병합한다.
 PR에서 세 곳의 버전이 같은지와 새 버전인지 검사하고, 병합 후 운영 배포가 성공하면 `vX.Y.Z` 태그와 GitHub Release(본문은 아래 항목)가 자동으로 만들어진다.
 
+## [2.2.1] - 2026-11-16
+
+### 수정
+- `/healthz`가 400을 돌려주던 문제 (2.2.0 배포 확인 단계 실패): 헬스 체크 경로가 upstream 이름 `backend_mgmt`를 Host 헤더로 보냈고, Tomcat은 밑줄이 든 Host를 거절한다. upstream 이름을 `backend-api`·`backend-mgmt`로 바꾸고 헬스 체크에도 Host를 지정
+
 ## [2.2.0] - 2026-11-16
 
 ### 추가

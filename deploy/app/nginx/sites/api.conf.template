@@ -12,12 +12,13 @@ server {
 
     # 외부 가동 상태 확인(UptimeRobot 등)용. 백엔드가 DB·Redis까지 받을 준비가 됐는지 본다 (상세 내용은 응답하지 않음)
     location = /healthz {
-        proxy_pass http://backend_mgmt/actuator/health/readiness;
+        proxy_pass http://backend-mgmt/actuator/health/readiness;
+        proxy_set_header Host $host;
     }
 
     # REST API, WebSocket(/ws/**), SSE(/notifications/subscribe)
     location / {
-        proxy_pass http://backend_api;
+        proxy_pass http://backend-api;
         # 배포 중 내려가는 컨테이너에 연결이 안 되면 바로 다른 컨테이너로 다시 보낸다
         # (연결 단계 실패만 재시도하므로 주문 같은 POST가 두 번 처리되지 않는다)
         proxy_connect_timeout 2s;
