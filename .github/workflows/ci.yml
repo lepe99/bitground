@@ -4,11 +4,14 @@
 # AWS에 올리는 일은 배포 워크플로가 맡는다 (이 워크플로에는 AWS 권한이 없다)
 name: CI
 
+# 문서만 바뀐 커밋·PR은 검사하지 않는다 (CI가 돌지 않으면 배포·릴리즈도 없다). 코드가 하나라도 섞이면 그대로 돈다
 on:
   pull_request:
     branches: [dev, main]
+    paths-ignore: ['**/*.md', 'docs/**']
   push:
     branches: [dev, main]
+    paths-ignore: ['**/*.md', 'docs/**']
   workflow_dispatch:
 
 # 같은 브랜치·PR에 새 커밋이 오면 이전 실행은 취소한다
