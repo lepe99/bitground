@@ -2,7 +2,7 @@
 
 [← README로 돌아가기](../README.md)
 
-Bitground v2의 구성과 흐름을 그린 그림 15장입니다. README에는 이 중 8장을 넣었고, 여기에는 전부 모았습니다. 모두 아트보드의 2배 해상도로 캡처했습니다. 이미지를 누르면 원본 크기로 볼 수 있습니다.
+Bitground v2의 구성과 흐름을 그린 그림 15장입니다. README에는 이 중 8장을 넣었고 여기에는 전부 모았습니다. 모두 아트보드의 2배 해상도라 이미지를 누르면 원본 크기로 선명하게 볼 수 있습니다.
 
 [구조](#구조) · [흐름](#흐름) · [v1 대 v2](#v1-대-v2) · [문제 해결](#문제-해결) · [데이터](#데이터)
 
@@ -12,19 +12,19 @@ Bitground v2의 구성과 흐름을 그린 그림 15장입니다. README에는 �
 
 ![운영 구성](img/architecture.png)
 
-AWS 서울 리전의 EC2 2대와 Lambda 3개(스케줄러 2 · 로그 전달 1)로 운영합니다. NAT 게이트웨이와 로드밸런서 없이 월 약 $32입니다. 서버 구성은 [deploy/README.md](../deploy/README.md)에 있습니다.
+AWS 서울 리전의 EC2 2대와 Lambda 3개(스케줄러 2 · 로그 전달 1)로 운영합니다. NAT 게이트웨이와 로드밸런서 없이 운영해 월 비용은 약 $32입니다. 서버 구성은 [deploy/README.md](../deploy/README.md)에 있습니다.
 
 ### 관측성 경로
 
 ![관측성 경로](img/observability.png)
 
-로그·지표·경보가 지나는 길입니다. 1차 부하 테스트에서 Nginx가 죽자 Grafana 화면도 열리지 않아, 앱 서버와 함께 멈추는 지점을 따로 표시했습니다.
+로그·지표·경보가 지나는 길입니다. 1차 부하 테스트에서 Nginx가 죽자 Grafana 화면도 열리지 않아 앱 서버와 함께 멈추는 지점을 따로 표시했습니다.
 
 ### CI/CD 파이프라인
 
 ![CI/CD 파이프라인](img/cicd.png)
 
-마지막 릴리즈 태그 이후 바뀐 영역만 검사하고 배포합니다. 문서·버전만 바뀐 릴리즈는 병합부터 운영 반영까지 6분 10초에서 1분 12초로 줄었습니다. 워크플로는 [.github/workflows](../.github/workflows)에 있습니다.
+마지막 릴리즈 태그 이후 바뀐 영역만 검사하고 배포합니다. 문서·버전만 바뀐 릴리즈는 병합부터 운영 반영까지 걸리는 시간이 6분 10초에서 1분 12초로 줄었습니다. 워크플로는 [.github/workflows](../.github/workflows)에서 볼 수 있습니다.
 
 ### 월 운영비 분해
 
@@ -36,7 +36,7 @@ AWS 서울 리전의 EC2 2대와 Lambda 3개(스케줄러 2 · 로그 전달 1)�
 
 ![인프라 v1 대 v2](img/infra-v1-v2.png)
 
-6명이 NCP에 만든 v1과 혼자 AWS로 옮긴 v2를 영역별로 비교하고, 바꾼 이유와 대가를 적었습니다.
+6명이 NCP에 만든 v1과 혼자 AWS로 옮긴 v2를 영역별로 비교하고 바꾼 이유와 대가를 적었습니다.
 
 ## 흐름
 
@@ -50,19 +50,19 @@ AWS 서울 리전의 EC2 2대와 Lambda 3개(스케줄러 2 · 로그 전달 1)�
 
 ![무중단 배포 이전·이후](img/rollout.png)
 
-부하 중 백엔드 재시작은 2분 7초 동안 전부 502였고, 컨테이너 2개를 겹쳐 교체하도록 바꾼 뒤 5xx가 0건이었습니다. 근거: [부하 테스트 보고서](LOAD_TEST.md) S3·S4, [rollout.sh](../deploy/app/rollout.sh)
+부하 중에 백엔드를 재시작하면 2분 7초 동안 응답이 전부 502였는데, 컨테이너 2개를 겹쳐 교체하도록 바꾼 뒤에는 5xx가 0건이 됐습니다. 근거: [부하 테스트 보고서](LOAD_TEST.md) S3·S4, [rollout.sh](../deploy/app/rollout.sh)
 
 ### 리프레시 토큰 재사용 탐지
 
 ![리프레시 토큰 재사용 탐지](img/token-family.png)
 
-이미 교체된 리프레시 토큰이 다시 오면 그 로그인의 토큰 패밀리 전체를 폐기합니다. 근거: 커밋 [b577de4](https://github.com/lepe99/bitground/commit/b577de4), 테스트 [AuthTokenTest](../backend/src/test/java/bit/bitgroundspring/auth/AuthTokenTest.java)
+이미 교체된 리프레시 토큰이 다시 오면 해당 로그인의 토큰 패밀리 전체를 폐기합니다. 근거: 커밋 [b577de4](https://github.com/lepe99/bitground/commit/b577de4), 테스트 [AuthTokenTest](../backend/src/test/java/bit/bitgroundspring/auth/AuthTokenTest.java)
 
 ### 스케줄러 Lambda 분리
 
 ![스케줄러 Lambda 분리](img/lambda-split.png)
 
-외부 API를 부르는 수집과 DB에 쓰는 쓰기를 나눠, NAT 없이 DB를 비공개로 둡니다. 근거: 커밋 [38aea34](https://github.com/lepe99/bitground/commit/38aea34) · [328f423](https://github.com/lepe99/bitground/commit/328f423)
+외부 API를 부르는 수집과 DB 쓰기 작업을 나눠 NAT 없이 DB를 비공개로 둡니다. 근거: 커밋 [38aea34](https://github.com/lepe99/bitground/commit/38aea34) · [328f423](https://github.com/lepe99/bitground/commit/328f423)
 
 ## v1 대 v2
 
@@ -70,7 +70,7 @@ AWS 서울 리전의 EC2 2대와 Lambda 3개(스케줄러 2 · 로그 전달 1)�
 
 ![알림 v1 대 v2](img/notification-v1-v2.png)
 
-v1은 1번 사용자를 전체 알림용 더미 계정으로 두고 공지·시즌 알림을 그 행에 모았습니다. v2는 사용자별로 저장하고, 사용자가 연결된 서버가 보냅니다. 근거: 커밋 [293127d](https://github.com/lepe99/bitground/commit/293127d) · [8391394](https://github.com/lepe99/bitground/commit/8391394), 테스트 [UserSseEmittersTest](../backend/src/test/java/bit/bitgroundspring/notification/UserSseEmittersTest.java) · [NotificationApiTest](../backend/src/test/java/bit/bitgroundspring/api/NotificationApiTest.java)
+v1은 1번 사용자를 전체 알림용 더미 계정으로 두고 공지·시즌 알림을 그 계정에 모았습니다. v2는 알림을 사용자별로 저장하고 사용자가 연결된 서버가 보냅니다. 근거: 커밋 [293127d](https://github.com/lepe99/bitground/commit/293127d) · [8391394](https://github.com/lepe99/bitground/commit/8391394), 테스트 [UserSseEmittersTest](../backend/src/test/java/bit/bitgroundspring/notification/UserSseEmittersTest.java) · [NotificationApiTest](../backend/src/test/java/bit/bitgroundspring/api/NotificationApiTest.java)
 
 ### 시즌 정산 v1 대 v2
 
@@ -84,7 +84,7 @@ v1은 1번 사용자를 전체 알림용 더미 계정으로 두고 공지·시�
 
 ![부하 테스트 3회 개선](img/load-test.png)
 
-측정 → 원인 → 수정을 세 번 반복해 500명에서 오류 35%를 0%로 줄였습니다. 상세는 [부하 테스트 보고서](LOAD_TEST.md)에 있습니다.
+측정 → 원인 → 수정을 세 번 반복해 500명일 때 오류율을 35%에서 0%로 줄였습니다. 자세한 내용은 [부하 테스트 보고서](LOAD_TEST.md)에 정리했습니다.
 
 ### 데드락 2건
 
@@ -98,10 +98,10 @@ v1은 1번 사용자를 전체 알림용 더미 계정으로 두고 공지·시�
 
 ![핵심 테이블 ERD](img/erd-core.png)
 
-테이블 21개 중 거래·시즌·알림 흐름에 쓰이는 11개와 유니크 키가 지키는 것을 정리했습니다.
+테이블 21개 중 거래·시즌·알림 흐름에 쓰이는 11개와, 유니크 키로 막는 중복을 정리했습니다.
 
 ### 전체 ERD
 
 ![전체 ERD](img/erd-full.png)
 
-테이블 21개 전부와 컬럼 타입, 외래 키 24개를 그렸습니다. 그림이 커서 눌러서 원본 크기로 보는 편이 좋습니다. 스키마는 [Flyway 마이그레이션](../backend/src/main/resources/db/migration)으로 관리합니다.
+테이블 21개 전부와 컬럼 타입, 외래 키 24개를 그렸습니다. 그림이 크므로 눌러서 원본 크기로 보는 편이 좋습니다. 스키마는 [Flyway 마이그레이션](../backend/src/main/resources/db/migration)으로 관리합니다.
