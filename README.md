@@ -53,7 +53,7 @@
 - **근거**: 커밋 [4f05885](https://github.com/lepe99/bitground/commit/4f05885) · [0749c83](https://github.com/lepe99/bitground/commit/0749c83) · [38aea34](https://github.com/lepe99/bitground/commit/38aea34), 통합 테스트 [main_test.go](scheduler/main_test.go)(커밋 [328f423](https://github.com/lepe99/bitground/commit/328f423)) · [season_test.go](scheduler/service/season_test.go), 그림 [시즌 정산 이전·이후](docs/DIAGRAMS.md#시즌-정산-v1-대-v2) · [Lambda 분리](docs/DIAGRAMS.md#스케줄러-lambda-분리)
 
 ### 3. 알림 (SSE)
-- **찾은 한계**: 공지·시즌 알림을 1번 사용자(전체 알림용 더미 계정)에게 모아 모두가 함께 읽게 했는데, 더미라는 전제가 코드나 스키마에 없고 데이터로만 존재했습니다. 1번이 실제 가입자인 운영 DB에서는 **그 사람의 체결 알림이 모든 사용자에게 보였습니다.** 읽음 여부도 1번 행 하나를 같이 써서 읽지 않은 개수에 잡히지 않았고, 비로그인 상태에서도 재연결을 몇 초에 100번 넘게 반복했습니다.
+- **찾은 한계**: 공지·시즌 알림을 1번 사용자(전체 알림용 더미 계정) 행 하나에 저장해 모두가 함께 읽게 해서, 사용자마다 읽음 여부를 둘 수 없었고 읽지 않은 개수에도 잡히지 않았습니다. 더미라는 전제는 코드나 스키마에 없이 데이터로만 존재해, 1번에 실제 사용자가 들어가면 그 사람의 체결 알림이 모두에게 보이는 구조였습니다. 비로그인 상태에서도 재연결을 몇 초에 100번 넘게 반복했습니다.
 - **해법**: 사용자별 저장과 지난 알림 백필, 로그인했을 때만 연결하고 지수 백오프로 재연결합니다. 알림은 먼저 저장하고 커밋 뒤에 보내며 여러 서버 중 사용자가 붙어 있는 서버가 보냅니다. 배포로 SSE가 끊겨도 알림은 알림함에 남습니다.
 - **근거**: 커밋 [293127d](https://github.com/lepe99/bitground/commit/293127d) · [8391394](https://github.com/lepe99/bitground/commit/8391394), 테스트 [UserSseEmittersTest](backend/src/test/java/bit/bitgroundspring/notification/UserSseEmittersTest.java) · [NotificationApiTest](backend/src/test/java/bit/bitgroundspring/api/NotificationApiTest.java), 그림 [알림 이전·이후](docs/DIAGRAMS.md#알림-v1-대-v2)
 
