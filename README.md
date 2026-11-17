@@ -6,15 +6,9 @@
 
 **https://www.bitground.kr** · 구글·네이버·카카오 계정으로 바로 로그인
 
-[핵심 수치](#핵심-수치) · [아키텍처](#아키텍처) · [v1 → v2](#v1--v2-같은-문제를-두-번-풀었습니다) · [부하 테스트](#부하-테스트와-운영-개선) · [결정과 대가](#기술적-결정과-대가) · [역할](#역할) · [문서](#저장소-구성과-문서) · [다이어그램 15장](docs/DIAGRAMS.md)
+[핵심 수치](#핵심-수치) · [아키텍처](#아키텍처) · [다시 설계한 부분](#다시-설계한-부분) · [부하 테스트](#부하-테스트와-운영-개선) · [결정과 대가](#기술적-결정과-대가) · [역할](#역할) · [문서](#저장소-구성과-문서) · [다이어그램 15장](docs/DIAGRAMS.md)
 
-이 저장소는 6인 팀 프로젝트(v1)를 혼자 다시 설계·운영한 **v2**입니다. v1에서 맡았던 부분(로그인·알림·예약 주문·스케줄러·모니터링)의 한계를 직접 찾아 고쳤고, AWS에 올려 운영하면서 부하 테스트로 한계를 확인했습니다.
-
-| | v1 (팀) | v2 (이 저장소, 개인) |
-|---|---|---|
-| 기간 | 2025-05 ~ 07, 6주 · 6명 | 2026-11-02 ~ (운영 중) |
-| 클라우드 | NCP (로드밸런서, NAT, 관리형 DB, Jenkins) | AWS (EC2 2대 + Lambda 3개, 월 약 $32) |
-| 저장소 | [spring](https://github.com/lepe99/spring-bitground) · [react](https://github.com/lepe99/react-bitground) · [go](https://github.com/lepe99/go-bitground) | 모노레포 (`backend` · `frontend` · `scheduler` · `deploy` · `monitoring` · `loadtest`) |
+6인 팀 프로젝트로 만든 v1([spring](https://github.com/lepe99/spring-bitground) · [react](https://github.com/lepe99/react-bitground) · [go](https://github.com/lepe99/go-bitground))을 2026년 11월부터 혼자 다시 설계하고 AWS에서 운영하는 저장소입니다.
 
 ## 핵심 수치
 
@@ -43,39 +37,35 @@
 
 원본은 DB의 PENDING 주문이고, Redis는 가격 매칭용 사본입니다. 체결 요청은 커밋한 뒤에만 확인(ack)하고 이벤트는 아웃박스를 거쳐 발행하므로, 서버나 Redis가 죽어도 다시 처리하고 중복은 DB에서 걸러 냅니다.
 
-## v1 → v2: 같은 문제를 두 번 풀었습니다
+## 다시 설계한 부분
 
-v1에서 제가 구현했던 기능을 다시 점검해 찾은 한계와 v2의 해법입니다. 항목마다 근거 커밋과 테스트, 그림을 달았습니다.
+팀 프로젝트 때 제가 구현한 기능을 다시 점검해 찾은 한계와 해법입니다. 항목마다 근거 커밋과 테스트, 그림을 달았습니다.
 
 ### 1. 예약 주문 체결
-- **v1**: 시세를 100ms마다 Redis에 일괄 저장(MSET)하고 Sorted Set으로 체결할 주문을 찾아 Redis List 큐로 처리했습니다.
-- **찾은 한계**: 큐를 100ms마다 1건만 꺼냈고 5분 지난 메시지는 버려서 그 주문이 PENDING으로 영영 남았습니다. 일괄 저장한 시세는 **읽는 곳이 없었습니다** — 최적화로 발표했던 부분이 실제로는 필요 없는 쓰기였습니다.
-- **v2**: Lua로 대기열에서 꺼내기와 스트림에 넣기를 한 번에 처리하고 Redis Stream 구독 그룹으로 읽어 커밋 뒤에 확인합니다. Redis 데이터가 사라지면 10초 안에 감지해 DB 기준으로 다시 만듭니다. 체결 이벤트는 아웃박스로 발행합니다.
+- **찾은 한계**: 체결 대기열(Redis List)을 100ms마다 1건만 꺼냈고 5분 지난 메시지는 버려서 그 주문이 PENDING으로 영영 남았습니다. 100ms마다 Redis에 일괄 저장하던 시세는 읽는 곳이 없는 쓰기였습니다.
+- **해법**: Lua로 대기열에서 꺼내기와 스트림에 넣기를 한 번에 처리하고 Redis Stream 구독 그룹으로 읽어 커밋 뒤에 확인합니다. Redis 데이터가 사라지면 10초 안에 감지해 DB 기준으로 다시 만듭니다. 체결 이벤트는 아웃박스로 발행합니다.
 - **검증**: 통합 테스트, 운영 서버에서 1,000건 동시 체결(누락·중복 0, Redis 유실 → 재구성 → 체결 약 23초)
 - **근거**: 커밋 [0a43fdc](https://github.com/lepe99/bitground/commit/0a43fdc) · [add7827](https://github.com/lepe99/bitground/commit/add7827), 테스트 [ReservedOrderFlowTest](backend/src/test/java/bit/bitgroundspring/order/ReservedOrderFlowTest.java) · [EventPipelineTest](backend/src/test/java/bit/bitgroundspring/order/EventPipelineTest.java), 그림 [위의 체결 흐름](#예약지정가-주문-체결)
 
 ### 2. 정시 스케줄러 (Go)
-- **v1**: 정시 작업을 Spring 서버에서 NCP Cloud Functions(Go)로 옮기고 정산 단계들을 고루틴으로 동시에 실행했습니다. 실행 시간은 자정 43초(Gemini 포함), 새벽 3시 3초 이내(콜드 스타트 포함)였습니다.
-- **찾은 한계**: 정산 5단계가 각자 트랜잭션이라 하나가 실패하면 반쯤 정산된 채 남았고 재시도하면 현금이 중복 지급될 수 있었습니다. 임시 테이블을 DROP/CREATE해서 실행이 겹치면 서로 지웠습니다.
-- **v2**: 단일 트랜잭션 순차 실행 + `scheduler_runs`로 같은 기간은 한 번만, 순위 계산은 윈도 함수 한 번으로 바꿨습니다. 동시성으로 얻은 속도보다 정합성을 택했습니다. Lambda를 수집/쓰기로 나눠 NAT 비용 없이 DB를 비공개로 두었습니다.
-- **근거**: 커밋 [4f05885](https://github.com/lepe99/bitground/commit/4f05885) · [0749c83](https://github.com/lepe99/bitground/commit/0749c83) · [38aea34](https://github.com/lepe99/bitground/commit/38aea34), 통합 테스트 [main_test.go](scheduler/main_test.go)(커밋 [328f423](https://github.com/lepe99/bitground/commit/328f423)) · [season_test.go](scheduler/service/season_test.go), 그림 [시즌 정산 v1 대 v2](docs/DIAGRAMS.md#시즌-정산-v1-대-v2) · [Lambda 분리](docs/DIAGRAMS.md#스케줄러-lambda-분리)
+- **찾은 한계**: 정산 5단계를 고루틴으로 동시에 돌렸는데 단계마다 트랜잭션이 따로라 하나가 실패하면 반쯤 정산된 채 남았고 재시도하면 현금이 중복 지급될 수 있었습니다. 임시 테이블을 DROP/CREATE해서 실행이 겹치면 서로 지웠습니다.
+- **해법**: 단일 트랜잭션 순차 실행 + `scheduler_runs`로 같은 기간은 한 번만, 순위 계산은 윈도 함수 한 번으로 바꿨습니다. 동시성으로 얻은 속도보다 정합성을 택했습니다. Lambda를 수집/쓰기로 나눠 NAT 비용 없이 DB를 비공개로 두었습니다.
+- **근거**: 커밋 [4f05885](https://github.com/lepe99/bitground/commit/4f05885) · [0749c83](https://github.com/lepe99/bitground/commit/0749c83) · [38aea34](https://github.com/lepe99/bitground/commit/38aea34), 통합 테스트 [main_test.go](scheduler/main_test.go)(커밋 [328f423](https://github.com/lepe99/bitground/commit/328f423)) · [season_test.go](scheduler/service/season_test.go), 그림 [시즌 정산 이전·이후](docs/DIAGRAMS.md#시즌-정산-v1-대-v2) · [Lambda 분리](docs/DIAGRAMS.md#스케줄러-lambda-분리)
 
 ### 3. 알림 (SSE)
-- **v1**: SSE + 자동 재연결 + DB 저장. 공지·시즌 알림은 1번 사용자를 전체 알림용 더미 계정으로 두고 그 계정에 모아 모두가 함께 읽게 했습니다.
-- **찾은 한계**: 더미라는 전제가 코드나 스키마에 없고 데이터로만 존재해, 1번이 실제 가입자인 v2 운영 DB에서는 **그 사람의 체결 알림이 모든 사용자에게 보였습니다.** 읽음 여부도 1번 행 하나를 같이 써서 읽지 않은 개수에 잡히지 않았고, 비로그인 상태에서도 재연결을 몇 초에 100번 넘게 반복했습니다.
-- **v2**: 사용자별 저장과 지난 알림 백필, 로그인했을 때만 연결하고 지수 백오프로 재연결합니다. 알림은 먼저 저장하고 커밋 뒤에 보내며 여러 서버 중 사용자가 붙어 있는 서버가 보냅니다. 배포로 SSE가 끊겨도 알림은 알림함에 남습니다.
-- **근거**: 커밋 [293127d](https://github.com/lepe99/bitground/commit/293127d) · [8391394](https://github.com/lepe99/bitground/commit/8391394), 테스트 [UserSseEmittersTest](backend/src/test/java/bit/bitgroundspring/notification/UserSseEmittersTest.java) · [NotificationApiTest](backend/src/test/java/bit/bitgroundspring/api/NotificationApiTest.java), 그림 [알림 v1 대 v2](docs/DIAGRAMS.md#알림-v1-대-v2)
+- **찾은 한계**: 공지·시즌 알림을 1번 사용자(전체 알림용 더미 계정)에게 모아 모두가 함께 읽게 했는데, 더미라는 전제가 코드나 스키마에 없고 데이터로만 존재했습니다. 1번이 실제 가입자인 운영 DB에서는 **그 사람의 체결 알림이 모든 사용자에게 보였습니다.** 읽음 여부도 1번 행 하나를 같이 써서 읽지 않은 개수에 잡히지 않았고, 비로그인 상태에서도 재연결을 몇 초에 100번 넘게 반복했습니다.
+- **해법**: 사용자별 저장과 지난 알림 백필, 로그인했을 때만 연결하고 지수 백오프로 재연결합니다. 알림은 먼저 저장하고 커밋 뒤에 보내며 여러 서버 중 사용자가 붙어 있는 서버가 보냅니다. 배포로 SSE가 끊겨도 알림은 알림함에 남습니다.
+- **근거**: 커밋 [293127d](https://github.com/lepe99/bitground/commit/293127d) · [8391394](https://github.com/lepe99/bitground/commit/8391394), 테스트 [UserSseEmittersTest](backend/src/test/java/bit/bitgroundspring/notification/UserSseEmittersTest.java) · [NotificationApiTest](backend/src/test/java/bit/bitgroundspring/api/NotificationApiTest.java), 그림 [알림 이전·이후](docs/DIAGRAMS.md#알림-v1-대-v2)
 
 ### 4. 인증
-- **v1**: OIDC 소셜 로그인 + JWT 쿠키 + 리프레시 토큰 교체(RTR)
-- **찾은 한계**: 탈퇴해도 리프레시 토큰이 남아 계속 재발급됐고 관리자 권한을 회수해도 반영되지 않았습니다.
-- **v2**: 로그인 단위 토큰 패밀리, 이미 교체된 토큰을 다시 쓰면 패밀리 전체 폐기(재사용 탐지), 재발급 때 DB 상태·현재 권한을 확인합니다. Lua로 여러 키를 원자적으로 바꿉니다. 통합 테스트는 8개입니다.
+- **찾은 한계**: OIDC 소셜 로그인 + JWT 쿠키 + 리프레시 토큰 교체(RTR) 구조였지만, 탈퇴해도 리프레시 토큰이 남아 계속 재발급됐고 관리자 권한을 회수해도 반영되지 않았습니다.
+- **해법**: 로그인 단위 토큰 패밀리, 이미 교체된 토큰을 다시 쓰면 패밀리 전체 폐기(재사용 탐지), 재발급 때 DB 상태·현재 권한을 확인합니다. Lua로 여러 키를 원자적으로 바꿉니다. 통합 테스트는 8개입니다.
 - **근거**: 커밋 [b577de4](https://github.com/lepe99/bitground/commit/b577de4), 테스트 [AuthTokenTest](backend/src/test/java/bit/bitgroundspring/auth/AuthTokenTest.java)
 
 ![리프레시 토큰 재사용 탐지](docs/img/token-family.png)
 
 ### 그 밖에
-- **모니터링**: v1에서는 Pinpoint로 팀원 코드의 랭킹 툴팁 API를 찾아 **900ms대 → 11ms**로 줄였습니다(지연 로딩 + 쿼리 수정). v2 서버(2GiB)에는 Pinpoint가 맞지 않아 빼고, traceId 구조화 로그(Java·Go)와 Lambda 로그까지 Loki로 모으고 Discord로 경보를 받습니다.
+- **모니터링**: 2GiB 서버에 맞지 않는 Pinpoint를 빼고, traceId 구조화 로그(Java·Go)와 Lambda 로그까지 Loki로 모아 Discord로 경보를 받습니다.
 - **보안**: 요청 본문의 userId를 믿던 커뮤니티 API(작성자 위조·남의 글 삭제), 저장형 XSS, 누구나 전체 알림을 보낼 수 있던 API를 막고 요청 횟수 제한을 넣었습니다.
 - **데이터**: 가격·수량을 float → DECIMAL로, 현금을 INT(약 21억에서 넘침) → BIGINT로 바꾸고 스키마는 Flyway 마이그레이션으로 관리합니다. 테이블 구조는 [ERD](docs/DIAGRAMS.md#전체-erd)로 정리했습니다.
 
@@ -113,16 +103,12 @@ v1에서 제가 구현했던 기능을 다시 점검해 찾은 한계와 v2의 �
 
 ![월 운영비 분해](docs/img/cost.png)
 
-![인프라 v1 대 v2](docs/img/infra-v1-v2.png)
-
 ## 역할
 
-**v1 (팀 6명)** — 로그인(OIDC·JWT·RTR), SSE 알림, 예약(지정가) 주문 접수·체결 로직, 정시 스케줄러와 서버리스 이관(Go), 모니터링(Prometheus·Loki·Grafana·Pinpoint), REST API 규약, React 라우팅·전역 상태. 클라우드 인프라는 팀원 한 명과 공동으로 설계·구축했습니다. 시장가 매매와 거래소 화면, 투자내역·랭킹·커뮤니티·AI 기능 등은 다른 팀원이 맡았습니다.
-
-**v2 (개인)** — 모노레포 통합, 전 영역 점검·수정, AWS 설계·구축·운영, CI/CD, 부하 테스트.
+혼자 진행했습니다. 모노레포 통합, 전 영역 점검·수정, AWS 설계·구축·운영, CI/CD, 부하 테스트를 맡았습니다. 팀 프로젝트(v1)에서 맡은 부분은 위의 v1 저장소 README에 적었습니다.
 
 ### AI 활용 방식
-v2는 Claude Code와 함께 작업했습니다. AI가 코드 전체를 넓게 점검하고, 사람이 정해야 할 항목(기능 범위, 비용과 구조의 맞교환 등)은 따로 뽑아 선택지를 비교한 뒤 직접 결정했습니다. 고친 뒤에는 수정 전 코드에서 테스트가 실패하는지, 일부러 값을 바꾸면 실패하는지 확인해 테스트가 실제로 결함을 잡는지 검증했습니다. 서비스 안의 AI 기능(Gemini)은 고정 평가셋과 프롬프트 버전 관리로 품질을 비교합니다([AI 평가셋](docs/AI_EVAL.md)).
+Claude Code와 함께 작업했습니다. AI가 코드 전체를 넓게 점검하고, 사람이 정해야 할 항목(기능 범위, 비용과 구조의 맞교환 등)은 따로 뽑아 선택지를 비교한 뒤 직접 결정했습니다. 고친 뒤에는 수정 전 코드에서 테스트가 실패하는지, 일부러 값을 바꾸면 실패하는지 확인해 테스트가 실제로 결함을 잡는지 검증했습니다. 서비스 안의 AI 기능(Gemini)은 고정 평가셋과 프롬프트 버전 관리로 품질을 비교합니다([AI 평가셋](docs/AI_EVAL.md)).
 
 ## 기술 스택
 
@@ -147,7 +133,7 @@ v2는 Claude Code와 함께 작업했습니다. AI가 코드 전체를 넓게 �
 | `monitoring/` | Prometheus·Loki·Grafana 설정 |
 | [`loadtest/`](loadtest/README.md) | k6 부하 테스트 스크립트 |
 | [`docs/LOAD_TEST.md`](docs/LOAD_TEST.md) | 부하 테스트 보고서 |
-| [`docs/DIAGRAMS.md`](docs/DIAGRAMS.md) | 다이어그램 15장 (구성·흐름·v1 대 v2·ERD) |
+| [`docs/DIAGRAMS.md`](docs/DIAGRAMS.md) | 다이어그램 15장 (구성·흐름·이전 구조와 비교·ERD) |
 | [`docs/API.md`](docs/API.md) | API 응답 규약 (RFC 9457 Problem Details) |
 | [`CHANGELOG.md`](CHANGELOG.md) | 릴리즈 기록 |
 
