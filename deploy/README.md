@@ -2,15 +2,9 @@
 
 로컬 개발 환경은 저장소 루트의 `docker-compose.yml`, 운영은 이 폴더를 씁니다.
 
-```
-인터넷 ──443──▶ 앱 서버 (t4g.small, 퍼블릭 서브넷)          모니터링 서버 (t4g.micro, 프라이빗 서브넷)
-               nginx ─▶ backend ─▶ mysql, redis             loki ◀── 앱 서버 alloy (로그)
-               alloy ──────────────────────────────────────▶ prometheus ◀── 앱 서버 alloy (지표)
-               tinyproxy ◀── 모니터링 서버의 외부 통신        alloy:3500 ◀── lambda-promtail (Lambda 로그)
-                                                            grafana ◀── SSM 포트 포워딩
-EventBridge ─▶ Lambda A (수집, VPC 밖) ─▶ Lambda B (쓰기, VPC 안) ─▶ mysql:3306, nginx:8090 → backend
-CloudFront ─▶ S3 (프론트)
-```
+![운영 구성](../docs/img/architecture.png)
+
+관측 경로는 [관측성 그림](../docs/DIAGRAMS.md#관측성-경로), 배포 단계는 [CI/CD 그림](../docs/DIAGRAMS.md#cicd-파이프라인)에 있습니다.
 
 | 경로 | 내용 |
 |---|---|
