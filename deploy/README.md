@@ -7,7 +7,7 @@
                nginx ─▶ backend ─▶ mysql, redis             loki ◀── 앱 서버 alloy (로그)
                alloy ──────────────────────────────────────▶ prometheus ◀── 앱 서버 alloy (지표)
                tinyproxy ◀── 모니터링 서버의 외부 통신        alloy:3500 ◀── lambda-promtail (Lambda 로그)
-                                                            grafana ◀── SSM 포트 포워딩
+                                                            grafana ◀── 앱 서버 nginx (기본 인증)
 EventBridge ─▶ Lambda A (수집, VPC 밖) ─▶ Lambda B (쓰기, VPC 안) ─▶ mysql:3306, nginx:8090 → backend
 CloudFront ─▶ S3 (프론트)
 ```
