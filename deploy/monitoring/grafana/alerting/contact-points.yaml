@@ -1,0 +1,14 @@
+# 경보를 받는 디스코드 연락처. 웹후크 주소는 커밋하지 않고 환경 변수로 받는다
+# (SSM /bitground/prod/monitoring/DISCORD_WEBHOOK_URL → .env → compose의 grafana 환경 변수)
+apiVersion: 1
+contactPoints:
+    - orgId: 1
+      name: discord
+      receivers:
+        - uid: dg4g37estfdogf
+          type: discord
+          settings:
+            url: $DISCORD_WEBHOOK_URL
+            use_discord_username: false
+            use_embed_description: false
+          disableResolveMessage: false
