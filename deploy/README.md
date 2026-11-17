@@ -21,6 +21,7 @@ CloudFront ─▶ S3 (프론트)
 | `app/rollout.sh` | 백엔드 무중단 교체 (새 컨테이너 healthy → 이전 컨테이너 정상 종료, 실패 시 이전 유지). `deploy.sh`가 부릅니다 |
 | `app/backup.sh` | MySQL → S3 백업 (호스트 cron) |
 | `monitoring/compose.yml` | 모니터링 서버: loki, prometheus, grafana, alloy(Lambda 로그 수신) |
+| `monitoring/deploy.sh` | 모니터링 서버 배포 (SSM에서 `.env` 재생성, 설정이 바뀐 서비스만 재시작, grafana·loki·prometheus 응답 확인). `monitoring/`이나 `deploy/monitoring/`이 바뀌면 배포 워크플로가 부릅니다 |
 | `monitoring/grafana/alerting/` | 운영 전용 Grafana 경보: 규칙 7개(스케줄러 실패·미실행, 백엔드 5xx, 메모리, 스왑, 디스크, Redis 메모리)와 디스코드 연락처. 웹후크 주소는 `.env`의 `DISCORD_WEBHOOK_URL`로 받습니다 |
 
 서버에는 `deploy/`와 `monitoring/`을 같은 구조로 올립니다 (모니터링 compose가 `../../monitoring/`의 설정을 같이 씁니다).
@@ -31,4 +32,4 @@ CloudFront ─▶ S3 (프론트)
 - EC2 IMDSv2 홉 제한 2 (컨테이너의 백엔드가 IAM 역할로 S3에 접근)
 - 모니터링 서버의 Docker·SSM 에이전트가 앱 서버 tinyproxy(`http://<앱 서버 프라이빗 IP>:8888`)를 프록시로 쓰도록 설정
 - Grafana 기본 인증 해시는 bcrypt 비용 5로 만듭니다(`htpasswd -nbB -C 5`, `app/.env.example` 참고). Nginx가 요청마다 해시를 검증하므로 비용을 높이면 Grafana와 API가 함께 느려집니다. 비용 14에서는 Grafana 화면 하나를 여는 데 30초 넘게 걸렸습니다.
-- 모니터링 서버는 배포 워크플로가 다루지 않습니다. 경보 규칙이나 compose를 바꾸면 서버에서 `git pull` 뒤 `docker compose up -d --force-recreate grafana`로 다시 띄웁니다. 파일로 불러온 경보 규칙은 Grafana 화면에서 고칠 수 없습니다.
+- 파일로 불러온 경보 규칙은 Grafana 화면에서 고칠 수 없습니다. `monitoring/grafana/alerting/`을 고쳐 커밋하면 배포 워크플로가 반영합니다.
