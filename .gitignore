@@ -30,4 +30,5 @@ scheduler/eval-reports/
 
 # 운영 서버에서 배포 스크립트가 남기는 파일
 deploy/app/.deployed-sha
+deploy/monitoring/.deployed-sha
 *.bak-*
