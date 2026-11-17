@@ -29,3 +29,4 @@ CloudFront ─▶ S3 (프론트)
 - 스왑 2GiB, `vm.swappiness=10`
 - EC2 IMDSv2 홉 제한 2 (컨테이너의 백엔드가 IAM 역할로 S3에 접근)
 - 모니터링 서버의 Docker·SSM 에이전트가 앱 서버 tinyproxy(`http://<앱 서버 프라이빗 IP>:8888`)를 프록시로 쓰도록 설정
+- Grafana 기본 인증 해시는 bcrypt 비용 5로 만듭니다(`htpasswd -nbB -C 5`, `app/.env.example` 참고). Nginx가 요청마다 해시를 검증하므로 비용을 높이면 Grafana와 API가 함께 느려집니다. 비용 14에서는 Grafana 화면 하나를 여는 데 30초 넘게 걸렸습니다.
