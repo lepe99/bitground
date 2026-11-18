@@ -6,7 +6,7 @@
 
 **https://www.bitground.kr** · 구글·네이버·카카오 계정으로 바로 로그인
 
-[핵심 수치](#핵심-수치) · [아키텍처](#아키텍처) · [다시 설계한 부분](#다시-설계한-부분) · [부하 테스트](#부하-테스트와-운영-개선) · [결정과 대가](#기술적-결정과-대가) · [역할](#역할) · [문서](#저장소-구성과-문서) · [다이어그램 15장](docs/DIAGRAMS.md)
+[핵심 수치](#핵심-수치) · [아키텍처](#아키텍처) · [다시 설계한 부분](#다시-설계한-부분) · [부하 테스트](#부하-테스트와-운영-개선) · [결정과 대가](#기술적-결정과-대가) · [역할](#역할) · [문서](#저장소-구성과-문서) · [다이어그램 16장](docs/DIAGRAMS.md)
 
 6인 팀 프로젝트로 만든 v1([spring](https://github.com/lepe99/spring-bitground) · [react](https://github.com/lepe99/react-bitground) · [go](https://github.com/lepe99/go-bitground))을 2026년 11월부터 혼자 다시 설계하고 AWS에서 운영하는 저장소입니다.
 
@@ -18,9 +18,10 @@
 | 부하 중 배포 | 백엔드 재시작 시 **2분 7초 전부 502** → 무중단 교체 후 **5xx 0건** |
 | 지정가 1,000건 동시 체결 | 누락·중복 **0**, 데드락 **0**, 알림 1,000건 모두 저장 |
 | 운영비 | 월 약 **$32** (NAT 게이트웨이·로드밸런서 없이) |
+| 개선 전/후 (로컬 측정) | 지정가 체결 1,000건 **약 131초 → 4.5초**, 랭킹 계산 **약 11배**, 시즌 정산 **약 3배** (개선 전 커밋과 같은 환경에서 비교) |
 | 테스트 | 백엔드 JUnit 207개(Testcontainers MySQL·Redis), 스케줄러 Go 52개 |
 
-상세: [부하 테스트 보고서](docs/LOAD_TEST.md)
+상세: [부하 테스트 보고서](docs/LOAD_TEST.md) · [개선 전/후 측정](docs/BENCHMARKS.md)
 
 ## 아키텍처
 
@@ -133,7 +134,8 @@ Claude Code와 함께 작업했습니다. AI가 코드 전체를 넓게 점검�
 | `monitoring/` | Prometheus·Loki·Grafana 설정 |
 | [`loadtest/`](loadtest/README.md) | k6 부하 테스트 스크립트 |
 | [`docs/LOAD_TEST.md`](docs/LOAD_TEST.md) | 부하 테스트 보고서 |
-| [`docs/DIAGRAMS.md`](docs/DIAGRAMS.md) | 다이어그램 15장 (구성·흐름·이전 구조와 비교·ERD) |
+| [`docs/DIAGRAMS.md`](docs/DIAGRAMS.md) | 다이어그램 16장 (구성·흐름·이전 구조와 비교·ERD) |
+| [`docs/BENCHMARKS.md`](docs/BENCHMARKS.md) | 개선 전/후 측정 (커밋별 로컬 비교, 측정 방법과 한계) |
 | [`docs/API.md`](docs/API.md) | API 응답 규약 (RFC 9457 Problem Details) |
 | [`CHANGELOG.md`](CHANGELOG.md) | 릴리즈 기록 |
 
