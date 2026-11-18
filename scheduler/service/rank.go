@@ -15,6 +15,10 @@ import (
 // 가입만 하고 거래하지 않은 사용자는 랭킹·티어 산정에서 빠진다(시즌 정산 때 티어 0).
 // 가격 정보가 없는 코인(상장 폐지 등)은 0원으로 계산한다.
 //
+// NO_MERGE(p): 가격 표(코인 수만큼의 행)를 한 번만 만들어 두고 조인하게 한다.
+// 힌트가 없으면 MySQL이 JSON_TABLE을 보유 자산 행마다 다시 펼쳐, 사용자 5만 명(보유 자산 25만 행)에서
+// 집계에 8.1초가 걸렸다(힌트 후 0.27초). TestRankingPricesMaterializedOnce가 실행 계획으로 확인한다.
+//
 // 파라미터: 코인 가격 JSON(pricesJSON), 시즌 ID
 const userTotalsCTE = `
 	WITH prices AS (
@@ -24,7 +28,7 @@ const userTotalsCTE = `
 		SELECT DISTINCT user_id FROM orders WHERE season_id = ? AND status = 'COMPLETED'
 	),
 	totals AS (
-		SELECT u.id AS user_id,
+		SELECT /*+ NO_MERGE(p) */ u.id AS user_id,
 		       u.cash,
 		       FLOOR(u.cash + COALESCE(SUM(ua.amount * p.price), 0)) AS total_value
 		FROM participants pt
